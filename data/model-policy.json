@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "updated": "2026-07-09",
+  "doc": "data/references/model-policy.md",
+  "notes": "Single source of truth for per-agent model+effort. Edit a class resolution here, run data/scripts/model-policy-apply.py, commit. NEVER hand-edit model:/effort:/model-class: frontmatter in data/agents/*.md \u2014 the apply script owns those keys. Resolutions use runtime ALIASES (fable/opus/sonnet/haiku), never pinned IDs, so provider-side alias updates flow automatically; fallbacks document the intended repoint order if the primary alias becomes unavailable (e.g. plan changes).",
+  "providers_note": "Per-provider resolution maps (S3.8a) live in each class's `providers` block; docs in data/references/model-policy.md, gated by data/scripts/model-policy-providers-check.py (providers.claude MUST equal the class model+effort). Per-provider CODEX EFFORT was set in the M3-packs adapter pass (max\u2192xhigh, high\u2192high, medium\u2192medium, fast-mechanical\u2192omit) \u2014 the values the hand-made 70 .codex/agents/*.toml already used, so the generated pack preserves live behavior. NOTE: the Codex .toml carries only `model_reasoning_effort`, NEVER a `model` field (Codex picks the model globally via config/profile), so codex.model (gpt-5.4/5.5/5.6) is informational and is NOT stamped into any pack artifact \u2014 gpt-5.6's UNVERIFIED status (a `gpt-5.6-sol` variant may be the live pin) therefore does not affect a stamped file. The ONLY model string a pack stamps is the OpenCode `model:` in .opencode/agents/*.md \u2014 all three VERIFIED live against `aws bedrock list-inference-profiles` (dev account, 2026-07-11): opus-4-8 (`us.anthropic.claude-opus-4-8`) and sonnet-5 (`us.anthropic.claude-sonnet-5`) exist date-less as the config uses them, but the shape-conformed date-less `us.anthropic.claude-haiku-4-5` does NOT exist \u2014 the only Haiku 4.5 inference profile is the dated `us.anthropic.claude-haiku-4-5-20251001-v1:0`, so fast-mechanical's opencode.model was corrected to that (the newest models 4-6/4-7/4-8/5 got clean aliases; haiku-4-5 did not).",
+  "classes": {
+    "deep-reasoning-max": {
+      "model": "fable",
+      "effort": "max",
+      "intent": "Frontier model at maximum effort. Adversaries, challengers, GATING reviewers, safety-critics \u2014 the agents that gate what ships or what mutates. An error here lets bad work through; effort spent here steers and redirects everything upstream of it. (milestone-frontend-ux is a deliberate balanced-high exception: advisory reviewer, medium stakes \u2014 do not 'fix' it upward.)",
+      "fallbacks": [
+        {
+          "model": "opus",
+          "effort": "max"
+        },
+        {
+          "model": "sonnet",
+          "effort": "max"
+        }
+      ],
+      "providers": {
+        "claude": {
+          "model": "fable",
+          "effort": "max"
+        },
+        "codex": {
+          "model": "gpt-5.6",
+          "effort": "xhigh"
+        },
+        "opencode": {
+          "model": "amazon-bedrock/us.anthropic.claude-opus-4-8"
+        }
+      }
+    },
+    "deep-reasoning-high": {
+      "model": "fable",
+      "effort": "high",
+      "intent": "Frontier model at high effort. Implementers, rectifiers, remediators, planners \u2014 agents whose output IS the deliverable (code, commits, cluster mutations, roadmap structure).",
+      "fallbacks": [
+        {
+          "model": "opus",
+          "effort": "high"
+        },
+        {
+          "model": "sonnet",
+          "effort": "high"
+        }
+      ],
+      "providers": {
+        "claude": {
+          "model": "fable",
+          "effort": "high"
+        },
+        "codex": {
+          "model": "gpt-5.6",
+          "effort": "high"
+        },
+        "opencode": {
+          "model": "amazon-bedrock/us.anthropic.claude-opus-4-8"
+        }
+      }
+    },
+    "balanced-high": {
+      "model": "sonnet",
+      "effort": "high",
+      "intent": "Mid-tier model at high effort. Scouts, researchers, diagnosticians, cartographers \u2014 breadth + judgment work that runs in parallel multiples and dominates pipeline token spend. Sonnet-class is the cost/accuracy sweet spot here.",
+      "fallbacks": [
+        {
+          "model": "opus",
+          "effort": "medium"
+        },
+        {
+          "model": "haiku",
+          "effort": null
+        }
+      ],
+      "providers": {
+        "claude": {
+          "model": "sonnet",
+          "effort": "high"
+        },
+        "codex": {
+          "model": "gpt-5.5",
+          "effort": "high"
+        },
+        "opencode": {
+          "model": "amazon-bedrock/us.anthropic.claude-sonnet-5"
+        }
+      }
+    },
+    "balanced-standard": {
+      "model": "sonnet",
+      "effort": "medium",
+      "intent": "Mid-tier model at standard effort. Template-following writers/materializers where structure is fixed and judgment is bounded.",
+      "fallbacks": [
+        {
+          "model": "haiku",
+          "effort": null
+        }
+      ],
+      "providers": {
+        "claude": {
+          "model": "sonnet",
+          "effort": "medium"
+        },
+        "codex": {
+          "model": "gpt-5.5",
+          "effort": "medium"
+        },
+        "opencode": {
+          "model": "amazon-bedrock/us.anthropic.claude-sonnet-5"
+        }
+      }
+    },
+    "fast-mechanical": {
+      "model": "haiku",
+      "effort": null,
+      "intent": "Small fast model. Deterministic-script relays, collectors, template transcription \u2014 the scripts do the logic, the agent transcribes. Haiku does not support effort levels; none is stamped.",
+      "fallbacks": [
+        {
+          "model": "sonnet",
+          "effort": "medium"
+        }
+      ],
+      "providers": {
+        "claude": {
+          "model": "haiku"
+        },
+        "codex": {
+          "model": "gpt-5.4"
+        },
+        "opencode": {
+          "model": "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0"
+        }
+      }
+    },
+    "specialist-default": {
+      "model": "sonnet",
+      "effort": "high",
+      "intent": "Standalone ad-hoc specialists dispatched outside pipelines (ops, debug, domain experts). Kept on Sonnet at high effort to preserve cheap casual delegation; promote individually if an incident domain proves to need frontier reasoning.",
+      "fallbacks": [
+        {
+          "model": "opus",
+          "effort": "medium"
+        },
+        {
+          "model": "haiku",
+          "effort": null
+        }
+      ],
+      "providers": {
+        "claude": {
+          "model": "sonnet",
+          "effort": "high"
+        },
+        "codex": {
+          "model": "gpt-5.5",
+          "effort": "high"
+        },
+        "opencode": {
+          "model": "amazon-bedrock/us.anthropic.claude-sonnet-5"
+        }
+      }
+    }
+  },
+  "assignments": {
+    "context-curator": "specialist-default",
+    "milestone-adversary": "deep-reasoning-max",
+    "milestone-closure-verifier": "deep-reasoning-max",
+    "milestone-delivery-integrity-adversary": "deep-reasoning-max",
+    "milestone-frontend-ux": "balanced-high",
+    "milestone-implementer": "deep-reasoning-high",
+    "milestone-infra-safety": "deep-reasoning-max",
+    "milestone-operations-adversary": "deep-reasoning-max",
+    "milestone-rectifier": "deep-reasoning-high",
+    "milestone-researcher": "balanced-high",
+    "roadmap-decomposer": "deep-reasoning-high",
+    "roadmap-materializer": "balanced-standard",
+    "roadmap-refiner": "deep-reasoning-high",
+    "roadmap-sequencer": "deep-reasoning-high",
+    "skill-to-command-author": "deep-reasoning-high",
+    "skill-to-command-reviewer": "deep-reasoning-max",
+    "spike-designer": "deep-reasoning-high",
+    "spike-executor": "balanced-high",
+    "spike-reviewer": "deep-reasoning-max",
+    "spike-writer": "fast-mechanical"
+  },
+  "reserved": {
+    "milestone-research-challenger": {
+      "class": "deep-reasoning-max",
+      "status": "data-gated",
+      "gate": "Propose only with outcomes.jsonl evidence (research-brief invalidation rates / rework traced to bad briefs) \u2014 same verdict as the deferred roadmap-challenger. Placeholder approved by Chris Dare 2026-07-09 (milestone-pipeline-uplift Q3).",
+      "note": "Reserved model class for a Phase-1 research-brief challenger. NOT an assignment: no agent file exists and model-policy-apply.py --check would exit 4 on an orphaned assignment. When the gate is met: create data/agents/milestone-research-challenger.md with model-class deep-reasoning-max, move this name into assignments, delete this entry."
+    }
+  },
+  "lint": {
+    "command_glob": "data/commands/*.md",
+    "forbidden_patterns": [
+      "\\bto (opus|sonnet|haiku)\\b",
+      "\\((opus)\\)",
+      "model\\s*=\\s*(opus|sonnet|haiku)",
+      "--executor (opus|sonnet|haiku)\\b",
+      "model:\\s*(opus|sonnet|haiku)\\b"
+    ],
+    "suppress_marker": "model-policy:ok",
+    "reference_glob": "data/references/*.md",
+    "workflow_glob": "data/scripts/*-workflow.mjs",
+    "workflow_forbidden_patterns": [
+      "[`'\"](opus|sonnet|haiku|fable)[-`'\"]"
+    ],
+    "exempt_files": [
+      "model-policy.md"
+    ]
+  }
+}

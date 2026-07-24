@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Daily artifact-memory backup (F-04). Ratified 2026-07-18.
+
+  One agent covers the whole cadence:
+    * refresh the Qdrant snapshot only when the newest is older than 7 days
+      (it is the largest and most rebuildable component, so daily is waste)
+    * build the age-encrypted bundle of the irreplaceable set every night
+    * rotate to the newest 7 bundles and 7 snapshots
+
+  Steady state is bounded at roughly 10 GB. Restore-drill evidence is never
+  rotated away.
+
+  Uses the venv interpreter: this job imports qdrant_client, which the system
+  python3 does not have.
+
+  RunAtLoad is false on purpose: bootstrapping should not fire an immediate
+  multi-hundred-MB write. launchd runs a missed StartCalendarInterval on the
+  next wake, so a sleeping Mac still gets its nightly bundle.
+
+  (Note: XML comments may not contain a double hyphen, so this block uses none.)
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.personal.artifact-backup-daily</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$HOME/.local/share/personal-artifacts/venv/bin/python</string>
+    <string>$HOME/Work/workspace/scripts/artifact_backup_offdevice.py</string>
+    <string>--apply</string>
+    <string>--recipients-file</string>
+    <string>$HOME/.config/age/personal-artifact-recipients.txt</string>
+    <string>--ensure-snapshot-days</string>
+    <string>7</string>
+    <string>--prune-keep</string>
+    <string>7</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>$HOME/Work/workspace/scripts</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>$HOME</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>2</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+  <key>Umask</key>
+  <integer>63</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>$HOME/Library/Logs/workspace-artifact-backup-daily.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>$HOME/Library/Logs/workspace-artifact-backup-daily.error.log</string>
+</dict>
+</plist>

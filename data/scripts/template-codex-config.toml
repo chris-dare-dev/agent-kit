@@ -1,0 +1,31 @@
+# template-codex-config.toml — Codex launch-config template (S1.1).
+# Planted by data/scripts/bootstrap.sh Step 7/10 as $WS/.codex/config.toml
+# (create-if-absent, NEVER overwrites; ${PERSONAL_WORKSPACE_ROOT} substituted at
+# install time).
+#
+# INDIRECT-BY-DEFAULT: no credential literal ever belongs in this file. Secrets
+# live ONLY in ~/.config/workspace/secrets.env (chmod 600) and are sourced by the
+# `bash -c 'set -a; . …; set +a; exec <server>'` wrapper at server launch —
+# define CONFLUENCE_USERNAME and CONFLUENCE_API_TOKEN there (see README.md
+# "Secret home"). The PreToolUse guard (block-plaintext-secret-write.sh) and
+# CI Gate 1n (secret-scan.py) enforce this file stays clean.
+
+[shell_environment_policy]
+inherit = "core"
+
+[mcp_servers.atlassian]
+command = "bash"
+args = ["-c", "set -a; . \"$HOME/.config/workspace/secrets.env\"; set +a; exec uvx mcp-atlassian"]
+
+[mcp_servers.atlassian.env]
+CONFLUENCE_URL = "https://example.atlassian.net/wiki"
+
+[mcp_servers.workspace-platform]
+command = "node"
+args = ["${PERSONAL_WORKSPACE_ROOT}/GitLab/workspace/platform/tools/claude-mcp-server/dist/index.js"]
+
+[mcp_servers.workspace-platform.env]
+PLATFORM_ROOT = "${PERSONAL_WORKSPACE_ROOT}/GitLab/workspace/platform"
+WORKSPACE_ROOT = "${PERSONAL_WORKSPACE_ROOT}"
+AWS_PROFILE = "YOUR_AWS_PROFILE"
+AWS_REGION = "us-east-1"

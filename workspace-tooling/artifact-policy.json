@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "description": "Discovery and presentation policy for the personal vault (Documents/Personal Projects). Catalog scope mirrors the Vault-System.md stamping scope: human notes under Projects/, each Source Code repo's CLAUDE.md / README.md / docs/ / plans/, and root-level notes. Generated hubs, Bases, Canvases, Daily journal, provider surfaces, and dependency trees are excluded. The vault projection block is default-deny and unused here — the vault's own .obsidian glue (add_properties.py + project-linker.py) owns projection.",
+  "vault_projection": {
+    "default_action": "exclude",
+    "candidate_roots": [],
+    "prune_directory_names": [
+      ".git",
+      ".obsidian",
+      ".venv",
+      "__pycache__",
+      "node_modules",
+      "_worktrees"
+    ],
+    "exclude_rules": [
+      {
+        "id": "projection-owned-by-vault-glue",
+        "globs": [
+          "**/*"
+        ]
+      }
+    ],
+    "allow_rules": []
+  },
+  "catalog": {
+    "canonical_roots": [
+      "Projects",
+      "Source Code"
+    ],
+    "required_roots": [
+      "Projects",
+      "Source Code"
+    ],
+    "top_level_globs": [
+      "*.md"
+    ],
+    "_glob_note": "These globs are fnmatch patterns matched against the full relative path, and fnmatch '*' CROSSES directory separators. A bare '*.md' therefore matches every markdown file in the vault, not just root-level ones (it silently took scope from 3,685 to 5,241 artifacts on 2026-07-22). Anchor root-level entries with a literal prefix, e.g. 'HANDOFF-*.md'; root files are otherwise covered by top_level_globs.",
+    "include_path_globs": [
+      "HANDOFF-*.md",
+      "Projects/**",
+      "Source Code/*/CLAUDE.md",
+      "Source Code/*/AGENTS.md",
+      "Source Code/*/README.md",
+      "Source Code/*/docs/**",
+      "Source Code/*/plans/**",
+      "Source Code/**/*handoff*.md",
+      "Source Code/**/*HANDOFF*.md",
+      "Source Code/**/*roadmap*.md",
+      "Source Code/**/*milestone*.md",
+      "Source Code/**/*adversar*.md",
+      "github-governance/**",
+      "local-llm-pipelines/**"
+    ],
+    "exclude_roots": [
+      "Bases",
+      "Canvases",
+      "Daily",
+      "_archive",
+      ".obsidian",
+      ".claude",
+      ".codex",
+      ".agents",
+      ".opencode"
+    ],
+    "prune_directory_names": [
+      ".aggregate",
+      ".cache",
+      ".git",
+      ".next",
+      ".pytest_cache",
+      ".ruff_cache",
+      ".trash",
+      ".venv",
+      "__pycache__",
+      "agent-memory",
+      "build",
+      "coverage",
+      "dist",
+      "node_modules",
+      "site-packages",
+      "target",
+      "_toolchains",
+      "_worktrees",
+      "worktrees"
+    ],
+    "prune_path_globs": [
+      "Projects/*/_index.md",
+      "Source Code/agent-kit/node_modules/**",
+      "Source Code/_pipeline/**",
+      "**/.aggregate/**",
+      "**/*run.failed*/**",
+      "**/vendor/**"
+    ]
+  },
+  "quarantine": {
+    "candidate_path_globs": [
+      "Projects/**",
+      "Source Code/*/plans/**"
+    ],
+    "eligible_artifact_types": [
+      "decision",
+      "handoff",
+      "plan",
+      "research",
+      "roadmap"
+    ],
+    "terminal_states": [
+      "archived",
+      "cancelled",
+      "obsolete",
+      "superseded"
+    ],
+    "review_only_states": [
+      "closed"
+    ],
+    "minimum_age_days": 14
+  }
+}

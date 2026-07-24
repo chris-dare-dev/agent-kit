@@ -1,0 +1,62 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(kubectl get:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(kubectl logs:*)",
+      "Bash(AWS_PROFILE=YOUR_AWS_PROFILE kubectl:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-kubectl-mutations.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/block-kubectl-mutations.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/validate-commit-subject.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/validate-commit-subject.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-plaintext-secret-write.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/block-plaintext-secret-write.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-deploy-repo-edits.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/block-deploy-repo-edits.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-plaintext-secret-write.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/block-plaintext-secret-write.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/scripts/memory-sync-reminder.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/scripts/memory-sync-reminder.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/scripts/project-linker-hook.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+          }
+        ]
+      }
+    ]
+  }
+}

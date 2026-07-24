@@ -1,0 +1,462 @@
+#!/usr/bin/env python3
+"""Validated runtime configuration for the local Artifact Memory Service.
+
+The configuration is private derived state, not a source of authority.  Qdrant
+remains a loopback-only dependency with owner-only credential files.  The
+adapter-to-service boundary is instead a private Unix-domain socket: its
+parent must be 0700 and the bound socket must be an owner-owned 0600 socket.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
+
+import artifact_security as security
+
+
+SCHEMA_VERSION = 2
+DEFAULT_DERIVED_ROOT = Path("~/.local/share/personal-artifacts").expanduser()
+DEFAULT_CONFIG = DEFAULT_DERIVED_ROOT / "artifact-memory-runtime.json"
+COLLECTION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+GENERATION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+DIGEST = re.compile(r"^[0-9a-f]{64}$")
+ACTIVE_RETRIEVALS = ("legacy-vector-v1", "exact-hybrid-v2")
+ROLLBACK_MODES = ("read-only", "read-write")
+PRIVATE_SOCKET_MODE = 0o600
+
+
+class RuntimeConfigError(ValueError):
+    """Runtime configuration is absent, unsafe, or internally inconsistent."""
+
+
+def _loopback_url(value: Any, label: str) -> str:
+    if not isinstance(value, str):
+        raise RuntimeConfigError(f"{label} must be a string")
+    parsed = urlparse(value)
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname != "127.0.0.1"
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeConfigError(
+            f"{label} must be an uncredentialed http://127.0.0.1:<port> URL"
+        )
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise RuntimeConfigError(f"{label} has an invalid port") from exc
+    if port is None or not 1 <= port <= 65535:
+        raise RuntimeConfigError(f"{label} must include a valid port")
+    return f"http://127.0.0.1:{port}"
+
+
+def _private_path(value: Any, label: str, *, file: bool) -> Path:
+    if not isinstance(value, str) or not value:
+        raise RuntimeConfigError(f"{label} must be a non-empty absolute path")
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        raise RuntimeConfigError(f"{label} must be an absolute path")
+    try:
+        if file:
+            security.require_private_file(path)
+        else:
+            security.require_private_directory(path)
+    except security.PrivateStateError as exc:
+        raise RuntimeConfigError(str(exc)) from exc
+    return path.absolute()
+
+
+def _future_private_file(value: Any, label: str) -> Path:
+    if not isinstance(value, str) or not value:
+        raise RuntimeConfigError(f"{label} must be a non-empty absolute path")
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        raise RuntimeConfigError(f"{label} must be an absolute path")
+    security.require_private_directory(path.absolute().parent)
+    if path.exists():
+        security.require_private_file(path)
+    return path.absolute()
+
+
+def _optional_future_private_file(value: Any, label: str) -> Path | None:
+    """Accept an absent optional derived-state file.
+
+    A ``null`` (or omitted) value means the feature has no artifact for this
+    generation — the legacy vector generation has no lexical index.  Naming a
+    path for a file that will never exist reads to an operator as a MISSING
+    artifact rather than an ABSENT feature, so the provisioner now emits null
+    instead of deriving a name unconditionally.
+    """
+    if value is None:
+        return None
+    return _future_private_file(value, label)
+
+
+def require_private_socket(path: Path, label: str = "service socket") -> Path:
+    """Require one existing owner-private Unix-domain socket.
+
+    Socket paths are not regular private files, so the generic derived-state
+    helpers deliberately do not accept them.  Keep the same ownership,
+    symlink, and direct-parent guarantees here before a client connects or the
+    service removes a stale endpoint.
+    """
+    path = path.expanduser()
+    if not path.is_absolute():
+        raise RuntimeConfigError(f"{label} must be an absolute path")
+    path = path.absolute()
+    try:
+        security.require_private_directory(path.parent)
+    except security.PrivateStateError as exc:
+        raise RuntimeConfigError(str(exc)) from exc
+    try:
+        information = path.lstat()
+    except FileNotFoundError as exc:
+        raise RuntimeConfigError(f"{label} is missing: {path}") from exc
+    if stat.S_ISLNK(information.st_mode) or not stat.S_ISSOCK(information.st_mode):
+        raise RuntimeConfigError(f"{label} must be a real Unix-domain socket: {path}")
+    if information.st_uid != os.geteuid():
+        raise RuntimeConfigError(
+            f"{label} is not owned by uid {os.geteuid()}: {path}"
+        )
+    mode = stat.S_IMODE(information.st_mode)
+    if mode != PRIVATE_SOCKET_MODE:
+        raise RuntimeConfigError(
+            f"{label} mode must be 0600, found {mode:04o}: {path}"
+        )
+    return path
+
+
+def _future_private_socket(value: Any, label: str) -> Path:
+    """Validate a configured socket pathname before the service binds it."""
+    if not isinstance(value, str) or not value:
+        raise RuntimeConfigError(f"{label} must be a non-empty absolute path")
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        raise RuntimeConfigError(f"{label} must be an absolute path")
+    path = path.absolute()
+    try:
+        security.require_private_directory(path.parent)
+    except security.PrivateStateError as exc:
+        raise RuntimeConfigError(str(exc)) from exc
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return path
+    return require_private_socket(path, label)
+
+
+def read_secret(path: Path, label: str) -> str:
+    path = _private_path(str(path), label, file=True)
+    value = path.read_text(encoding="utf-8").strip()
+    if not 32 <= len(value) <= 512 or "\0" in value or "\n" in value:
+        raise RuntimeConfigError(f"{label} must contain one 32-512 character secret")
+    return value
+
+
+@dataclass(frozen=True)
+class RetrievalRuntime:
+    collection: str
+    generation: str
+    manifest: Path
+    manifest_sha256: str
+    span_manifest_digest: str
+    profile_digest: str
+    embedding_model: str
+    embedding_model_snapshot: Path
+    embedding_model_manifest_digest: str
+    reranker_model: str
+    reranker_model_snapshot: Path
+    reranker_model_manifest_digest: str
+    ranking_version: str
+    policy_file: Path
+    policy_digest: str
+    development_evidence: Path
+    development_evidence_digest: str
+    holdout_evidence: Path
+    holdout_evidence_digest: str
+
+
+@dataclass(frozen=True)
+class ArtifactRuntime:
+    config_path: Path
+    active_backend: str
+    active_retrieval: str
+    retrieval: RetrievalRuntime | None
+    workspace: Path
+    catalog: Path
+    outbox_root: Path
+    ingestion_state: Path
+    consumer_state: Path
+    receipt_root: Path
+    qdrant_url: str
+    qdrant_collection: str
+    qdrant_generation: str
+    qdrant_admin_key_file: Path
+    qdrant_read_key_file: Path
+    embedded_path: Path
+    service_socket_path: Path
+    lexical_index: Path | None
+    build_manifest: Path
+    rollback_until: str
+    rollback_mode: str
+
+    def qdrant_admin_key(self) -> str:
+        return read_secret(self.qdrant_admin_key_file, "Qdrant admin key")
+
+    def qdrant_read_key(self) -> str:
+        return read_secret(self.qdrant_read_key_file, "Qdrant read-only key")
+
+
+def load_runtime(path: Path = DEFAULT_CONFIG) -> ArtifactRuntime:
+    path = path.expanduser().absolute()
+    security.require_private_file(path)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeConfigError(f"invalid runtime configuration: {exc}") from exc
+    if not isinstance(payload, dict) or payload.get("schema_version") != SCHEMA_VERSION:
+        raise RuntimeConfigError(
+            f"runtime schema must be exactly {SCHEMA_VERSION}"
+        )
+    active = payload.get("active_backend")
+    if active not in ("embedded", "server"):
+        raise RuntimeConfigError("active_backend must be embedded or server")
+    active_retrieval = payload.get("active_retrieval", "legacy-vector-v1")
+    if active_retrieval not in ACTIVE_RETRIEVALS:
+        raise RuntimeConfigError(
+            "active_retrieval must be legacy-vector-v1 or exact-hybrid-v2"
+        )
+
+    qdrant = payload.get("qdrant")
+    service = payload.get("service")
+    paths = payload.get("paths")
+    rollback = payload.get("rollback")
+    if not all(isinstance(value, dict) for value in (qdrant, service, paths, rollback)):
+        raise RuntimeConfigError(
+            "runtime requires qdrant, service, paths, and rollback objects"
+        )
+    expected_service_fields = {"socket_path"}
+    if set(service) != expected_service_fields:
+        missing = sorted(expected_service_fields - set(service))
+        unknown = sorted(set(service) - expected_service_fields)
+        raise RuntimeConfigError(
+            f"service fields mismatch; missing={missing}, unknown={unknown}"
+        )
+    collection = qdrant.get("collection")
+    generation = qdrant.get("generation")
+    if not isinstance(collection, str) or not COLLECTION.fullmatch(collection):
+        raise RuntimeConfigError("Qdrant collection name is invalid")
+    if not isinstance(generation, str) or not GENERATION.fullmatch(generation):
+        raise RuntimeConfigError("Qdrant generation name is invalid")
+    rollback_until = rollback.get("retain_embedded_until")
+    if not isinstance(rollback_until, str) or len(rollback_until) > 64:
+        raise RuntimeConfigError("rollback retention timestamp is invalid")
+    rollback_mode = rollback.get("embedded_mode", "read-only")
+    if rollback_mode not in ROLLBACK_MODES:
+        raise RuntimeConfigError(
+            "rollback embedded_mode must be read-only or read-write"
+        )
+
+    retrieval_payload = payload.get("retrieval")
+    retrieval: RetrievalRuntime | None = None
+    if retrieval_payload is not None:
+        if not isinstance(retrieval_payload, dict):
+            raise RuntimeConfigError("retrieval must be an object")
+        required = {
+            "collection",
+            "generation",
+            "manifest",
+            "manifest_sha256",
+            "span_manifest_digest",
+            "profile_digest",
+            "embedding_model",
+            "embedding_model_snapshot",
+            "embedding_model_manifest_digest",
+            "reranker_model",
+            "reranker_model_snapshot",
+            "reranker_model_manifest_digest",
+            "ranking_version",
+            "policy_file",
+            "policy_digest",
+            "development_evidence",
+            "development_evidence_digest",
+            "holdout_evidence",
+            "holdout_evidence_digest",
+        }
+        if set(retrieval_payload) != required:
+            missing = sorted(required - set(retrieval_payload))
+            unknown = sorted(set(retrieval_payload) - required)
+            raise RuntimeConfigError(
+                f"retrieval fields mismatch; missing={missing}, unknown={unknown}"
+            )
+
+        def retrieval_string(name: str, maximum: int = 500) -> str:
+            value = retrieval_payload[name]
+            if (
+                not isinstance(value, str)
+                or not value
+                or len(value) > maximum
+                or "\0" in value
+            ):
+                raise RuntimeConfigError(f"retrieval.{name} is invalid")
+            return value
+
+        retrieval_collection = retrieval_string("collection", 128)
+        retrieval_generation = retrieval_string("generation", 128)
+        if not COLLECTION.fullmatch(retrieval_collection):
+            raise RuntimeConfigError("retrieval.collection is invalid")
+        if not GENERATION.fullmatch(retrieval_generation):
+            raise RuntimeConfigError("retrieval.generation is invalid")
+        digests: dict[str, str] = {}
+        for name in (
+            "manifest_sha256",
+            "span_manifest_digest",
+            "profile_digest",
+            "embedding_model_manifest_digest",
+            "reranker_model_manifest_digest",
+            "policy_digest",
+            "development_evidence_digest",
+            "holdout_evidence_digest",
+        ):
+            value = retrieval_string(name, 64)
+            if not DIGEST.fullmatch(value):
+                raise RuntimeConfigError(f"retrieval.{name} must be SHA-256")
+            digests[name] = value
+        retrieval = RetrievalRuntime(
+            collection=retrieval_collection,
+            generation=retrieval_generation,
+            manifest=_private_path(
+                retrieval_payload["manifest"],
+                "retrieval manifest",
+                file=True,
+            ),
+            manifest_sha256=digests["manifest_sha256"],
+            span_manifest_digest=digests["span_manifest_digest"],
+            profile_digest=digests["profile_digest"],
+            embedding_model=retrieval_string("embedding_model"),
+            embedding_model_snapshot=_private_path(
+                retrieval_payload["embedding_model_snapshot"],
+                "retrieval embedding snapshot",
+                file=False,
+            ),
+            embedding_model_manifest_digest=digests[
+                "embedding_model_manifest_digest"
+            ],
+            reranker_model=retrieval_string("reranker_model"),
+            reranker_model_snapshot=_private_path(
+                retrieval_payload["reranker_model_snapshot"],
+                "retrieval reranker snapshot",
+                file=False,
+            ),
+            reranker_model_manifest_digest=digests[
+                "reranker_model_manifest_digest"
+            ],
+            ranking_version=retrieval_string("ranking_version"),
+            policy_file=_private_path(
+                retrieval_payload["policy_file"],
+                "retrieval policy",
+                file=True,
+            ),
+            policy_digest=digests["policy_digest"],
+            development_evidence=_private_path(
+                retrieval_payload["development_evidence"],
+                "retrieval development evidence",
+                file=True,
+            ),
+            development_evidence_digest=digests[
+                "development_evidence_digest"
+            ],
+            holdout_evidence=_private_path(
+                retrieval_payload["holdout_evidence"],
+                "retrieval holdout evidence",
+                file=True,
+            ),
+            holdout_evidence_digest=digests["holdout_evidence_digest"],
+        )
+    if active_retrieval == "exact-hybrid-v2" and retrieval is None:
+        raise RuntimeConfigError(
+            "exact-hybrid-v2 requires the frozen retrieval object"
+        )
+    if active_retrieval == "exact-hybrid-v2" and active != "server":
+        raise RuntimeConfigError(
+            "exact-hybrid-v2 requires active_backend=server"
+        )
+
+    workspace_value = paths.get("workspace")
+    if not isinstance(workspace_value, str):
+        raise RuntimeConfigError("workspace must be an absolute path")
+    workspace = Path(workspace_value).expanduser()
+    if not workspace.is_absolute() or not workspace.is_dir():
+        raise RuntimeConfigError("workspace directory does not exist")
+
+    return ArtifactRuntime(
+        config_path=path,
+        active_backend=active,
+        active_retrieval=active_retrieval,
+        retrieval=retrieval,
+        workspace=workspace.absolute().resolve(strict=True),
+        catalog=_private_path(paths.get("catalog"), "catalog", file=True),
+        outbox_root=_private_path(paths.get("outbox_root"), "outbox root", file=False),
+        ingestion_state=_private_path(
+            paths.get("ingestion_state"), "ingestion state", file=True
+        ),
+        consumer_state=_private_path(
+            paths.get("consumer_state"), "consumer state", file=True
+        ),
+        receipt_root=_private_path(
+            paths.get("receipt_root"), "receipt root", file=False
+        ),
+        qdrant_url=_loopback_url(qdrant.get("url"), "Qdrant URL"),
+        qdrant_collection=collection,
+        qdrant_generation=generation,
+        qdrant_admin_key_file=_private_path(
+            qdrant.get("admin_key_file"), "Qdrant admin-key file", file=True
+        ),
+        qdrant_read_key_file=_private_path(
+            qdrant.get("read_key_file"), "Qdrant read-key file", file=True
+        ),
+        embedded_path=_private_path(
+            qdrant.get("embedded_path"), "embedded Qdrant path", file=False
+        ),
+        service_socket_path=_future_private_socket(
+            service.get("socket_path"), "service socket"
+        ),
+        lexical_index=_optional_future_private_file(
+            paths.get("lexical_index"), "lexical index"
+        ),
+        build_manifest=_future_private_file(
+            paths.get("build_manifest"), "build manifest"
+        ),
+        rollback_until=rollback_until,
+        rollback_mode=rollback_mode,
+    )
+
+
+def update_active_backend(
+    backend: str,
+    path: Path = DEFAULT_CONFIG,
+) -> dict[str, Any]:
+    """Atomically switch only the service-side backend selector."""
+    if backend not in ("embedded", "server"):
+        raise RuntimeConfigError("backend must be embedded or server")
+    runtime = load_runtime(path)
+    if runtime.active_retrieval == "exact-hybrid-v2" and backend != "server":
+        raise RuntimeConfigError(
+            "exact-hybrid-v2 cannot switch away from the server backend"
+        )
+    payload = json.loads(runtime.config_path.read_text(encoding="utf-8"))
+    previous = payload["active_backend"]
+    payload["active_backend"] = backend
+    security.atomic_write_json(runtime.config_path, payload, replace=True)
+    return {"previous": previous, "active": backend, "config": str(runtime.config_path)}

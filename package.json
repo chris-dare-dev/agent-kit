@@ -1,0 +1,30 @@
+{
+  "name": "@chris-dare-dev/agent-kit",
+  "version": "0.1.0",
+  "description": "Personal provider-neutral agent kit + artifact-memory substrate (fork of the kit architecture)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "test": "node --import tsx --test src/mcp-contract.test.ts src/server-profile.test.ts src/transport-lock.test.ts",
+    "test:update-golden": "UPDATE_GOLDEN=1 node --import tsx --test src/mcp-contract.test.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.750.0",
+    "@aws-sdk/client-secrets-manager": "^3.750.0",
+    "@aws-sdk/credential-provider-ini": "^3.750.0",
+    "@aws-sdk/types": "^3.750.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "glob": "^11.0.2",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

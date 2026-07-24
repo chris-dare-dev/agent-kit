@@ -1,0 +1,18 @@
+{
+  "_TODO_S1_2_PENDING_LIVE_VERIFICATION": "STUB — not planted by bootstrap.sh yet. OpenCode's MCP-server config block shape under opencode 1.17.17 is UNCONFIRMED in this repo (platform/opencode.json declares no mcp block to mirror). Verify the key name/shape ('mcp' per https://opencode.ai/config.json schema) in a live OpenCode session, then wire planting into bootstrap.sh Step 7/10. The intent is fixed: indirect-by-default — the bash -c wrapper below sources ~/.config/workspace/secrets.env (chmod 600) so no credential literal ever lands in this file. Companion adapter: data/scripts/template-opencode-plugin.mjs (secret-guard plugin, also pending live verification).",
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["./.opencode/plugin/secret-guard.js"],
+  "mcp": {
+    "atlassian": {
+      "type": "local",
+      "command": [
+        "bash",
+        "-c",
+        "set -a; . \"$HOME/.config/workspace/secrets.env\"; set +a; exec uvx mcp-atlassian"
+      ],
+      "environment": {
+        "CONFLUENCE_URL": "https://example.atlassian.net/wiki"
+      }
+    }
+  }
+}

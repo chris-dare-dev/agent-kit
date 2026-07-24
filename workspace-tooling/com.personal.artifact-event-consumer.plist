@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.personal.artifact-event-consumer</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$HOME/.local/share/personal-artifacts/venv/bin/python</string>
+    <string>$HOME/Work/workspace/scripts/artifact_event_consumer.py</string>
+    <string>consume</string>
+    <string>--workspace</string>
+    <string>$HOME/Work/workspace</string>
+    <string>--catalog</string>
+    <string>$HOME/.local/share/personal-artifacts/artifact-catalog.sqlite3</string>
+    <string>--policy</string>
+    <string>$HOME/Work/workspace/scripts/artifact-policy.json</string>
+    <string>--receipt-root</string>
+    <string>$HOME/.local/share/personal-artifacts/skill-events</string>
+    <string>--state</string>
+    <string>$HOME/.local/share/personal-artifacts/artifact-event-consumer.sqlite3</string>
+    <string>--outbox-root</string>
+    <string>$HOME/.local/share/personal-artifacts/outbox</string>
+    <string>--ingestion-state</string>
+    <string>$HOME/.local/share/personal-artifacts/ingestion-state.sqlite3</string>
+    <!-- No sink flags.  The write target is resolved from
+         artifact-memory-runtime.json so this job can never outlive a backend
+         change and publish into a retired store; a named sink that disagrees
+         with the runtime is refused, not silently honoured. -->
+    <string>--runtime-config</string>
+    <string>$HOME/.local/share/personal-artifacts/artifact-memory-runtime.json</string>
+    <string>--batch-size</string>
+    <string>32</string>
+    <string>--health-file</string>
+    <string>$HOME/.local/share/personal-artifacts/artifact-event-consumer-health.json</string>
+    <string>--reconcile-retry-seconds</string>
+    <string>60</string>
+    <string>--desktop-notify</string>
+    <string>--refresh-catalog</string>
+    <string>--apply</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>$HOME/Work/workspace</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>$HOME</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>Umask</key>
+  <integer>63</integer>
+  <key>StartInterval</key>
+  <integer>900</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>$HOME/Library/Logs/workspace-artifact-event-consumer.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>$HOME/Library/Logs/workspace-artifact-event-consumer.error.log</string>
+</dict>
+</plist>

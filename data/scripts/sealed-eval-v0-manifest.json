@@ -1,0 +1,10 @@
+{
+  "seal_version": "v0",
+  "custodian": "Chris Dare",
+  "seal_date": "2026-06-19T14:26:44Z",
+  "corpus_path": "data/scripts/sealed-eval-v0-corpus.jsonl",
+  "corpus_sha256": "3dac0bbfcba86fc993b46e43c6d16f795f55ba3ddb77fd9fd9d79830d006f4d3",
+  "record_count": 9,
+  "provenance": "committed-v0, claude-mcp-server data/scripts/",
+  "immutability_note": "Tamper-EVIDENCE (detectable change), not write-prevention. Re-verify with: python3 sealed-eval.py verify data/scripts/sealed-eval-v0-manifest.json --corpus data/scripts/sealed-eval-v0-corpus.jsonl"
+}

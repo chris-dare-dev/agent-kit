@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/portfolio-index.schema.json",
+  "title": "workspace generated milestone portfolio index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_by",
+    "source_snapshot_sha256",
+    "source_root",
+    "presentation_vault",
+    "summary",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "generated_by": {
+      "const": "scripts/portfolio_projection.py"
+    },
+    "source_snapshot_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_root": {
+      "type": "string",
+      "minLength": 1
+    },
+    "presentation_vault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "projects_root"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "projects_root": {"type": "string", "minLength": 1}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_records"],
+      "properties": {
+        "total_records": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "integer", "minimum": 0},
+          {
+            "type": "object",
+            "additionalProperties": {"type": "integer", "minimum": 0}
+          }
+        ]
+      }
+    },
+    "records": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/record"}
+    }
+  },
+  "$defs": {
+    "nullableString": {
+      "type": ["string", "null"]
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "kind",
+        "record_role",
+        "canonical_id",
+        "disposition",
+        "project_id",
+        "project_name",
+        "owner_resolution",
+        "owner_candidates",
+        "roadmap_id",
+        "title",
+        "source_subject",
+        "tracking_status",
+        "pipeline_phase",
+        "implementation_status",
+        "operational_status",
+        "required_targets",
+        "depends_on",
+        "source_mode",
+        "source_path",
+        "source_exists",
+        "source_alias",
+        "source_uri",
+        "register_path",
+        "state_path",
+        "updated_at",
+        "external_writes_declared",
+        "external_writes_completed",
+        "attention",
+        "data_quality"
+      ],
+      "properties": {
+        "record_id": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["milestone", "spike"]},
+        "record_role": {"enum": ["canonical", "alias", "unresolved"]},
+        "canonical_id": {"$ref": "#/$defs/nullableString"},
+        "disposition": {
+          "enum": ["active", "delegated", "consumed", "superseded", "cancelled", "unknown"]
+        },
+        "project_id": {"type": "string", "minLength": 1},
+        "project_name": {"type": "string", "minLength": 1},
+        "owner_resolution": {
+          "enum": [
+            "register-v2",
+            "manifest-source-match",
+            "manifest-repo-match",
+            "manifest-alias-match",
+            "conflicting",
+            "unresolved"
+          ]
+        },
+        "owner_candidates": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "roadmap_id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "source_subject": {"type": "string", "minLength": 1},
+        "tracking_status": {"enum": ["pending", "in_progress", "complete", "unknown"]},
+        "pipeline_phase": {"$ref": "#/$defs/nullableString"},
+        "implementation_status": {
+          "enum": [
+            "pending",
+            "in_progress",
+            "validated",
+            "committed",
+            "published",
+            "not_owned",
+            "not_required",
+            "unknown"
+          ]
+        },
+        "operational_status": {
+          "enum": [
+            "not_required",
+            "pending",
+            "applying",
+            "applied",
+            "verified",
+            "failed",
+            "waived",
+            "not_owned",
+            "unknown"
+          ]
+        },
+        "required_targets": {"type": "array"},
+        "depends_on": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "source_mode": {"type": "string", "minLength": 1},
+        "source_path": {"type": "string", "minLength": 1},
+        "source_exists": {"type": "boolean"},
+        "source_alias": {"$ref": "#/$defs/nullableString"},
+        "source_uri": {"$ref": "#/$defs/nullableString"},
+        "register_path": {"$ref": "#/$defs/nullableString"},
+        "state_path": {"$ref": "#/$defs/nullableString"},
+        "updated_at": {"$ref": "#/$defs/nullableString"},
+        "external_writes_declared": {"type": "integer", "minimum": 0},
+        "external_writes_completed": {"type": "integer", "minimum": 0},
+        "attention": {
+          "enum": [
+            "delegated-record",
+            "archived-record",
+            "delivery-complete",
+            "applied-not-verified",
+            "code-complete-ops-open",
+            "tracking-complete-delivery-unknown",
+            "active-work",
+            "planned-work",
+            "state-needs-resolution"
+          ]
+        },
+        "data_quality": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

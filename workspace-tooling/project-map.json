@@ -1,0 +1,288 @@
+{
+  "_comment": "Manifest for project-linker.py. project_id is the stable, unique identity; the object key is a display/folder name and slugs are discovery aliases only. Each project consolidates scattered .md files into Notes/Projects/<folder>/_sources/ plus an indexed _index.md hub. The two root placeholders are materialized by scripts/path_contract.py from script location defaults or environment overrides. presentation_vault defines the portable Obsidian link contract. Matching uses filename-prefix and bounded-segment 'slugs', optional 'contains' rules, and 'excludes' as the highest-precedence negative override.",
+  "vault_root": "${PERSONAL_WORKSPACE_ROOT}",
+  "projects_root": "Notes/Projects",
+  "presentation_vault": {
+    "name": "Vault",
+    "root": "${PERSONAL_VAULT_ROOT}",
+    "projects_root": "Notes/Projects",
+    "source_alias_dir": "_sources"
+  },
+  "regions": {
+    "plans": "plans",
+    "docs": "docs",
+    "platform-plans": "GitLab/workspace/platform/plans",
+    "platform-docs": "GitLab/workspace/platform/docs",
+    "cms-plans": "GitLab/workspace/platform/tools/claude-mcp-server/plans",
+    "platform-infra-plans": "GitLab/workspace/platform/infra/platform-infra/plans",
+    "platform-infra-docs": "GitLab/workspace/platform/infra/platform-infra/docs"
+  },
+  "projects": {
+    "the dispatcher service": {
+      "project_id": "dispatcher",
+      "slugs": [
+        "dispatcher"
+      ],
+      "deliverable_dirs": [
+        "the dispatcher service"
+      ],
+      "parent_roadmap": "dispatcher-prove-and-distribute-roadmap",
+      "app_dirs": [
+        "GitLab/workspace/platform/source/agents-dispatcher"
+      ],
+      "contains": [
+        "engine-reliability-safety",
+        "extraction-seam-hardening",
+        "knowledge-representation",
+        "consumer-integration-surface",
+        "oss-selfhost-distribution",
+        "market-gtm-positioning",
+        "dispatcher-receipt-authz"
+      ]
+    },
+    "Service Registry": {
+      "project_id": "service-registry",
+      "slugs": [
+        "service-registry",
+        "srm-",
+        "srm.",
+        "sre-catalog-deploy"
+      ],
+      "deliverable_dirs": [],
+      "app_dirs": [
+        "GitLab/workspace/platform/source/service-registry-api",
+        "GitLab/workspace/platform/source/service-registry-operator"
+      ],
+      "contains": [
+        "srm-",
+        "sre-catalog-deploy",
+        "svcreg",
+        "mosaic-getting-started"
+      ]
+    },
+    "Service-Mesh": {
+      "project_id": "service-mesh",
+      "slugs": [
+        "mesh-as-code",
+        "istio-gateway",
+        "istio-cutover",
+        "tenant-pep",
+        "pep-"
+      ],
+      "deliverable_dirs": [],
+      "app_dirs": [
+        "GitLab/workspace/platform/charts/istio-gateway"
+      ],
+      "excludes": [
+        "tenant-pep-kargo-onboard",
+        "zt-tenant-pep"
+      ]
+    },
+    "Kargo": {
+      "project_id": "kargo",
+      "slugs": [
+        "kargo",
+        "branch-kargo"
+      ],
+      "deliverable_dirs": [],
+      "excludes": [
+        "admin-mcp-server-kargo-onboard",
+        "admin-web-app-kargo-onboard",
+        "tenant-pep-kargo-onboard"
+      ]
+    },
+    "Zero-Trust": {
+      "project_id": "zero-trust",
+      "slugs": [
+        "zero-trust",
+        "zerotrust",
+        "airgap-zerotrust"
+      ],
+      "deliverable_dirs": [],
+      "app_dirs": [
+        "GitLab/workspace/platform/source/tenant-pep"
+      ],
+      "contains": [
+        "zt-pep",
+        "tenant-pep",
+        "per-app-enforce",
+        "m6-per-app",
+        "perappenforce",
+        "tenant-isolation",
+        "airgap"
+      ]
+    },
+    "Config Overlay": {
+      "project_id": "config-overlay",
+      "slugs": [
+        "config-overlay",
+        "cue-overlay",
+        "cue-cutover",
+        "cue-full",
+        "cue-helm",
+        "cue-m4a",
+        "format-on-ci"
+      ],
+      "deliverable_dirs": [],
+      "contains": [
+        "cue-overlay-cutover",
+        "config-overlay-strategy"
+      ],
+      "parent_roadmap": "cue-overlay-cutover-roadmap"
+    },
+    "Cost Optimization": {
+      "project_id": "cost-optimization",
+      "slugs": [
+        "cost-optimization"
+      ],
+      "deliverable_dirs": [],
+      "contains": [
+        "stage-pathb",
+        "stage-opsobs",
+        "pathb",
+        "opsobs"
+      ]
+    },
+    "GitOps": {
+      "project_id": "gitops",
+      "slugs": [
+        "cicd-uplift",
+        "gitlab-capability",
+        "gitlab-runner",
+        "gitlab-external",
+        "platform-group-runner",
+        "gitops"
+      ],
+      "deliverable_dirs": []
+    },
+    "Admin MCP Server": {
+      "project_id": "admin-mcp-server",
+      "slugs": [
+        "admin-mcp-server"
+      ],
+      "contains": [
+        "release-artifact-plane",
+        "ecr-replication-hygiene",
+        "admin-mcp-posture-completion",
+        "admin-mcp-audit-remediation"
+      ],
+      "deliverable_dirs": [],
+      "app_dirs": [
+        "GitLab/workspace/platform/source/admin-mcp-server"
+      ]
+    },
+    "Admin WebApp": {
+      "project_id": "admin-web-app",
+      "slugs": [
+        "admin-web-app"
+      ],
+      "deliverable_dirs": [],
+      "app_dirs": [
+        "GitLab/workspace/platform/source/admin-web-app"
+      ]
+    },
+    "AI Ops": {
+      "project_id": "ai-ops",
+      "slugs": [
+        "ai-ops-admin-workflow-builder"
+      ],
+      "deliverable_dirs": [],
+      "parent_roadmap": "ai-ops-admin-workflow-builder-roadmap"
+    },
+    "CrossPlane": {
+      "project_id": "crossplane",
+      "slugs": [
+        "crossplane"
+      ],
+      "deliverable_dirs": [],
+      "excludes": [
+        "service-registry-crossplane-"
+      ]
+    },
+    "Multicluster": {
+      "project_id": "multicluster",
+      "slugs": [
+        "multicluster"
+      ],
+      "deliverable_dirs": []
+    },
+    "Token Optimization": {
+      "project_id": "token-optimization",
+      "slugs": [
+        "token-optimization"
+      ],
+      "deliverable_dirs": []
+    },
+    "Keycloak SMTP": {
+      "project_id": "keycloak-smtp",
+      "slugs": [
+        "keycloak-smtp",
+        "keycloak-smtp-invite-enablement"
+      ],
+      "deliverable_dirs": []
+    },
+    "Per-Env Role-as-Code": {
+      "project_id": "per-env-role-as-code",
+      "slugs": [
+        "per-env-role-as-code"
+      ],
+      "deliverable_dirs": [],
+      "contains": [
+        "per-env-role-as-code"
+      ],
+      "parent_roadmap": "per-env-role-as-code-roadmap"
+    },
+    "Identity Seed": {
+      "project_id": "identity-seed",
+      "slugs": [
+        "identity-seed",
+        "identity-seed-externalization",
+        "keycloak-starter-password"
+      ],
+      "deliverable_dirs": [],
+      "parent_roadmap": "identity-seed-roadmap"
+    },
+    "Session Logout": {
+      "project_id": "session-logout",
+      "slugs": [
+        "session-logout",
+        "session-logout-idle-timeout",
+        "platform-logout-session-termination"
+      ],
+      "deliverable_dirs": [],
+      "parent_roadmap": "session-logout-idle-timeout-roadmap"
+    },
+    "Authz Catalog": {
+      "project_id": "authz-catalog",
+      "slugs": [
+        "authz-catalog",
+        "authz-catalog-authoring",
+        "cue-authz-discovery",
+        "cue-authz"
+      ],
+      "deliverable_dirs": []
+    },
+    "Config-as-Freight": {
+      "project_id": "config-as-freight",
+      "slugs": [
+        "config-as-freight"
+      ],
+      "deliverable_dirs": []
+    },
+    "Pipeline Tooling": {
+      "project_id": "pipeline-tooling",
+      "slugs": [
+        "live-drift-inventory",
+        "pipeline-builder",
+        "milestone-pipeline"
+      ],
+      "contains": [
+        "knowledge-server-quality-loop",
+        "institutional-memory-completion",
+        "product-bets-market-probes",
+        "provider-neutral-agent-kit"
+      ],
+      "deliverable_dirs": []
+    }
+  }
+}

@@ -1,0 +1,4 @@
+apiVersion: v2
+name: fixtureapp
+version: 1.0.0
+description: Hermetic fixture chart for the MCP contract test.

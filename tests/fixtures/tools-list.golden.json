@@ -1,0 +1,261 @@
+[
+  {
+    "name": "artifact_memory_status",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "get_agent",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Agent name (e.g., argocd-ops, gitops, cluster-health)"
+        },
+        "section": {
+          "type": "string",
+          "description": "Optional section slug, or 'list'/'all'."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_artifact",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "relative_path": {
+          "type": "string",
+          "description": "Path relative to the workspace"
+        },
+        "max_chars": {
+          "type": "number",
+          "description": "Maximum content characters, 256-50000 (default 12000)"
+        }
+      },
+      "required": [
+        "relative_path"
+      ]
+    }
+  },
+  {
+    "name": "get_context_guide",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "topic": {
+          "type": "string",
+          "description": "Topic name or partial match"
+        },
+        "section": {
+          "type": "string",
+          "description": "Optional section slug, or 'list'/'all'."
+        }
+      },
+      "required": [
+        "topic"
+      ]
+    }
+  },
+  {
+    "name": "get_memory",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Memory name (filename stem) or a unique substring of it"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_reference",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Reference name (e.g., cluster-contexts)"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_skill",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Skill name (e.g., argocd-debug)"
+        },
+        "section": {
+          "type": "string",
+          "description": "Optional section slug, or 'list'/'all'."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_token_stats",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "summary",
+            "detail"
+          ],
+          "description": "summary (default) or detail"
+        }
+      }
+    }
+  },
+  {
+    "name": "list_agents",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "list_context_guides",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "list_memory",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "list_references",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "list_skills",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "query_temporal_facts",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Fact text to match"
+        },
+        "max_results": {
+          "type": "number",
+          "description": "Maximum results, 1-25 (default 8)"
+        },
+        "group_id": {
+          "type": "string",
+          "description": "Optional exact Graphiti group"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "search_artifacts",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Semantic search query"
+        },
+        "max_results": {
+          "type": "number",
+          "description": "Maximum results, 1-25 (default 8)"
+        },
+        "project": {
+          "type": "string"
+        },
+        "artifact_type": {
+          "type": "string"
+        },
+        "authority_class": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "lifecycle_hint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "search_memory",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query"
+        },
+        "max_results": {
+          "type": "number",
+          "description": "Maximum results to return (default: 10)"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "search_platform_knowledge",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query"
+        },
+        "max_results": {
+          "type": "number",
+          "description": "Maximum results to return (default: 10)"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  }
+]

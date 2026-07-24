@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.personal.artifact-memory-service</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$HOME/.local/share/personal-artifacts/venv/bin/python</string>
+    <string>$HOME/Work/workspace/scripts/artifact_memory_service.py</string>
+    <string>--config</string>
+    <string>$HOME/.local/share/personal-artifacts/artifact-memory-runtime.json</string>
+    <string>--health-file</string>
+    <string>$HOME/.local/share/personal-artifacts/artifact-memory-service-health.json</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>$HOME/Work/workspace</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>$HOME</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>PYTHONUNBUFFERED</key>
+    <string>1</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>Umask</key>
+  <integer>63</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>$HOME/Library/Logs/workspace-artifact-memory-service.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>$HOME/Library/Logs/workspace-artifact-memory-service.error.log</string>
+</dict>
+</plist>
