@@ -1,0 +1,118 @@
+{
+  "named-and-installable-e1": {
+    "number": 108,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/108"
+  },
+  "named-and-installable-e2": {
+    "number": 109,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/109"
+  },
+  "named-and-installable-e3": {
+    "number": 110,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/110"
+  },
+  "named-and-installable-e4": {
+    "number": 111,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/111"
+  },
+  "named-and-installable-spike-1": {
+    "number": 116,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/116"
+  },
+  "named-and-installable-t-console-scripts": {
+    "number": 124,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/124"
+  },
+  "named-and-installable-t-conventional-commits": {
+    "number": 127,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/127"
+  },
+  "named-and-installable-t-degraded-mode-ci-job": {
+    "number": 134,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/134"
+  },
+  "named-and-installable-t-degraded-tool-surface": {
+    "number": 133,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/133"
+  },
+  "named-and-installable-t-devcontainer-and-compose": {
+    "number": 136,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/136"
+  },
+  "named-and-installable-t-env-namespace-rename": {
+    "number": 120,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/120"
+  },
+  "named-and-installable-t-extract-artifact-release": {
+    "number": 131,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/131"
+  },
+  "named-and-installable-t-lexical-only-retrieval": {
+    "number": 132,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/132"
+  },
+  "named-and-installable-t-mcp-2026-07-28-migration": {
+    "number": 117,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/117"
+  },
+  "named-and-installable-t-npm-package-metadata": {
+    "number": 112,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/112"
+  },
+  "named-and-installable-t-pack-context-budget": {
+    "number": 118,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/118"
+  },
+  "named-and-installable-t-package-move": {
+    "number": 122,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/122"
+  },
+  "named-and-installable-t-prerequisite-table": {
+    "number": 135,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/135"
+  },
+  "named-and-installable-t-pyproject-skeleton": {
+    "number": 121,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/121"
+  },
+  "named-and-installable-t-python-error-contract": {
+    "number": 115,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/115"
+  },
+  "named-and-installable-t-registry-and-mcpb": {
+    "number": 130,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/130"
+  },
+  "named-and-installable-t-release-please-manifest": {
+    "number": 128,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/128"
+  },
+  "named-and-installable-t-remove-syspath-hacks": {
+    "number": 123,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/123"
+  },
+  "named-and-installable-t-substrate-import-layering": {
+    "number": 126,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/126"
+  },
+  "named-and-installable-t-team-product-voice": {
+    "number": 119,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/119"
+  },
+  "named-and-installable-t-tool-descriptor-registry": {
+    "number": 113,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/113"
+  },
+  "named-and-installable-t-tool-result-contract": {
+    "number": 114,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/114"
+  },
+  "named-and-installable-t-trusted-publishing": {
+    "number": 129,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/129"
+  },
+  "named-and-installable-t-uvx-entry-point": {
+    "number": 125,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/125"
+  }
+}

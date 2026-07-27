@@ -1,0 +1,1481 @@
+schema: roadmap/1
+slug: starts-everywhere
+project: agent-kit
+title: M1 Starts Everywhere — the server launches, every registered tool answers, and the three gating
+  decisions are recorded
+status: draft
+phase: sequenced
+brief: 'M1 makes the product observable. Today the default server profile hard-throws at import on win32
+  (`absoluteSocketPath` rejects `process.platform === "win32"` unconditionally), the README Quick Start
+  omits the `PLATFORM_ROOT` that `loadConfig()` throws without, the four artifact-memory tools address
+  `~/.local/share/workspace-artifacts/...` while the Python provisioner writes `~/.local/share/personal-artifacts/...`,
+  and `query_temporal_facts` reads an approvals file that nothing in the repo ever writes. Ten of the
+  22 roadmap blockers live here.
+
+  It also records the three owner decisions — the OpenAI AgentKit name collision (DevDay 2025-10-06),
+  the fate of the Graphiti pilot, and the four unused @aws-sdk runtime dependencies — because each is
+  S-effort now and expensive once M2 starts writing the name into env namespaces, a CLI binary, MCP registration
+  templates and a package name. The decisions are kept off the critical path of the crash fixes so an
+  undecided owner cannot stall F001/F169.
+
+  If the owner stops after M1, they still have a kit that starts on macOS, Linux and Windows, whose every
+  registered tool can answer, and a clone containing nothing a public repository should not carry.'
+goal:
+  hmw: How might we make a stranger's first five minutes with agent-kit end in a running server on their
+    own operating system — rather than a stack trace, an undocumented environment variable, or a tool
+    that can only return an empty list?
+  objective: Any engineer on macOS, Linux or Windows can clone the repo, follow the README verbatim, and
+    get a running MCP server in which every registered tool is capable of returning a real result — with
+    the three owner decisions that gate every downstream identifier and dependency written down and merged.
+  key_results:
+  - '`npm ci && npm run build && node dist/index.js` starts and answers a stdio `tools/list` with zero
+    environment variables set, on all three of macOS, Linux and Windows. Today it exits 1 on every platform
+    (PLATFORM_ROOT throw) and additionally hard-throws before tool registration on win32.'
+  - 'Zero registered tools that cannot return a non-empty result by construction: the four artifact-memory
+    tools resolve their socket from the same runtime config the Python provisioner writes, and `query_temporal_facts`
+    is either wired to a working approvals producer or removed from `tools/list` and the README table.'
+  - 'One derived-state-root resolver replaces the 13 hardcoded `~/.local/share/personal-artifacts` literals:
+    `git grep -nE "local/share/(personal|workspace)-artifacts" -- ''workspace-tooling/*.py'' ''src/**''`
+    returns zero module-level literals outside the resolver and its tests.'
+  - 'Three ADRs are merged under `docs/adr/`: the name/licence/provenance decision, the Graphiti decision,
+    and the AWS-dependency decision — each with a `Status: Accepted` line and a dated decision record.'
+  - '`git grep -nE "SWAT DevOps|Nalej|nalej-|GitLab/workspace/platform|gitlab\\.example\\.com|claude-mcp-server"`
+    over tracked files returns zero matches, and a committed denylist script asserts it.'
+  - '`agent-kit init` completes on a bare clone in a temporary directory on all three OSes, writes nothing
+    outside the clone without an explicit flag, and never removes pre-existing `.claude/` content without
+    `--force`. `bash setup-local.sh --build-only` today aborts before `npm ci` on every clone.'
+  - '`agent-kit doctor` exits non-zero on a machine with an unmet prerequisite and prints one actionable
+    line per failing row; it exits 0 on a correctly provisioned machine.'
+  wont:
+  - Windows named-pipe transport for the artifact-memory adapter, or any Python-side IPC port — the fail-soft
+    degrade is the M1 answer; the native transport is M5 (native-everywhere).
+  - Making the Python substrate importable/runnable on Windows (fcntl, geteuid, AF_UNIX, resource) — M1
+    only makes the README stop overclaiming; the port is M2 (gates-green) plus M5.
+  - Any GitHub Actions workflow, CI matrix, lint/type/coverage gate, CODEOWNERS or branch ruleset — M1
+    fixes are verified by locally runnable commands; enforcement is M3 (ci-proves-it).
+  - npm/PyPI publication, `bin`/`files`/`exports` packaging, release automation, provenance attestation
+    or MCP Registry entry — M4 (named-and-installable). M1 only reserves the identifiers.
+  - Turning the four generator gates green, wiring the orphaned TypeScript test files into `npm test`,
+    or re-sealing the sealed-eval corpus — M2 (gates-green).
+  - Any retrieval-quality, chunking, BM25, hot/cold tiering, eval-harness or ROI work — M6 and M8.
+  - Provider capability manifests, conformance suites or the Claude plugin — M7 (providers-as-data).
+generated_by:
+  agent: claude-opus-5
+  at: '2026-07-26'
+  brief: multi-workflow audit + landscape benchmark synthesis
+retired: []
+items:
+- id: starts-everywhere-e1
+  kind: epic
+  title: '[OWNER DECISION] Settle the name, the licence and the fork provenance'
+  status: planned
+  summary: 'Three decisions that cost nothing today and a great deal from M2 onward: whether to rename
+    around OpenAI''s AgentKit (shipped DevDay 2025-10-06), how to licence a repo whose actual deliverable
+    is prose under a code licence, and whether the 20 agents and 32 references inherited through a squashed-history
+    fork of an employer codebase are clean for public release. The name gets written into env namespaces,
+    a CLI binary name, MCP registration templates and a package name from M2 onward; four registries are
+    expensive to un-name. Nothing in this epic blocks the crash fixes in e2.'
+  priority: should
+  lane: now
+  size: S
+  acceptance:
+  - 'Given the repo at HEAD, when `ls docs/adr/`, then three files exist: `adr-0001-project-name.md`,
+    `adr-0002-licensing.md`, `adr-0003-fork-provenance.md`, each containing a `Status: Accepted` line
+    and a decision date.'
+  - Given the accepted name, when `git grep -n "agent-kit\|<chosen-name>" package.json README.md`, then
+    the chosen identifier appears consistently in `package.json:name`, the README H1 and the MCP server
+    name used in `data/scripts/template-mcp.json`, with no residual occurrence of the rejected name outside
+    the ADR.
+  - Given the provenance ledger, when `python3 data/scripts/provenance-check.py --check` is run, then
+    it exits 0 and every file under `data/agents/`, `data/references/` and `data/commands/` has a ledger
+    row with a recorded clearance verdict.
+  tags:
+  - X001
+  - X002
+  - owner-decision
+  - naming
+  - licensing
+  - provenance
+  - governance
+  - docs
+- id: starts-everywhere-t-name-collision-decision
+  kind: task
+  title: Resolve the OpenAI AgentKit name collision and reserve every identifier in one pass
+  status: planned
+  parent: starts-everywhere-e1
+  summary: OpenAI shipped a platform product called AgentKit on 2025-10-06 (Agent Builder, ChatKit, Connector
+    Registry, Guardrails). This repo is `@chris-dare-dev/agent-kit` in package.json:2 and registers an
+    MCP server called `agent-kit` in README.md:92. Publishing to npm, PyPI, the MCP Registry and skills.sh
+    under that name means competing for the same search surface as an OpenAI product. Decide once — rename,
+    or commit to a disambiguating scoped identity everywhere and accept the SEO cost knowingly — and reserve
+    all identifiers together so they cannot diverge.
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - 'Given the decision, when `cat docs/adr/adr-0001-project-name.md`, then it names the collision with
+    a dated citation, states the chosen option (rename | scoped coexistence), and lists the exact strings
+    chosen for: npm package name, PyPI distribution name, `mcpName` reverse-DNS namespace, GitHub org/repo,
+    skills.sh handle, the MCP server key used in registration templates, and the environment-variable
+    prefix (today `PLATFORM_ROOT`/`WORKSPACE_ROOT`/`PERSONAL_*`).'
+  - Given the chosen strings, when the reservation checklist in the ADR is followed, then each of npm,
+    PyPI, GitHub and the MCP Registry shows the identifier held by the owner, and the ADR records the
+    reservation date per registry.
+  - Given a fresh clone, when `node -e "console.log(require('./package.json').name)"` is run, then it
+    prints the chosen npm name, and `git grep -n "<rejected-name>"` returns matches only inside `docs/adr/`.
+  tags:
+  - X001
+  - owner-decision
+  - naming
+  - blocks-publishing
+  - docs
+- id: starts-everywhere-t-licence-split
+  kind: task
+  title: 'Split the licence: MIT for code, CC-BY-4.0 for data/ prose'
+  status: planned
+  parent: starts-everywhere-e1
+  summary: 'LICENSE at the repo root is MIT — a code licence — on a repo whose actual deliverable is prose:
+    32 references, 20 agent definitions, 5 commands and 1 skill under data/. The Agent Skills spec itself
+    splits Apache-2.0 code / CC-BY-4.0 docs. package.json also carries no `license` field at all, so `npm
+    publish` would emit an unlicensed package. Record the split, add the second licence file, and state
+    the boundary in one sentence a lawyer can read.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - 'Given the repo, when `ls LICENSE LICENSE-DOCS`, then both exist: LICENSE is the unchanged MIT text
+    and LICENSE-DOCS is the CC-BY-4.0 text (or the alternative recorded in `docs/adr/adr-0002-licensing.md`).'
+  - 'Given README.md, when the `## Licence` section is read, then it names exactly which paths are under
+    which licence (code: `src/`, `data/scripts/`, `data/hooks/`, `workspace-tooling/`; prose: `data/skills/`,
+    `data/agents/`, `data/commands/`, `data/references/`, `data/claude-md/`) with no ambiguous remainder.'
+  - Given package.json, when `node -e "console.log(require('./package.json').license)"` is run, then it
+    prints the SPDX expression recorded in the ADR (e.g. `MIT`) and a `repository` field resolving to
+    the public GitHub URL.
+  - Given `data/references/` and `data/agents/`, when the licence-header check `python3 data/scripts/licence-header-check.py
+    --check` is run, then it exits 0 with every prose directory carrying the agreed attribution notice.
+  depends_on:
+  - starts-everywhere-t-name-collision-decision
+  tags:
+  - X002
+  - owner-decision
+  - licensing
+  - dual-licence
+  - docs
+- id: starts-everywhere-t-fork-provenance-ledger
+  kind: task
+  title: Provenance pass over the 20 agents and 32 references inherited through a squashed-history fork
+  status: planned
+  parent: starts-everywhere-e1
+  summary: package.json:4 describes the repo as a 'fork of the kit architecture' and the entire history
+    is one squashed commit, so the provenance of every inherited artifact relative to the employer codebase
+    has never been examined and cannot be reconstructed from git. README.md:126-132 makes the falsifiable
+    claim that 'the employer-specific integrations, infrastructure facts, and operational tooling were
+    removed' — e5 proves that claim is currently false. Produce a per-artifact ledger with an explicit
+    clearance verdict so the claim becomes checkable rather than asserted.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - 'Given the repo, when `cat docs/provenance-ledger.json`, then it contains one row per tracked file
+    under `data/agents/`, `data/references/`, `data/commands/`, `data/skills/` and `data/claude-md/`,
+    each with `{path, origin: authored-here|inherited|third-party, verdict: clear|redacted|removed, reviewed_at,
+    notes}`.'
+  - Given the ledger, when `python3 data/scripts/provenance-check.py --check` is run, then it exits 0
+    only if every tracked file in those directories has a row and no row has verdict `pending`; deleting
+    a ledger row and re-running exits non-zero naming the orphaned path.
+  - Given any artifact with verdict `removed`, when `git ls-files <path>` is run, then it returns nothing
+    — the file is actually gone, not merely marked.
+  - Given README.md, when the Provenance section is read, then the falsifiable sentence at README.md:126-132
+    is replaced by one that points at `docs/provenance-ledger.json` and the denylist gate from starts-everywhere-t-purge-employer-content.
+  tags:
+  - X002
+  - owner-decision
+  - provenance
+  - fork
+  - release-blocker
+  - docs
+- id: starts-everywhere-e2
+  kind: epic
+  title: 'Fail-soft startup: one unavailable tool group must never kill the server'
+  status: planned
+  summary: The MCP server — the primary product — dies at startup on Windows under its default configuration,
+    and silently disables the personal-memory tier there too. `absoluteSocketPath()` (src/tools/artifact-memory.ts:165-182)
+    makes `process.platform === "win32"` the first clause of its rejection test, and src/index.ts:159-162
+    calls `createArtifactMemoryTools()` unguarded at module top level whenever the profile is `personal`
+    (the default for any unset or typo'd SERVER_PROFILE). The outcome of this epic is that an unavailable
+    tool group degrades to a logged, enumerable state and the other 13 tools keep serving.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - 'Given a Windows host and a built `dist/`, when `node dist/index.js` is launched over stdio and sent
+    `initialize` then `tools/list`, then the process does not exit, and the response enumerates the 13
+    non-artifact-memory tools. Today the process prints its discovery counts and dies with `Error: artifact
+    memory service socket path must be an absolute, normalized Unix path...`.'
+  - Given the same host, when `npm test` is run, then `src/mcp-contract.test.ts`, `src/server-profile.test.ts`
+    and `src/transport-lock.test.ts` all pass. Today 3 of 7 test cases fail on native Windows for exactly
+    this reason.
+  - Given a Windows host with `USERPROFILE` set and `HOME` unset, when the server starts, then the startup
+    log reports a non-zero `Memory (local/private)` count for a user who has memory files, instead of
+    the current silent `0`.
+  - Given a POSIX host with a reachable socket, when the server starts, then `tools/list` still returns
+    all 17 tools and no degradation line is printed — the fix must not regress the working path.
+  tags:
+  - F001
+  - F049
+  - F107
+  - F169
+  - F009
+  - F127
+  - windows
+  - startup
+  - fail-soft
+  - blocker
+  - mcp-server
+- id: starts-everywhere-t-failsoft-tool-group-registration
+  kind: task
+  title: Wrap createArtifactMemoryTools() so an unavailable transport disables four tools instead of killing
+    the process
+  status: planned
+  parent: starts-everywhere-e2
+  summary: src/index.ts:159-162 evaluates `createArtifactMemoryTools()` at module scope whenever `config.serverProfile
+    === "personal"`. That call reaches `absoluteSocketPath()` (src/tools/artifact-memory.ts:376-382 →
+    :165-182), which throws unconditionally on win32. The throw is uncaught, so the process exits 1 before
+    a single tool is served — taking `list_skills`, `get_agent`, `search_platform_knowledge` and 10 other
+    tools that never touch the substrate with it. Mirror the graceful-degradation pattern already used
+    at src/config.ts:42-51.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - 'Given src/index.ts, when the `createArtifactMemoryTools()` call at :159-162 is wrapped in try/catch,
+    then on throw it sets `artifactMemoryTools = undefined`, writes exactly one stderr line matching `^\[agent-kit-mcp\]
+    artifact-memory tools unavailable: .+$` including the reason and the socket path attempted, and continues.'
+  - Given `artifactMemoryTools === undefined`, when `tools/list` is served, then the four names in `ARTIFACT_MEMORY_TOOL_NAMES`
+    (src/index.ts:152-158) are absent from the response, and the four `case` arms at src/index.ts:723-724
+    and the dispatch set at :566 can no longer be reached with a non-null assertion — replace `artifactMemoryTools!`
+    with a guarded branch returning an `isError` result naming the reason.
+  - Given a test double that forces `createArtifactMemoryTools` to throw, when `node --import tsx --test
+    src/mcp-contract.test.ts` is run on any platform, then a new case `personal profile starts when artifact
+    memory is unavailable` passes and asserts a 13-tool list against a new fixture `tests/fixtures/tools-list.degraded.golden.json`.
+  - Given a Windows host, when `node dist/index.js` is run and a `tools/list` request sent, then exit
+    code is not 1 and 13 tools are returned. This is the F001/F107/F169 reproduction and it must now pass.
+  tags:
+  - F001
+  - F049
+  - F107
+  - F169
+  - windows
+  - startup
+  - fail-soft
+  - blocker
+  - mcp-server
+- id: starts-everywhere-t-artifact-memory-capability-probe
+  kind: task
+  title: Gate artifact-memory registration on a capability probe, not on serverProfile alone
+  status: planned
+  parent: starts-everywhere-e2
+  summary: Registration today is decided by `config.serverProfile === "personal"` (src/index.ts:159) with
+    no check that the transport is usable or that the socket exists. That is why the failure mode is an
+    exception rather than a decision. Replace the boolean with a probe that returns a structured availability
+    verdict, so 'this platform has no AF_UNIX', 'the socket file is absent', 'the shared profile excludes
+    this group' and 'it works' are four distinguishable states rather than one throw.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - 'Given a new exported `probeArtifactMemory(config): { available: true, socketPath } | { available:
+    false, reason: ''unsupported-platform''|''socket-missing''|''socket-insecure''|''disabled-by-profile'',
+    detail: string }` in src/tools/artifact-memory.ts, when it is called on win32, then it returns `available:false,
+    reason:''unsupported-platform''` and does not throw.'
+  - Given a POSIX host where the socket path does not exist, when the probe runs, then it returns `reason:'socket-missing'`
+    with `detail` containing the absolute path that was checked — so the operator can see which path was
+    wrong (this is the F037 symptom made visible).
+  - Given the probe result, when the server registers tools, then registration happens if and only if
+    `available === true`, and `src/tools/artifact-memory.test.ts` gains a case per reason value driven
+    by a stubbed `process.platform` and a temp-dir socket fixture.
+  - Given `node --import tsx --test src/tools/artifact-memory.test.ts` on Windows, when it is run, then
+    it passes — the POSIX-only socket-binding cases skip explicitly with a named skip reason rather than
+    erroring with EACCES.
+  depends_on:
+  - starts-everywhere-t-failsoft-tool-group-registration
+  tags:
+  - F107
+  - F169
+  - F001
+  - capability-probe
+  - fail-soft
+  - mcp-server
+- id: starts-everywhere-t-homedir-personal-memory
+  kind: task
+  title: Resolve home with os.homedir() so the personal-memory tier is not silently disabled on Windows
+  status: planned
+  parent: starts-everywhere-e2
+  summary: src/config.ts:157 and :161 gate the entire personal-memory tier on `process.env.HOME`. Under
+    native PowerShell — how Claude Code actually launches on Windows — `HOME` is undefined while `USERPROFILE`
+    and `os.homedir()` both resolve. The condition is false, control falls to the `else` at :163, `memoryDir`
+    becomes `""`, and `discoverMemory` returns `[]` with no warning, so `list_memory`/`get_memory`/`search_memory`
+    return empty results indistinguishable from 'this user has no memory files'. `homedir()` is already
+    imported and used correctly one directory away at src/tools/artifact-memory.ts:16.
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given src/config.ts, when `import { homedir } from "node:os"` is added and the reads at :157 and :161
+    are replaced with `homedir()`, then `MEMORY_ROOT` still wins as the explicit first-priority override
+    (including the empty-string 'disable' case at :154-156).
+  - Given a new `src/config.test.ts`, when `node --import tsx --test src/config.test.ts` is run with `HOME`
+    deleted from the environment and `USERPROFILE` set, then it asserts `memoryDir` is non-empty and resolves
+    under `homedir()`.
+  - Given the same test file, when it is run with `MEMORY_ROOT=""`, then `memoryDir` is `""` and the assertion
+    documents that as the deliberate disable path.
+  - 'Given a Windows host with memory files present under `%USERPROFILE%\.claude\projects\<slug>\memory`,
+    when the server starts, then the startup log line `Memory (local/private): N` reports N > 0.'
+  tags:
+  - F009
+  - F127
+  - windows
+  - memory
+  - config
+  - mcp-server
+- id: starts-everywhere-t-startup-degradation-log
+  kind: task
+  title: One startup line that distinguishes 'disabled by config' from 'disabled by failure' from 'empty'
+  status: planned
+  parent: starts-everywhere-e2
+  summary: The server's only statement about the memory tier is the count at src/index.ts:69 and the shared-profile
+    exclusion line at :81-83. Neither fires for a personal profile whose `memoryDir` resolved to `""`,
+    and nothing at all is said when the artifact-memory group fails to register. An operator therefore
+    cannot tell a misconfiguration from an empty corpus. Emit one explicit, greppable line per tier state.
+  priority: should
+  lane: now
+  size: S
+  acceptance:
+  - 'Given a personal profile where `config.memoryDir === ""`, when the server starts, then stderr contains
+    `[agent-kit-mcp] memory tier disabled: no MEMORY_ROOT and no resolvable home directory` — distinct
+    from the shared-profile line already emitted at src/index.ts:81-83.'
+  - Given a personal profile where `memoryDir` resolves to a real but empty directory, when the server
+    starts, then stderr contains `[agent-kit-mcp] memory tier enabled, 0 entries at <path>` — distinguishable
+    from the disabled case by the presence of the path.
+  - Given the artifact-memory group, when the probe reports unavailable, when the server starts, then
+    exactly one line names the reason and the attempted socket path; when the group is excluded by `SERVER_PROFILE=shared`,
+    then the existing 'EXCLUDED (shared profile)' line is emitted and no failure line is.
+  - Given `src/server-profile.test.ts`, when it is run, then it asserts the exact set of degradation lines
+    for each of the four states, so a future silent regression fails the suite.
+  depends_on:
+  - starts-everywhere-t-homedir-personal-memory
+  - starts-everywhere-t-artifact-memory-capability-probe
+  tags:
+  - F009
+  - F127
+  - F049
+  - observability
+  - startup
+  - mcp-server
+- id: starts-everywhere-t-win32-startup-regression-test
+  kind: task
+  title: Lock the win32 startup regression into the contract suite with a stubbed platform
+  status: planned
+  parent: starts-everywhere-e2
+  summary: src/mcp-contract.test.ts already boots the default profile over stdio and already fails on
+    this defect — it simply never runs anywhere that would notice, and it cannot exercise the win32 branch
+    from a POSIX developer machine. Add a platform-stubbed case so the regression is caught on every OS,
+    not only on a Windows runner, and so it is green before M3 wires the CI matrix.
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given `src/mcp-contract.test.ts`, when a new case `default profile starts on a platform without AF_UNIX`
+    runs with `process.platform` stubbed to `win32`, then the server initializes, answers `tools/list`
+    with 13 tools, and the test passes on macOS, Linux and Windows alike.
+  - Given `src/server-profile.test.ts:51-76`, when the existing personal-profile cases are run on native
+    Windows, then all pass — today 3 of 7 fail.
+  - Given the golden fixtures, when `npm run test:update-golden` is run, then `tests/fixtures/tools-list.golden.json`
+    (17 tools) and `tests/fixtures/tools-list.degraded.golden.json` (13 tools) are both regenerated and
+    both are asserted by name in the suite.
+  - Given a deliberate revert of the try/catch in src/index.ts, when `npm test` is run on any platform,
+    then the new case fails — proving the test actually guards the fix.
+  depends_on:
+  - starts-everywhere-t-failsoft-tool-group-registration
+  tags:
+  - F001
+  - F169
+  - F107
+  - regression-test
+  - windows
+  - mcp-server
+- id: starts-everywhere-e3
+  kind: epic
+  title: '[OWNER DECISION on Graphiti] One runtime config, one derived root, and no tool that is dead
+    on arrival'
+  status: planned
+  summary: 'The TypeScript adapter hardcodes `~/.local/share/workspace-artifacts/services/qdrant/artifact-memory.sock`
+    (src/tools/artifact-memory.ts:44-52) while the Python provisioner writes `~/.local/share/personal-artifacts/services/qdrant/artifact-memory.sock`
+    — so all four artifact-memory tools are dead on a clean install. That divergence is a symptom: the
+    derived-state root is re-declared as a literal in 13 independent places with no env override and no
+    shared constant, and the only cross-language drift test skips itself because it looks for the adapter
+    inside an employer directory tree. Includes the owner call on whether the Graphiti pilot — which needs
+    Docker and an LLM against a stated local-first posture — stays at all.'
+  priority: must
+  lane: now
+  size: L
+  acceptance:
+  - Given a machine where `artifact_memory_provision.py` has run, when the MCP server starts, then `artifact_memory_status`
+    returns a healthy status over the socket the provisioner actually wrote — verified by `node dist/index.js`
+    plus a `tools/call artifact_memory_status` request returning a non-error result.
+  - Given the substrate, when `git grep -nE "local/share/(personal|workspace)-artifacts" -- 'workspace-tooling/*.py'
+    'src/**/*.ts'` is run, then the only matches are inside the single resolver function and its tests.
+  - Given `python3 -m unittest workspace-tooling.tests.test_artifact_memory_service -k typescript_adapter`
+    (or the equivalent discover invocation), when the adapter file is moved or its constants changed,
+    then the test FAILS rather than skipping — and it additionally asserts the socket-path default matches
+    `artifact_memory_provision._runtime_payload()['service']['socket_path']`.
+  - 'Given `docs/adr/adr-0004-graphiti-pilot.md` with `Status: Accepted`, when the recorded branch is
+    ''retire'', then `git grep -n query_temporal_facts src/ README.md` returns zero matches and `tests/fixtures/tools-list.golden.json`
+    enumerates 16 tools; when it is ''keep'', then `artifact_memory_provision.py graphiti-approve <group>`
+    writes a mode-0600 `graphiti-approvals.json` and an integration test asserts `query_temporal_facts`
+    returns a non-empty result for that group.'
+  tags:
+  - F037
+  - F113
+  - F171
+  - F054
+  - F050
+  - F118
+  - F012
+  - F178
+  - F101
+  - F036
+  - F124
+  - owner-decision
+  - socket-path
+  - derived-root
+  - graphiti
+  - memory
+- id: starts-everywhere-spike-1
+  kind: spike
+  title: 'Time-box: what does keeping the Graphiti pilot actually cost against a local-first posture?'
+  status: planned
+  parent: starts-everywhere-e3
+  summary: '`query_temporal_facts` is 1 of the 17 advertised tools and the temporal-graph leg of goal
+    D, but it is unreachable by construction: `_approved_groups()` (artifact_memory.py:284-298) reads
+    `graphiti-approvals.json`, which is READ in four places and WRITTEN in zero. Before the owner can
+    decide keep-or-retire, someone must price the ''keep'' branch honestly: a graph database (Neo4j/FalkorDB,
+    i.e. Docker) and an LLM in the ingest path, both aimed straight at the stated goals of running on
+    any OS and keeping everything local. Time-box this to two days and produce a decision memo, not code.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - 'Given the spike, when `cat docs/spikes/graphiti-cost.md` is read, then it states, with file:line
+    evidence: every runtime dependency the ''keep'' branch adds (container images, Python extras, model
+    endpoints), which of the three target OSes each is available on, and the measured wall-clock and disk
+    cost of a minimal pilot ingest.'
+  - Given the memo, when the alternatives section is read, then it states what capability is lost by retiring
+    the pilot and which of the M8 items (F044 fact-tokenization, F068 invalid_at filtering) would close
+    as won't-do — naming both ids explicitly.
+  - Given the memo, when the recommendation section is read, then it makes exactly one recommendation
+    with a stated confidence and the single fact that would change it.
+  - The spike is closed when the memo is merged; no production code is changed by it.
+  tags:
+  - F036
+  - F124
+  - graphiti
+  - spike
+  - local-first
+  - memory
+- id: starts-everywhere-t-graphiti-decision
+  kind: task
+  title: '[OWNER DECISION] Keep the Graphiti pilot with a wired approvals path, or unregister query_temporal_facts'
+  status: planned
+  parent: starts-everywhere-e3
+  summary: 'An advertised tool that returns HTTP 200 with an empty result list and no error is worse than
+    an absent one: it reports success while being permanently empty (artifact_memory.py:326-335). This
+    decision is owner-gated because ''keep'' puts Docker and an LLM into the dependency story that M4''s
+    packaging and no-Docker first run are built on. Record the call in an ADR; the implementation task
+    follows it.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - 'Given `docs/adr/adr-0004-graphiti-pilot.md`, when it is read, then it carries `Status: Accepted`,
+    a decision date, a link to `docs/spikes/graphiti-cost.md`, and exactly one of two outcomes: `retire`
+    or `keep-with-approvals-path`.'
+  - Given the ADR, when the consequences section is read, then it states explicitly what happens to F044
+    and F068 in M8 (memory-that-earns-it) under the chosen branch.
+  - Given the ADR under `keep`, then it names who operates the graph database in the documented first-run
+    path and whether it is opt-in or default; under `retire`, then it names the tool count the server
+    advertises afterwards (16) and where `graphiti_pilot.py` lives (retained as a labelled experiment,
+    or deleted).
+  depends_on:
+  - starts-everywhere-spike-1
+  tags:
+  - F036
+  - F124
+  - owner-decision
+  - graphiti
+  - memory
+- id: starts-everywhere-t-graphiti-resolve-tool
+  kind: task
+  title: 'Execute the Graphiti decision: wire the approvals producer, or remove the tool from every surface'
+  status: planned
+  parent: starts-everywhere-e3
+  summary: 'Implement whichever branch adr-0004 records. Under ''keep'': add `graphiti-approve <group-id>`
+    / `graphiti-revoke <group-id>` subcommands to workspace-tooling/artifact_memory_provision.py writing
+    a `{schema_version: 1, approved_groups: [...]}` file at mode 0600 into the derived root via `security.atomic_write_json`
+    (artifact_security.py:288), and document the workflow in workspace-tooling/README-artifact-ingestion.md.
+    Under ''retire'': remove the tool from src/index.ts:157, :373-392, :566 and :723-724, from the README
+    tool table at README.md:78, and from the golden fixture. Either way, the empty-approvals branch at
+    artifact_memory.py:326-335 must stop lying.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - 'Given the `keep` branch, when `python3 workspace-tooling/artifact_memory_provision.py graphiti-approve
+    demo-group` is run on a clean machine, then `<derived-root>/graphiti-approvals.json` exists at mode
+    0600 with `schema_version: 1`, and `stat -c ''%a''` (or the Python `oct(path.stat().st_mode & 0o777)`
+    equivalent) returns `600`.'
+  - 'Given the `keep` branch, when an integration test ingests N pilot units and calls `query_temporal_facts`
+    for the approved group, then it returns N non-empty results — today the same call returns `results:
+    []` with HTTP 200.'
+  - Given the `retire` branch, when `git grep -n query_temporal_facts -- src/ README.md tests/fixtures/`
+    is run, then it returns zero matches, and `npm test` passes against a regenerated 16-tool `tests/fixtures/tools-list.golden.json`.
+  - 'Given either branch, when `_approved_groups()` returns an empty set, then `temporal_facts()` (artifact_memory.py:326-335)
+    returns `status: "unconfigured"` plus the absolute approvals path it looked for — asserted by a unit
+    test in workspace-tooling/tests/ — so a caller can distinguish ''no facts'' from ''never provisioned''.'
+  depends_on:
+  - starts-everywhere-t-graphiti-decision
+  tags:
+  - F036
+  - F124
+  - graphiti
+  - dead-tool
+  - memory
+- id: starts-everywhere-t-derived-root-resolver
+  kind: task
+  title: Collapse the 13 hardcoded derived-state roots into one env-overridable, per-OS resolver
+  status: planned
+  parent: starts-everywhere-e3
+  summary: '`~/.local/share/personal-artifacts` is re-declared as a literal in 13 independent places —
+    artifact_runtime.py:25, artifact_ingestion.py:50, artifact_memory.py:34, artifact_catalog.py:32, artifact_outbox_retention.py:78,
+    artifact_unit_archive.py:74, artifact_skill_capture.py:26, artifact_quarantine.py:39-40, artifact_supervisor_receipt.py:44,
+    graphiti_pilot.py:33 and :37, artifact_watermark.py:1024 — plus the diverged TypeScript copy at src/tools/artifact-memory.ts:44-52
+    that spells it `workspace-artifacts`. A grep for XDG_DATA_HOME or any env override across workspace-tooling/*.py
+    returns nothing. This is the structural cause of the socket divergence, not a coincidence: there is
+    no single definition to keep in sync.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - 'Given a new `derived_root()` in workspace-tooling/artifact_runtime.py, when it is called, then it
+    resolves in order: `AGENT_KIT_DERIVED_ROOT`, then `$XDG_DATA_HOME/agent-kit`, then the per-OS default
+    (`~/.local/share/agent-kit` on Linux, `~/Library/Application Support/agent-kit` on macOS, `%LOCALAPPDATA%\agent-kit`
+    on Windows) — asserted by a unit test that monkeypatches each env var and `sys.platform` in turn.'
+  - Given the substrate, when `git grep -nE "local/share/(personal|workspace)-artifacts" -- 'workspace-tooling/*.py'`
+    is run, then the only match is the legacy-migration branch inside artifact_runtime.py, and a new test
+    `test_no_module_level_derived_root_literals` fails if any module reintroduces one.
+  - Given an existing installation at the old path, when the resolver runs and the legacy directory exists
+    while the new one does not, then it emits one stderr line naming both paths and the migration command,
+    and does not silently start a second empty store.
+  - Given `artifact-memory-runtime.json`, when the provisioner writes it, then it carries the resolved
+    `derived_root` as an explicit field so the TypeScript side reads it rather than reconstructing the
+    path.
+  tags:
+  - F050
+  - F118
+  - F012
+  - F101
+  - derived-root
+  - configuration
+  - portability
+  - substrate
+- id: starts-everywhere-t-derived-root-profile
+  kind: task
+  title: Add --profile so two clones can coexist on one machine
+  status: planned
+  parent: starts-everywhere-e3
+  summary: 'One machine gets exactly one catalog, one collection and one port: `GENERATION = "p20260721v1"`,
+    `COLLECTION = f"personal_artifact_chunks_{GENERATION}"` and `QDRANT_URL = "http://127.0.0.1:6343"`
+    are module constants in artifact_memory_provision.py:57-66. Two engineers on the same box, or one
+    engineer wanting a separate index per client repo, have no supported path. Thread a profile name through
+    the derived root, the collection name, the compose container name and the port so the substrate is
+    usable more than once.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given `python3 workspace-tooling/artifact_memory_provision.py --profile work` and `--profile personal`
+    run in sequence, when both complete, then two independent derived roots exist under the resolver's
+    base, each with its own `artifact-memory-runtime.json`, distinct `collection` values and distinct
+    ports (base + deterministic offset), and neither run modified the other's files.
+  - Given a profile name that is not `[a-z0-9-]{1,32}`, when it is passed, then the provisioner exits
+    non-zero with a message naming the allowed pattern.
+  - Given a provisioned profile, when the MCP server is started with `AGENT_KIT_PROFILE=work`, then `artifact_memory_status`
+    reports the collection and socket belonging to that profile — asserted by an integration test that
+    provisions two profiles in temp dirs and queries each.
+  - Given `services/qdrant/compose.yaml`, when it is generated for a profile, then `container_name` and
+    the published port both carry the profile suffix, so `docker compose up` for two profiles does not
+    collide.
+  depends_on:
+  - starts-everywhere-t-derived-root-resolver
+  tags:
+  - F178
+  - profiles
+  - multi-repo
+  - derived-root
+  - substrate
+- id: starts-everywhere-t-socket-path-resolution
+  kind: task
+  title: Resolve the artifact-memory socket from config, not from a hardcoded constant the provisioner
+    contradicts
+  status: planned
+  parent: starts-everywhere-e3
+  summary: '`DEFAULT_SOCKET_PATH` at src/tools/artifact-memory.ts:44-52 points at `workspace-artifacts`;
+    the provisioner writes `service.socket_path` under `personal-artifacts` (artifact_memory_provision.py:57,
+    :221). The two never meet, and the only escape hatch — `ArtifactMemoryConfig.socketPath` at :20-23
+    — is documented ''Test-only override'' with no environment variable reading it, so there is no way
+    to correct the mismatch without editing source. `createArtifactMemoryTools()` is called with no arguments
+    at src/index.ts:161.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - 'Given src/config.ts, when `loadConfig()` runs, then it exposes `artifactMemorySocketPath` resolved
+    in order: `ARTIFACT_MEMORY_SOCKET` env var; else `service.socket_path` read from `<derived-root>/artifact-memory-runtime.json`;
+    else the single shared default derived from the same resolver — and src/index.ts:161 passes it into
+    `createArtifactMemoryTools(config)`.'
+  - Given the doc comment at src/tools/artifact-memory.ts:21, when the change lands, then it no longer
+    says 'Test-only override' and instead documents the three-step resolution order.
+  - Given an unreachable socket, when any of the four tools is called, then the error text contains the
+    absolute path that was attempted and which of the three resolution steps supplied it — asserted by
+    a case in src/tools/artifact-memory.test.ts.
+  - Given a machine where the provisioner has run, when `node dist/index.js` is started and `artifact_memory_status`
+    called, then it returns a non-error result. Today this call fails on every clean install regardless
+    of platform.
+  depends_on:
+  - starts-everywhere-t-derived-root-resolver
+  tags:
+  - F037
+  - F113
+  - F171
+  - socket-path
+  - configuration
+  - blocker
+  - mcp-server
+- id: starts-everywhere-t-revive-drift-test
+  kind: task
+  title: Revive the dead TS-to-Python drift test and extend it to the field that actually diverged
+  status: planned
+  parent: starts-everywhere-e3
+  summary: '`test_typescript_adapter_pins_the_same_protocol_version` at workspace-tooling/tests/test_artifact_memory_service.py:1832-1854
+    resolves the adapter as `SCRIPT_DIR.parent / "GitLab" / "SWAT DevOps - SDO" / "platform" / "tools"
+    / "claude-mcp-server" / "src" / "tools" / "artifact-memory.ts"` and calls `self.skipTest("claude-mcp-server
+    checkout is not present")` when absent. In this repo the adapter is at `src/tools/artifact-memory.ts`,
+    so the only cross-language contract check in the repo has been silently skipping — which is precisely
+    why the socket path was free to diverge.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given the test at test_artifact_memory_service.py:1832-1854, when the path is changed to `Path(__file__).resolve().parents[2]
+    / 'src' / 'tools' / 'artifact-memory.ts'` and `self.skipTest(...)` replaced with `self.fail(...)`,
+    then running the substrate suite on this repo executes the test rather than skipping it.
+  - 'Given the revived test, when it runs, then it asserts three things, not two: `PROTOCOL_VERSION`,
+    `PROTOCOL_HEADER`, and that the TypeScript default socket path equals `artifact_memory_provision._runtime_payload()[''service''][''socket_path'']`
+    for a fixture derived root.'
+  - Given a deliberate edit changing `const PROTOCOL_VERSION = 1;` in the adapter to `2`, when the suite
+    is run, then the test FAILS — proving it is no longer a no-op.
+  - Given the employer path literal, when `git grep -n 'SWAT DevOps' -- workspace-tooling/tests/` is run
+    after this change, then test_artifact_memory_service.py no longer appears.
+  depends_on:
+  - starts-everywhere-t-socket-path-resolution
+  tags:
+  - F113
+  - F167
+  - drift-test
+  - cross-language-contract
+  - substrate
+- id: starts-everywhere-t-embedded-search-fallback
+  kind: task
+  title: Make the embedded search fallback read real runtime config, or fail loudly naming the missing
+    file
+  status: planned
+  parent: starts-everywhere-e3
+  summary: '`artifact_memory.search_artifacts` routes to the service only when `runtime is not None and
+    runtime.active_backend == "server"` (artifact_memory.py:257-258); otherwise it falls through to :260-272
+    and queries `collection=ingestion.DEFAULT_COLLECTION` (= `personal_artifact_chunks_v1`, artifact_ingestion.py:55)
+    with `embedding_model=DEFAULT_EMBEDDING_MODEL` (:56). The only provisioner in the repo writes `active_backend:
+    "server"` and `COLLECTION = f"personal_artifact_chunks_{GENERATION}"` — it never creates `personal_artifact_chunks_v1`.
+    So any config-read failure silently degrades to querying a collection that does not exist.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given a missing or unreadable `artifact-memory-runtime.json`, when `search_artifacts` is called, then
+    it raises `MemoryReadError` naming the absolute runtime-config path it could not read — asserted by
+    a unit test that points the resolver at an empty temp dir. It must not silently query an embedded
+    collection.
+  - Given the alternative branch (fallback retained), when it runs, then it reads `collection`, `generation`
+    and `embedding_model` from the same runtime config the server path uses, and a test asserts the two
+    branches cannot select different collection names for the same config.
+  - Given the repo, when `git grep -n 'DEFAULT_COLLECTION\|DEFAULT_EMBEDDING_MODEL' -- workspace-tooling/`
+    is run, then no module declares an independent default that is not derived from the single generation
+    value — enforced by a new test `test_all_collection_constants_derive_from_one_generation`.
+  - Given the substrate suite, when it is run on macOS or Linux, then the new tests pass and no previously
+    passing test regresses.
+  depends_on:
+  - starts-everywhere-t-derived-root-resolver
+  tags:
+  - F054
+  - fallback
+  - fail-loud
+  - collection-identity
+  - substrate
+- id: starts-everywhere-t-substrate-readme-truth
+  kind: task
+  title: Make workspace-tooling/README.md describe the paths the code actually reads
+  status: planned
+  parent: starts-everywhere-e3
+  summary: 'workspace-tooling/README.md:52-61 tells the reader to build the venv at `~/.local/share/workspace-artifacts/venv`
+    and states that the LaunchAgent plists reference that interpreter path. Both halves are false: every
+    module defaults to `~/.local/share/personal-artifacts` and the plists reference `personal-artifacts`
+    too. A reader following the README verbatim builds a venv nothing looks at. The same file also claims
+    a CI pipeline at :82 that does not exist and links a file at :121 that is absent.'
+  priority: should
+  lane: next
+  size: S
+  acceptance:
+  - Given workspace-tooling/README.md, when `git grep -n 'workspace-artifacts' -- workspace-tooling/*.md`
+    is run, then it returns zero matches; every path in the install block resolves through the documented
+    `AGENT_KIT_DERIVED_ROOT` resolution order.
+  - Given README-artifact-catalog.md and README-artifact-ingestion.md, when the same grep is run over
+    them, then it also returns zero matches.
+  - Given workspace-tooling/README.md:82, when the file is read, then the `.gitlab-ci.yml` CI claim is
+    deleted (there is no CI in this repo until M3), and the dangling link at :121 is either repaired to
+    an existing file or removed.
+  - Given the install block, when a reader follows it verbatim on macOS or Linux, then `python3 workspace-tooling/artifact_memory_provision.py
+    --check` exits 0 — verified once manually and recorded in the PR description.
+  depends_on:
+  - starts-everywhere-t-derived-root-resolver
+  tags:
+  - F101
+  - F012
+  - docs
+  - substrate-install
+- id: starts-everywhere-e4
+  kind: epic
+  title: A first run that matches the documentation
+  status: planned
+  summary: The documented entrypoint cannot run for anyone but the original author, on any OS. `loadConfig()`
+    (src/config.ts:31-37) throws when `PLATFORM_ROOT` is unset and the README Quick Start sets no environment
+    at all; `setup-local.sh` walks parent directories for `charts/`+`tools/` then `GitLab/` and calls
+    `fatal` otherwise; `bootstrap.sh` invokes four files absent from the repo; `test-smoke.sh` asserts
+    tools, skills and agents that do not exist; and the shipped MCP registration templates register a
+    server named `workspace-platform` at a path from the pre-genericization employer layout. This epic
+    makes the first five minutes work and tells the truth about which platforms are supported.
+  priority: must
+  lane: now
+  size: L
+  acceptance:
+  - Given a bare clone in a temporary directory with an empty environment, when the fenced commands in
+    README.md's Quick Start are executed verbatim, then a server process starts and answers `tools/list`
+    — on macOS, Linux and Windows. Today it exits 1 with `PLATFORM_ROOT environment variable is required`
+    on all three.
+  - Given the same bare clone, when `agent-kit init` is run, then it completes with exit 0, writes only
+    inside the clone unless an explicit flag is passed, and leaves any pre-existing `.claude/` content
+    intact.
+  - Given a machine with a missing prerequisite (e.g. no python3.12), when `agent-kit doctor` is run,
+    then it exits non-zero and prints exactly one actionable line for that row while still reporting every
+    other row.
+  - Given the repo, when `git ls-files test-smoke.sh` is run, then it returns nothing; and `git grep -n
+    'workspace-platform' -- data/scripts/` returns nothing.
+  - Given README.md, when the `## Supported platforms` section is read, then it states per component (MCP
+    server / Python substrate / shell hooks) which of macOS, Linux and Windows are supported today, with
+    no component silently claimed.
+  tags:
+  - F008
+  - F093
+  - F170
+  - F168
+  - F097
+  - F173
+  - F144
+  - F156
+  - F175
+  - F033
+  - F108
+  - X007
+  - onboarding
+  - first-run
+  - installer
+  - docs
+- id: starts-everywhere-t-platform-root-default
+  kind: task
+  title: Default PLATFORM_ROOT to the package root and make the employer-shaped discovery globs configurable
+  status: planned
+  parent: starts-everywhere-e4
+  summary: src/config.ts:27-37 throws unconditionally when `PLATFORM_ROOT` is unset, with an error telling
+    the user to point the tool at a 'platform monorepo' that has nothing to do with this repository. Even
+    a user who guesses a value gets silent zero-discovery, because `contextGuidesDir` is `<root>/sandbox/context`
+    (config.ts:64) and `claudeMdGlobs` (config.ts:86-95) are four employer-monorepo paths — `charts/*/CLAUDE.md`,
+    `source/*/CLAUDE.md`, `infra/*/CLAUDE.md`, `ci-cd-templates/CLAUDE.md` — that resolve to nothing in
+    a normal clone.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given an empty environment, when `loadConfig()` is called, then `platformRoot` defaults to the package
+    root computed the same way `dataDir` already is at src/config.ts:78-79 (`resolve(dirname(fileURLToPath(import.meta.url)),
+    "..")`), and no exception is thrown.
+  - Given `PLATFORM_ROOT` explicitly set to a path that does not exist, when `loadConfig()` is called,
+    then it throws with a message naming the supplied path — an explicit bad value must still fail loudly.
+  - Given no config file, when the server starts, then `claudeMdGlobs` defaults to a depth-bounded `**/CLAUDE.md`
+    under the workspace root (max depth documented in the code) rather than the four hardcoded employer
+    globs, and `contextGuidesDir` is read from the same configurable discovery block.
+  - Given `src/config.test.ts`, when `node --import tsx --test src/config.test.ts` is run with an empty
+    environment, then it asserts a non-throwing config whose `platformRoot` equals the package root and
+    whose `dataSkillsDir` contains the bundled `handoff` skill.
+  - Given the existing contract suite, when `npm test` is run, then `src/mcp-contract.test.ts` still passes
+    against `tests/fixtures/mcp-contract/` with its explicit PLATFORM_ROOT — the default must not break
+    the fixture-driven path.
+  tags:
+  - F170
+  - F093
+  - F008
+  - F122
+  - config
+  - onboarding
+  - blocker
+  - mcp-server
+- id: starts-everywhere-t-readme-quickstart-verify
+  kind: task
+  title: Make the README Quick Start executable, and add a script that executes it
+  status: planned
+  parent: starts-everywhere-e4
+  summary: README.md:87-93 documents `npm ci && npm run build` then `claude mcp add agent-kit -- node
+    /abs/path/to/agent-kit/dist/index.js`. Run with a clean environment, that command dies immediately.
+    Documentation that is not executed drifts; make the Quick Start a runnable artifact so the next person
+    who edits it finds out.
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given README.md, when the Quick Start fenced block is read, then it contains the exact working `claude
+    mcp add` invocation including any `-e` flags actually required after the PLATFORM_ROOT default lands
+    — and no variable that the reader must invent.
+  - Given `scripts/verify-quickstart.mjs`, when `node scripts/verify-quickstart.mjs` is run from a bare
+    clone, then it extracts the fenced `bash` block from README.md's Quick Start section, executes it
+    in a temporary directory with an empty environment, sends `initialize` + `tools/list` over stdio,
+    and exits 0 only if a tool list is returned.
+  - Given a deliberate edit that removes a required step from the README block, when `node scripts/verify-quickstart.mjs`
+    is run, then it exits non-zero — proving the check reads the README rather than a copy.
+  - Given Windows, when the same script is run under PowerShell (not Git Bash), then it succeeds — the
+    script must not shell out to bash.
+  depends_on:
+  - starts-everywhere-t-platform-root-default
+  - starts-everywhere-t-failsoft-tool-group-registration
+  tags:
+  - F093
+  - F170
+  - F008
+  - readme
+  - executable-docs
+  - docs
+- id: starts-everywhere-t-supported-platforms-statement
+  kind: task
+  title: State supported platforms honestly instead of overclaiming while the substrate port is in flight
+  status: planned
+  parent: starts-everywhere-e4
+  summary: 'README.md:104-105 documents the substrate suite as ''~590 tests'' and the single commit message
+    claims ''593 passing''. On Windows 11 / CPython 3.11 that exact command collects 260 tests and reports
+    169 red — 44 `AttributeError: module ''os'' has no attribute ''geteuid''`, 40 `ModuleNotFoundError:
+    No module named ''fcntl''` at module scope, plus an AF_UNIX bind at artifact_memory_service.py:1677.
+    The port is M2 and M5 work; this story is the scoping half only, so the README stops making a claim
+    the code cannot honour.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given README.md, when the new `## Supported platforms` section is read, then it has one row per component
+    — MCP server, Python substrate, shell hooks, Obsidian projection, launchd services — and a supported/unsupported/WSL-only
+    verdict per row for macOS, Linux and Windows, with a link to the milestone that changes each 'unsupported'
+    cell.
+  - Given workspace-tooling/README.md, when its Run-the-tests block is read, then it carries the same
+    statement and does not present the substrate suite as runnable on Windows.
+  - Given a Windows host, when the documented substrate suite command is run, then it prints one clear
+    banner naming the unsupported platform and the supported alternatives (macOS, Linux, WSL2) instead
+    of 169 errors — implemented as a `sys.platform` guard in the suite's discovery entry point, not by
+    fixing the modules (that is gates-green).
+  - Given README.md's Requirements section at :140, when read, then it no longer implies the substrate
+    runs everywhere the server does.
+  tags:
+  - F108
+  - F101
+  - docs
+  - scoping
+  - honesty
+- id: starts-everywhere-t-agent-kit-init
+  kind: task
+  title: Replace setup-local.sh's employer-monorepo detection with an `agent-kit init` that works on a
+    bare clone
+  status: planned
+  parent: starts-everywhere-e4
+  summary: setup-local.sh:65-81 walks parent directories for one containing both `charts/` and `tools/`
+    and calls `fatal` otherwise; :89-105 then requires an ancestor containing `GitLab/`. Neither exists
+    in this repo or any generic clone, so `bash setup-local.sh --build-only` prints 'Could not find a
+    parent directory containing both charts/ and tools/' and exits before `npm ci` — the build-only path
+    is unreachable. The loop condition `while [[ "$dir" != "/" ]]` also never terminates correctly on
+    a Windows path root. Rewrite as a Node subcommand so the single Node >= 20 prerequisite covers setup
+    on all three OSes.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given a bare clone in a temp directory with no matching ancestors, when `node scripts/init.mjs` (exposed
+    as `agent-kit init`) is run, then it exits 0 — today the shell equivalent exits non-zero before `npm
+    ci`.
+  - Given the same run, when the roots are resolved, then `platformRoot` and `workspaceRoot` default to
+    the clone root, are overridable by `--platform-root` / `--workspace-root` flags and by the `PLATFORM_ROOT`
+    / `WORKSPACE_ROOT` environment variables, and `--build-only` short-circuits before any root resolution
+    at all.
+  - Given a Windows host, when `agent-kit init` is run from PowerShell, then it completes without invoking
+    bash and plants content by copy; on POSIX it uses `fs.symlink` with an automatic copy fallback when
+    symlink creation fails.
+  - Given the three `data/claude-md/*.md` plant targets that do not exist (`workspace-root.md`, `gitlab-domain.md`,
+    `platform-monorepo.md` — `data/claude-md/` contains only AGENTS.md and CONTEXT.md), when init runs,
+    then those targets are gone from the source and a missing plant source produces a warning line rather
+    than a silent `return 0`.
+  - Given `tests/init.test.mjs`, when `node --test tests/init.test.mjs` is run, then it asserts init succeeds
+    in a temp copy with no matching ancestors, on the current platform.
+  depends_on:
+  - starts-everywhere-t-platform-root-default
+  tags:
+  - F168
+  - F144
+  - F008
+  - X007
+  - F097
+  - installer
+  - onboarding
+  - blocker
+  - portability
+- id: starts-everywhere-t-init-safe-planting
+  kind: task
+  title: Stop the installer destroying pre-existing .claude content, and record what it created
+  status: planned
+  parent: starts-everywhere-e4
+  summary: 'setup-local.sh destroys user content without a prompt or backup: lines 178, 187 and 195 `rm
+    -rf` directories under `${WORKSPACE_ROOT}/.claude/`, and :207-234 overwrites CLAUDE.md/AGENTS.md at
+    up to four locations outside the clone. Nothing anywhere records what was created, which is also why
+    no uninstall path can exist. Make planting refuse-by-default and receipt-backed.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given a target under `.claude/` that exists and is not a symlink this installer created, when `agent-kit
+    init` runs without `--force`, then it refuses, prints the exact absolute paths it would have removed,
+    and exits non-zero — asserted by a test that pre-creates `.claude/commands/mine.md` and checks the
+    file still exists afterwards.
+  - Given `--force`, when init runs, then the same paths are replaced and each removal is recorded in
+    the receipt with its prior content hash.
+  - 'Given any successful init, when `cat <clone>/.agent-kit/install-receipt.json` is read, then it lists
+    every path created or modified with `{path, action: created|linked|copied|overwritten, sha256_before?,
+    at}` and the resolved roots used.'
+  - Given a run that would write outside the clone, when no `--install-to` flag is passed, then it refuses
+    and names the path — writing outside the clone requires an explicit opt-in flag.
+  - 'Given a second `agent-kit init` on an already-initialized clone, when it runs, then it is idempotent:
+    exit 0, receipt updated, no destructive action taken.'
+  depends_on:
+  - starts-everywhere-t-agent-kit-init
+  tags:
+  - F144
+  - F175
+  - X007
+  - installer
+  - safety
+  - receipt
+  - portability
+- id: starts-everywhere-t-retire-dead-installers
+  kind: task
+  title: Delete test-smoke.sh, and repair or delete bootstrap.sh
+  status: planned
+  parent: starts-everywhere-e4
+  summary: test-smoke.sh (185 lines, repo root) prints 'Cannot detect PLATFORM_ROOT' and exits; even if
+    it started, line 103 requires tools `get_environment_map` and `get_app_context` that do not exist,
+    line 139 asserts a skill `argocd-debug` (data/skills/ contains only handoff/) and line 173 an agent
+    `cluster-health` (none of the 20 is named that). data/scripts/bootstrap.sh invokes `clone-workspace.sh`,
+    `install-cilint-hook.sh` and `repos-manifest.tsv` — all absent — hardcodes `PLATFORM_ROOT="$WS/GitLab/workspace/platform"`
+    and assumes ~70 platform repos behind SSH to an employer GitLab. Both point readers at `data/references/onboarding.md`,
+    which does not exist.
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given the repo, when `git ls-files test-smoke.sh` is run, then it returns nothing. `src/mcp-contract.test.ts`
+    already covers initialize + the tools/list golden + representative tool calls hermetically and cross-platform,
+    so nothing is lost.
+  - Given data/scripts/bootstrap.sh, when the decision is 'delete', then `git ls-files data/scripts/bootstrap.sh`
+    returns nothing and every reference to it (setup-local.sh:16-18, README-adjacent docs) is removed;
+    when the decision is 'repair', then running it on a bare clone in a temp dir exits 0 and it no longer
+    references clone-workspace.sh, install-cilint-hook.sh, repos-manifest.tsv, the Atlassian phase or
+    the AWS phase.
+  - Given the repo, when `git grep -n 'data/references/onboarding.md'` is run, then either the file exists
+    at that path or there are zero references to it.
+  - Given a bare clone, when `bash setup-local.sh --build-only` is run (if the script is retained as a
+    thin wrapper over `agent-kit init`), then it exits 0.
+  depends_on:
+  - starts-everywhere-t-agent-kit-init
+  tags:
+  - F156
+  - F173
+  - F097
+  - dead-code
+  - installer
+  - portability
+- id: starts-everywhere-t-mcp-registration-templates
+  kind: task
+  title: Fix the MCP registration templates — they name a different server at a path that does not exist
+  status: planned
+  parent: starts-everywhere-e4
+  summary: data/scripts/template-mcp.json:3-11 and data/scripts/template-codex-config.toml:23-29 both
+    register this kit's server as `workspace-platform` with the command `node ${PERSONAL_WORKSPACE_ROOT}/GitLab/workspace/platform/tools/claude-mcp-server/dist/index.js`
+    — a pre-genericization employer path whose entry point in this repo is `<repo>/dist/index.js`. Meanwhile
+    README.md:92 registers it as `agent-kit` and 47 tool grants across data/ name `mcp__agent-kit__*`;
+    `git grep mcp__workspace-platform` returns zero hits. Both templates also carry an `AWS_PROFILE`/`AWS_REGION`
+    block and an `atlassian` server requiring an unlisted `uvx` binary and `~/.config/workspace/secrets.env`.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given data/scripts/template-mcp.json, when it is read, then the single server key equals the name
+    chosen in adr-0001, its `args[0]` is `${AGENT_KIT_ROOT}/dist/index.js`, its `env` block contains only
+    variables this server actually reads, and the `atlassian` block, `AWS_PROFILE` and `AWS_REGION` are
+    gone.
+  - Given data/scripts/template-codex-config.toml, when it is read, then the same three properties hold
+    for `[mcp_servers.<name>]` and the `[mcp_servers.atlassian]` section is gone.
+  - 'Given `agent-kit init`, when it writes an MCP registration, then `${AGENT_KIT_ROOT}` is substituted
+    with the resolved clone path, and the resulting `.mcp.json` is loadable: `node -e "JSON.parse(require(''fs'').readFileSync(''.mcp.json'',''utf8''))"`
+    exits 0 and the referenced `dist/index.js` exists.'
+  - Given a new gate `python3 data/scripts/mcp-server-name-check.py --check`, when run, then it exits
+    0 only if every `mcp__<server>__` prefix appearing in `data/**/*.md` matches a server key present
+    in both shipped templates; introducing a mismatched grant makes it exit non-zero naming the file.
+  depends_on:
+  - starts-everywhere-t-name-collision-decision
+  tags:
+  - F033
+  - F173
+  - templates
+  - mcp-registration
+  - packs
+- id: starts-everywhere-t-doctor-preflight
+  kind: task
+  title: Add an `agent-kit doctor` preflight that reports each unmet prerequisite in one actionable line
+  status: planned
+  parent: starts-everywhere-e4
+  summary: Grepping the whole tree for `doctor`, `uninstall` and `--preflight` returns zero matches across
+    .sh, .py, .ts, .md and .json. There is no command that answers 'is my install healthy and what is
+    wrong'. Given how many independent things must line up — roots, build freshness, the socket path,
+    Qdrant, the generator gates — a first-run failure today is undiagnosable without reading TypeScript
+    source.
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given `agent-kit doctor` on a correctly provisioned machine, when it is run, then it prints one PASS
+    row per check and exits 0.
+  - Given a machine missing any single prerequisite, when it is run, then it exits non-zero, prints exactly
+    one FAIL line for that row containing what was expected, what was found and the command to fix it,
+    and still evaluates and reports every other row (no early abort).
+  - 'Given the check list, when the source is read, then it covers at minimum: node >= 20; python3.12
+    resolvable; `dist/index.js` present and newer than `src/`; resolved platformRoot/workspaceRoot exist;
+    the four generator `--check` gates under `PYTHONUTF8=1`; the resolved artifact-memory socket path
+    exists at mode 0600 and matches the value in `artifact-memory-runtime.json`; Qdrant answering on the
+    configured port; docker reachable — each row explicitly labelled required or optional.'
+  - Given a Windows host, when `agent-kit doctor` is run from PowerShell, then it completes without invoking
+    bash, jq or shasum, and rows that cannot apply on the platform report SKIP with a reason rather than
+    FAIL.
+  - Given the four generator gates that are red at HEAD, when doctor is run today, then it reports them
+    as FAIL with the exact regeneration command — doctor must be honest about the repo's own state, not
+    tuned to pass.
+  depends_on:
+  - starts-everywhere-t-socket-path-resolution
+  - starts-everywhere-t-platform-root-default
+  tags:
+  - F175
+  - F108
+  - doctor
+  - preflight
+  - dx
+  - portability
+- id: starts-everywhere-t-uninstall-receipt
+  kind: task
+  title: Add `agent-kit uninstall` driven by the install receipt, dry-run by default
+  status: planned
+  parent: starts-everywhere-e4
+  summary: What a user gets today is symlinks planted into `$WORKSPACE_ROOT/.claude/{skills,agents,references,scripts,hooks,commands}`,
+    CLAUDE.md/AGENTS.md copies at up to four locations, merged keys in `.claude/settings.json`, a `.mcp.json`,
+    a `.codex/config.toml`, appended `.git/info/exclude` lines, a registered git clean filter, a derived
+    root with a venv and sqlite databases, and generated packs at two more anchors — none of it inventoried.
+    Make removal possible and safe.
+  priority: could
+  lane: later
+  size: M
+  acceptance:
+  - 'Given a clone initialized by `agent-kit init`, when `agent-kit uninstall` is run with no flags, then
+    it defaults to dry-run: it prints every path it would remove or restore, grouped by action, and changes
+    nothing on disk.'
+  - Given `--apply`, when it is run, then every path listed in `.agent-kit/install-receipt.json` with
+    action `created` or `linked` is removed, every `overwritten` path is restored from its recorded prior
+    content where a backup exists, and paths absent from the receipt are never touched.
+  - Given a receipt entry whose current content hash no longer matches what init wrote, when `--apply`
+    runs, then that path is skipped with a warning naming it, unless `--force` is passed.
+  - Given `tests/uninstall.test.mjs`, when `node --test tests/uninstall.test.mjs` is run, then it asserts
+    an init-then-uninstall round trip leaves the temp workspace byte-identical to its pre-init state apart
+    from the build output.
+  depends_on:
+  - starts-everywhere-t-init-safe-planting
+  tags:
+  - F175
+  - uninstall
+  - receipt
+  - dx
+  - portability
+- id: starts-everywhere-e5
+  kind: epic
+  title: '[OWNER DECISION on AWS] Clone hygiene: nothing in the tree a public clone should not contain'
+  status: planned
+  summary: README.md:126-132 claims the employer-specific material was removed; `git grep` disproves it.
+    The employer's internal GitLab group name is in five tracked files, two of them live path-construction
+    code including the OpenCode plugin template shipped to third parties; `artifact_catalog.py:297` hashes
+    an employer product key; `artifact-policy.json` ships one engineer's private vault layout as the enforced
+    default. Separately the repo has no .gitattributes, zero files with the executable bit recorded, nothing
+    excluding the MCP token log that stores a 120-character raw preview of every tool call's arguments,
+    and four @aws-sdk runtime dependencies with zero imports that contradict the 'Nothing leaves the machine'
+    headline claim.
+  priority: should
+  lane: now
+  size: M
+  acceptance:
+  - Given the repo, when `git grep -nE "SWAT DevOps|Nalej|nalej-|GitLab/workspace/platform|gitlab\\.example\\.com|claude-mcp-server"`
+    is run over tracked files, then it returns zero matches, and `bash data/scripts/denylist-check.sh`
+    exits 0 (and non-zero when any literal is reintroduced).
+  - Given the repo, when `node -e "const d=require('./package.json').dependencies; console.log(Object.keys(d).filter(k=>k.startsWith('@aws-sdk')).length)"`
+    is run, then it prints 0, and `npm ci && npm run build && npm test` all succeed.
+  - Given a fresh clone with `core.autocrlf=true`, when `git ls-files --eol setup-local.sh data/hooks/*.sh`
+    is run, then every entry shows `w/lf`, and `git ls-files -s data/hooks/*.sh` shows mode `100755`.
+  - Given a personal-profile server run, when `git status --porcelain` is checked, then `.claude/mcp-token-log*.jsonl`
+    and `.claude/mcp-cache-snapshot*.jsonl` do not appear as untracked, and `git check-ignore -v .claude/mcp-cache-snapshot.shared.jsonl`
+    exits 0.
+  - Given `workspace-tooling/artifact_catalog.py`, when it is run with no `--policy`, then it exits non-zero
+    naming `artifact-policy.example.json` rather than silently enforcing one engineer's vault roots.
+  tags:
+  - F007
+  - F105
+  - F145
+  - F099
+  - F125
+  - F135
+  - F184
+  - F122
+  - F095
+  - F167
+  - F035
+  - F052
+  - F183
+  - owner-decision
+  - hygiene
+  - de-personalisation
+  - dependencies
+  - security
+- id: starts-everywhere-t-aws-sdk-deps
+  kind: task
+  title: '[OWNER DECISION] Remove the four unused @aws-sdk runtime dependencies, or declare the AWS integration
+    a real roadmap item'
+  status: planned
+  parent: starts-everywhere-e5
+  summary: package.json:17-20 declares `@aws-sdk/client-dynamodb`, `@aws-sdk/client-secrets-manager`,
+    `@aws-sdk/credential-provider-ini` and `@aws-sdk/types` as runtime dependencies. A grep for `aws-sdk|DynamoDB|SecretsManager|fromIni`
+    across src/ and data/ returns zero hits; the only references are stale `dist/` build output for modules
+    that no longer exist in src/. They expand to 29 @aws-sdk/@smithy lock entries and 7.6 MB, and `credential-provider-ini`
+    exists specifically to read `~/.aws/credentials` and assume roles — in a tool whose README.md:25 headline
+    is 'Nothing leaves the machine'. This is owner-gated because dropping a declared dependency is a public
+    API decision.
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - 'Given `docs/adr/adr-0005-aws-dependencies.md`, when it is read, then it carries `Status: Accepted`
+    and records either ''remove'' or ''AWS integration is a roadmap item'', with the milestone named in
+    the second case.'
+  - Given the 'remove' branch, when `node -e "const d=require('./package.json').dependencies; console.log(Object.keys(d).filter(k=>k.startsWith('@aws-sdk')))"`
+    is run, then it prints `[]`, `package-lock.json` has been regenerated (dropping the 20 @aws-sdk and
+    9 @smithy entries), and `npm ci && npm run build && npm test` all succeed.
+  - Given a committed expected production-dependency list at `data/facts/expected-prod-deps.json`, when
+    `node scripts/check-prod-deps.mjs` is run, then it exits 0 for the current set and non-zero when a
+    runtime dependency is added without updating the list — so the 'nothing leaves the machine' claim
+    stays mechanically true.
+  - Given `workspace-tooling/artifact_retrieval_eval.py:60-75`, which pins digests over package.json and
+    package-lock.json, when the dependency change lands, then those pinned digests are updated in the
+    same commit and the substrate suite still passes on macOS or Linux.
+  tags:
+  - F099
+  - F135
+  - F184
+  - F125
+  - owner-decision
+  - dependencies
+  - supply-chain
+  - security
+- id: starts-everywhere-t-dead-modules-and-metadata
+  kind: task
+  title: Delete the unreferenced src/ modules and duplicated type, and fill in package.json's OSS metadata
+  status: planned
+  parent: starts-everywhere-e5
+  summary: '`src/facts/loader.ts` is 63 lines with a 17-line doc comment and zero consumers — `loadFacts`
+    appears only in its own definition, and `data/facts/catalog.json` is read exclusively by the Python
+    generators (catalog-generate.py:70, generate-adapter-packs.py:65, generate-root-contract.py:38). `src/tools/index.ts`
+    is a barrel exporting 6 of the 8 tool factories, missing `createMemoryTools` and `createTokenStatsTools`,
+    and nothing imports it since src/index.ts:33-41 imports each module directly. `src/search/indexer.ts:8-20`
+    re-declares the ContentType union already exported from src/types.ts:84. package.json also lacks `license`
+    and `repository`.'
+  priority: should
+  lane: next
+  size: S
+  acceptance:
+  - Given the repo, when `git ls-files src/facts/loader.ts src/tools/index.ts` is run, then it returns
+    nothing (or, if either is retained, it is imported by at least one non-test module — assert with a
+    grep in the PR description).
+  - Given src/search/indexer.ts, when it is read, then the ContentType union is imported from src/types.ts
+    rather than re-declared, and `npm run build` succeeds with no new type errors.
+  - Given package.json, when `node -e "const p=require('./package.json'); console.log(p.license, p.repository.url)"`
+    is run, then it prints the SPDX expression from adr-0002 and the public GitHub URL.
+  - Given `npm run build && npm test`, when run after the deletions, then both succeed — nothing imported
+    the removed modules.
+  depends_on:
+  - starts-everywhere-t-licence-split
+  tags:
+  - F125
+  - F184
+  - dead-code
+  - package-metadata
+  - mcp-server
+- id: starts-everywhere-t-gitattributes-exec-bits
+  kind: task
+  title: Add .gitattributes pinning LF and restore the executable bit on directly-invoked scripts
+  status: planned
+  parent: starts-everywhere-e5
+  summary: '`git ls-files -s` reports all 293 tracked files as mode 100644 — zero 100755 entries. The
+    repo''s .git/config sets `core.filemode = false` (the Git-for-Windows default) and the single squashed
+    commit was made under it, so the executable bit was never recorded for any of the 29 tracked .sh scripts
+    or the ~60 Python files carrying a shebang. There is also no .gitattributes anywhere, so a contributor
+    with the common `core.autocrlf=true` checks out CRLF .sh files that fail on POSIX with `bad interpreter:
+    /usr/bin/env bash^M`. The owner''s own clone is `core.autocrlf=input`, which is why this is invisible
+    locally.'
+  priority: should
+  lane: now
+  size: S
+  acceptance:
+  - Given a root `.gitattributes`, when it is read, then it pins `* text=auto eol=lf`, `*.sh text eol=lf`,
+    `*.py text eol=lf`, `*.mjs text eol=lf`, `*.plist text eol=lf`, `*.ps1 text eol=crlf` and `*.png binary`
+    — covering only extensions actually tracked.
+  - Given a clone made with `git -c core.autocrlf=true clone`, when `git ls-files --eol -- '*.sh' '*.py'`
+    is run, then every entry shows `w/lf`.
+  - Given the tracked tree, when `git ls-files -s -- setup-local.sh 'tests/*.sh' 'tests/hooks/*.sh' 'data/scripts/*.sh'
+    'data/hooks/*.sh' 'workspace-tooling/*.sh'` is run, then every entry shows mode `100755` after `git
+    update-index --chmod=+x` has been applied and committed.
+  - Given the same clone on a POSIX host, when `bash tests/hooks/block-plaintext-secret-write.test.sh`
+    is run, then it executes rather than failing with a `^M` interpreter error.
+  tags:
+  - F007
+  - F105
+  - gitattributes
+  - line-endings
+  - portability
+- id: starts-everywhere-t-gitignore-runtime-logs
+  kind: task
+  title: Gitignore the MCP token log and cache snapshot — they carry raw tool arguments
+  status: planned
+  parent: starts-everywhere-e5
+  summary: 'Under the default personal profile the token log stores a 120-character raw preview of every
+    tool call''s arguments: src/logging/token-logger.ts:297-300 selects `summarizeArgs` (:153-160) and
+    only `SERVER_PROFILE=shared` switches to `hashArgs`. Both that log and the response-cache snapshot
+    (which stores raw argsKeys) default to `$WORKSPACE_ROOT/.claude/` (src/config.ts:109-137). This repo''s
+    .gitignore covers only node_modules/, dist/, __pycache__/, *.pyc, .DS_Store and npm-debug.log*; `git
+    check-ignore -v .claude/mcp-cache-snapshot.shared.jsonl` exits 1 and `git status --porcelain` shows
+    `?? .claude/` — one `git add -A` from a public commit.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given the repo .gitignore, when `git check-ignore -v .claude/mcp-token-log.personal.jsonl` and `git
+    check-ignore -v .claude/mcp-cache-snapshot.shared.jsonl` are run, then both exit 0 naming the matching
+    pattern.
+  - Given `data/scripts/ensure-claude-gitignore.sh:54-64`, when the emitted exclude block is inspected,
+    then it contains `.claude/mcp-token-log*.jsonl` and `.claude/mcp-cache-snapshot*.jsonl` alongside
+    the existing `.claude/notes/`, `.claude/agent-memory/` and `.claude/settings.local.json` entries —
+    so every repo the pipeline touches is covered, not just this one.
+  - Given README.md's SERVER_PROFILE section, when it is read, then it states that the personal profile
+    persists a 120-character raw argument preview, names the exact default file path, and names the `hashArgs`
+    behaviour of the shared profile.
+  - Given a server run under the personal profile followed by `git status --porcelain`, when checked,
+    then no `.claude/` entry appears as untracked.
+  tags:
+  - F145
+  - gitignore
+  - privacy
+  - token-log
+  - security
+- id: starts-everywhere-t-purge-employer-code-paths
+  kind: task
+  title: Purge employer paths from the four live code sites that construct them
+  status: planned
+  parent: starts-everywhere-e5
+  summary: Two of the five tracked files carrying the employer's internal group name are not comments
+    but live path construction. `data/scripts/template-opencode-plugin.mjs:57` builds `join(ws, "GitLab",
+    "SWAT DevOps - SDO", "platform", GUARD_REL)` — so every OpenCode plugin this kit emits for an external
+    user carries that string, all three of its candidates miss on any other machine, and `resolveGuard`
+    returns null and the secret guard fails open silently by design (:44-45). `workspace-tooling/artifact_retrieval_eval.py:217-220`
+    hardcodes `_LEGACY_ADAPTER_OFFSET` and consults it before the generic walk. `data/scripts/generate-adapter-packs.py:59`
+    computes `PLATFORM_ROOT = ROOT.parents[1]`, resolving to an unrelated directory two levels above the
+    clone. `workspace-tooling/artifact_catalog.py:33-44` defaults `DEFAULT_ROOTS` to a fourth layout including
+    `GitLab`, and :297 hashes the employer product key `nalej-artifact-v1`.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given data/scripts/template-opencode-plugin.mjs, when it is read, then the three-candidate list at
+    :51-60 is replaced by a single `${process.env.AGENT_KIT_ROOT}/data/hooks/block-plaintext-secret-write.sh`
+    resolution with the repo-relative path as the only fallback, and the unresolvable-guard branch emits
+    a stderr warning naming the path it looked for instead of failing open silently.
+  - Given workspace-tooling/artifact_retrieval_eval.py, when `git grep -n _LEGACY_ADAPTER_OFFSET` is run,
+    then it returns nothing — the constant at :217-220 and its branch at :268-271 are deleted, leaving
+    the explicit root plus the ancestor walk.
+  - Given data/scripts/generate-adapter-packs.py, when it is run with no arguments in a bare clone, then
+    it resolves its platform root to the clone root via an explicit `--platform-root` default, not `ROOT.parents[1]`;
+    a test asserts no output path escapes the clone.
+  - Given workspace-tooling/artifact_catalog.py, when `DEFAULT_ROOTS`/`DEFAULT_INCLUDE_GLOBS` (:33-44)
+    are read, then they no longer name `GitLab`, and the `nalej-artifact-v1` key at :297 is replaced with
+    a project-neutral key plus a documented migration for existing catalogs (existing rows must not be
+    silently invalidated).
+  - Given the repo, when `git grep -nE "SWAT DevOps|nalej-" -- data/scripts/ workspace-tooling/*.py` is
+    run, then it returns zero matches.
+  tags:
+  - F122
+  - F167
+  - F035
+  - F095
+  - de-personalisation
+  - live-code
+  - secret-guard
+  - security
+- id: starts-everywhere-t-purge-employer-content
+  kind: task
+  title: Sweep employer identifiers out of shipped content and add the denylist gate that keeps them out
+  status: planned
+  parent: starts-everywhere-e5
+  summary: 'Beyond the live code paths, the employer literals persist across tracked content that ships
+    to consumers: `data/skills/handoff/SKILL.md`, `data/facts/catalog.json`, `data/provider-adapters/codex/entrypoints/milestone-pipeline/SKILL.md`,
+    `data/scripts/claude-md-copy-lint.sh:51`, `workspace-tooling/tests/test_artifact_memory_service.py:1838`,
+    `workspace-tooling/tests/test_f10_mirror.py:32-33`, and ~77 files referencing `claude-mcp-server`
+    (largely data/references/ and data/agents/). Sweep them, then add the gate so a future sync from the
+    internal tree cannot reintroduce them.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given the repo, when `bash data/scripts/denylist-check.sh` is run, then it exits 0; when any of `SWAT
+    DevOps`, `Nalej`, `nalej-`, `GitLab/workspace/platform`, `gitlab.example.com` or `claude-mcp-server`
+    is reintroduced into a tracked file, then it exits non-zero naming the file and line.
+  - Given `workspace-tooling/tests/test_f10_mirror.py`, when `git ls-files` is run, then it returns nothing
+    — the workspace-mirror invariant belongs to the pre-fork internal layout and cannot hold in a public
+    repo.
+  - Given `data/facts/catalog.json`, when it is regenerated after the source sweep and inspected, then
+    it contains no employer literal. (`catalog-generate.py --check` may still be red for the separate
+    POSIX-separator reason — that is gates-green's item, not this one; this story asserts content only.)
+  - Given README.md:126-132, when it is read, then the falsifiable 'were removed' sentence is replaced
+    by one pointing at `docs/provenance-ledger.json` and the denylist gate.
+  - Given the repo-wide rename, when `git grep -n 'claude-mcp-server'` is run, then it returns zero matches
+    and `npm test` plus the macOS/Linux substrate suite still pass.
+  depends_on:
+  - starts-everywhere-t-purge-employer-code-paths
+  - starts-everywhere-t-name-collision-decision
+  tags:
+  - F095
+  - F122
+  - F167
+  - de-personalisation
+  - denylist
+  - content
+  - docs
+- id: starts-everywhere-t-artifact-policy-example
+  kind: task
+  title: Ship artifact-policy as a schema-backed example instead of one engineer's private vault layout
+  status: planned
+  parent: starts-everywhere-e5
+  summary: 'workspace-tooling/artifact-policy.json is not an example, it is the enforced default: artifact_catalog.py:784
+    sets `--policy` to `Path(__file__).with_name("artifact-policy.json")`. Its `catalog.canonical_roots`
+    and `required_roots` are both `["Projects", "Source Code"]` — the author''s Obsidian vault layout
+    — and its include globs name `github-governance/**` and `local-llm-pipelines/**`, two of the author''s
+    own repositories. Because `required_roots` is enforced (:119-134 validates, :332-337 emits `missing
+    required root:`), running the catalog against any normal repository produces a scan with both required
+    roots missing. The module''s own DEFAULT_ROOTS (:33-42) describe a third, different layout, so the
+    fallback and the shipped policy do not agree.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given the repo, when `git ls-files workspace-tooling/artifact-policy*.json` is run, then only `artifact-policy.example.json`
+    is tracked and it contains no path naming a personal vault or a private repository.
+  - Given `python3 workspace-tooling/artifact_catalog.py scan` with no `--policy`, when it is run, then
+    it exits non-zero with a message naming `artifact-policy.example.json` and the `init-policy` command
+    — it must not silently enforce someone else's roots.
+  - Given `python3 workspace-tooling/artifact_catalog.py init-policy --workspace <path>`, when run against
+    an arbitrary repository, then it writes a starter policy whose `canonical_roots` were inferred from
+    that tree, and a subsequent `scan --policy <written-file>` completes with zero `missing required root:`
+    diagnostics.
+  - Given `workspace-tooling/schemas/artifact-policy.schema.json`, when the example is validated against
+    it, then validation passes; when a required key is removed from the example, then it fails — asserted
+    by a unit test.
+  - Given artifact_catalog.py:33-42, when read, then DEFAULT_ROOTS/DEFAULT_INCLUDE_GLOBS either match
+    the shipped example or are deleted, so there is one layout contract instead of three.
+  tags:
+  - F052
+  - F122
+  - de-personalisation
+  - policy
+  - schema
+  - substrate
+- id: starts-everywhere-t-template-settings
+  kind: task
+  title: Rewrite template-settings.json — it ships kubectl/AWS grants and a hook path that does not exist
+  status: planned
+  parent: starts-everywhere-e5
+  summary: data/scripts/template-settings.json is what the installer merges into a user's Claude Code
+    settings.json. Its `permissions.allow` block grants `Bash(kubectl get:*)`, `Bash(kubectl describe:*)`,
+    `Bash(kubectl logs:*)` and `Bash(AWS_PROFILE=YOUR_AWS_PROFILE kubectl:*)` — a Kubernetes/AWS allowlist
+    for a repo that ships no Kubernetes anything. Its PreToolUse hooks fall back to `${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/...`,
+    the author's machine layout. Its PostToolUse Edit|Write hook invokes `${CLAUDE_PROJECT_DIR:-$PWD}/scripts/project-linker-hook.sh`
+    — there is no `scripts/` directory at the repo root (the script is workspace-tooling/project-linker-hook.sh)
+    — and the `[ -f "$h" ] && exec ...; exit 0` shape means the miss is never reported.
+  priority: should
+  lane: next
+  size: S
+  acceptance:
+  - Given data/scripts/template-settings.json, when `permissions.allow` is read, then it contains no kubectl
+    or AWS entry; if those grants are still wanted, they live in a separate opt-in `data/scripts/template-settings.k8s.json`.
+  - Given the hook entries, when they are read, then every path is rooted at `${CLAUDE_PROJECT_DIR}` with
+    no `$HOME/Work/workspace` fallback, and the PostToolUse Edit|Write hook points at a path that exists
+    in this repo — verified by a check that resolves every hook command path in the template against the
+    tree and fails on a miss.
+  - Given a hook whose target is missing at runtime, when it fires, then it emits one stderr line naming
+    the missing path instead of silently `exit 0`.
+  - Given `block-kubectl-mutations.sh`, when the template is read, then it is either shipped and registered
+    deliberately or its registration is removed — no registration of a guard for a tool the kit does not
+    otherwise mention.
+  - Given a new `data/scripts/template-settings.md`, when it is read, then it states which hooks are on
+    by default and what each blocks.
+  tags:
+  - F183
+  - templates
+  - hooks
+  - permissions
+  - security

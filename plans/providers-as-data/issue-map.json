@@ -1,0 +1,102 @@
+{
+  "providers-as-data-e1": {
+    "number": 197,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/197"
+  },
+  "providers-as-data-e2": {
+    "number": 198,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/198"
+  },
+  "providers-as-data-e3": {
+    "number": 199,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/199"
+  },
+  "providers-as-data-spike-1": {
+    "number": 208,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/208"
+  },
+  "providers-as-data-t-agents-tier0-tree": {
+    "number": 215,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/215"
+  },
+  "providers-as-data-t-anchor-resolver": {
+    "number": 201,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/201"
+  },
+  "providers-as-data-t-capabilities-block": {
+    "number": 203,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/203"
+  },
+  "providers-as-data-t-catalog-id-stamping": {
+    "number": 220,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/220"
+  },
+  "providers-as-data-t-claude-plugin": {
+    "number": 218,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/218"
+  },
+  "providers-as-data-t-conformance-corpus": {
+    "number": 209,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/209"
+  },
+  "providers-as-data-t-conformance-suite": {
+    "number": 210,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/210"
+  },
+  "providers-as-data-t-derive-provider-set": {
+    "number": 204,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/204"
+  },
+  "providers-as-data-t-entrypoint-coverage-contract": {
+    "number": 212,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/212"
+  },
+  "providers-as-data-t-library-root-refs": {
+    "number": 207,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/207"
+  },
+  "providers-as-data-t-lossiness-report": {
+    "number": 211,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/211"
+  },
+  "providers-as-data-t-manifest-driven-renderer": {
+    "number": 202,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/202"
+  },
+  "providers-as-data-t-model-policy-override-chain": {
+    "number": 205,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/205"
+  },
+  "providers-as-data-t-pack-format": {
+    "number": 216,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/216"
+  },
+  "providers-as-data-t-pack-signing": {
+    "number": 217,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/217"
+  },
+  "providers-as-data-t-provider-authoring-reference": {
+    "number": 219,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/219"
+  },
+  "providers-as-data-t-provider-event-hooks": {
+    "number": 221,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/221"
+  },
+  "providers-as-data-t-provider-manifest-schema": {
+    "number": 200,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/200"
+  },
+  "providers-as-data-t-provider-status-and-guard-legs": {
+    "number": 213,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/213"
+  },
+  "providers-as-data-t-root-contract-per-provider": {
+    "number": 206,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/206"
+  },
+  "providers-as-data-t-spec-pins-drift-watchdog": {
+    "number": 214,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/214"
+  }
+}

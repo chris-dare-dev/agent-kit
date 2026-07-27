@@ -1,0 +1,1496 @@
+schema: roadmap/1
+slug: ci-proves-it
+project: agent-kit
+title: M3 CI Proves It — cross-OS enforcement, governance, and a security posture that actually enforces
+status: draft
+phase: sequenced
+brief: 'M3 turns M1''s working server and M2''s green gates into properties a machine defends. It adds
+  the repo''s first `.github/`: a {ubuntu, macOS, Windows} x {node 20, 22} matrix plus a python-3.12 substrate
+  job, and a data-gates workflow that runs all 25 `--self-test` entrypoints, the four `--check` gates
+  and the four shell harnesses as individually named, attributable steps — with eslint/ruff/mypy/shellcheck
+  and a coverage ratchet landing non-blocking then required.
+
+  It publishes the governance layer an enterprise OSS intake literally greps for (CONTRIBUTING, SECURITY
+  with private reporting, CODE_OF_CONDUCT, CODEOWNERS, issue forms, a ruleset on main) plus ADR-002, ADR-010
+  and the backup/DR policy — cited normatively by 27 code sites and present nowhere in the tree.
+
+  It hardens the supply chain: SHA-pinned actions, zizmor, CodeQL, dependabot, per-platform hash-pinned
+  Python locks, committed ONNX snapshot digests verified at load, and 0600 atomic writes for the token
+  log and cache snapshot.
+
+  And it makes the security posture enforce rather than assert: one Node implementation of the four PreToolUse
+  guards that no longer fails open when bash or jq is missing, a written threat model, per-class enforcement
+  with a severity floor, and an output-side gate that scans what the server serves rather than only what
+  the caller asks.
+
+  Finally it retires the phantom-CI class of defect — after this milestone nothing in the tree may claim
+  a `.gitlab-ci.yml` or a `data-lint` job again, and a grep gate keeps it that way.'
+goal:
+  hmw: How might we make every enforcement claim this repository already prints — gated in CI, digest-checked,
+    fails closed — literally true on every push, on all three operating systems, while the solo maintainer
+    is asleep?
+  objective: 'Establish machine enforcement of the truth M1 and M2 made green: a cross-OS CI matrix that
+    runs every suite and every gate, a governance and supply-chain layer a large engineering team can
+    intake, and a security posture whose controls actually fire on the platforms the project claims to
+    support.'
+  key_results:
+  - Every push runs `npm ci && npm run build && npm test` green on all six {ubuntu-latest, macos-latest,
+    windows-latest} x {node 20, 22} legs, and the Windows leg executes the full `src/**/*.test.ts` glob
+    rather than skipping it.
+  - The data-gates workflow runs all 25 `--self-test` entrypoints (`grep -l -- --self-test data/scripts/*.py
+    | wc -l` == 25), the four generator `--check` gates and all four shell harnesses as individually named
+    steps, with zero steps reporting SKIP.
+  - '`grep -rn ''gitlab-ci|data-lint|install-cilint-hook'' data/ workspace-tooling/ src/ README.md` returns
+    0 hits, and a committed regression gate fails any PR that reintroduces one.'
+  - '`grep -hn ''uses:'' .github/workflows/*.yml` shows 100% of third-party actions SHA-pinned; zizmor,
+    CodeQL, dependabot and `npm audit --omit=dev --audit-level=high` all pass on clean HEAD.'
+  - Every one of the 27 ADR-002 / ADR-010 / DR-policy citations resolves to a committed docs/ file with
+    a stable anchor, enforced by a docs link-check gate that fails on a broken anchor.
+  - On a windows-latest runner with neither bash nor jq on PATH, each of the four guards exits non-zero
+    against a known-bad payload and exits 0 against a known-good one — the fail-open path is gone on every
+    OS.
+  - '`pip install --require-hashes -r` succeeds against a committed per-platform lock on linux/x86_64
+    and darwin/arm64, and `lock_check.py` fails when any lock line lacks a `--hash`.'
+  - The token log and cache snapshot are created 0600 and written atomically; a two-writer concurrency
+    test loses no entries and never observes a partial line.
+  wont:
+  - Building real multi-tenancy for SERVER_PROFILE=shared — identity, per-caller authz, per-collection
+    JWT scopes, principal-partitioned logs. M3 only writes the threat model and lands the owner's rename-or-schedule
+    decision; the build, if chosen, belongs to memory-that-earns-it.
+  - 'Publishing anything: no npm package, no PyPI distribution, no MCP Registry or skills.sh entry, no
+    release automation. That is named-and-installable, and it is blocked behind the OpenAI AgentKit name-collision
+    decision in starts-everywhere.'
+  - Porting the substrate's own POSIX dependencies (fcntl, AF_UNIX, geteuid) — only the hook half of F132
+    lands here. Import-level portability is gates-green; the UDS-to-named-pipe transport and cross-OS
+    service supervision are native-everywhere.
+  - A skills corpus, skill authoring paths, or any measurement of whether skills improve. data/skills/
+    contains exactly one skill (handoff/), so every statistic over it is n=1; that work is author-and-measure.
+  - 'Retrieval quality work of any kind: no gold set, no nDCG gate, no BM25 rewrite, no embedding-model
+    pluggability. The model-pin task here is supply-chain integrity, not retrieval quality.'
+  - Hot/warm/cold tiering, eviction, compaction or access-ledger work — that is memory-that-earns-it,
+    and it depends on the ADRs this milestone finally publishes.
+  - Provider capability manifests and the conformance suite. M3 compiles the guards to each provider's
+    hook format; turning provider support itself into data is providers-as-data.
+  - A documentation site, Projects v2 board build-out, or any release-notes tooling beyond a PR template
+    and a label set — deliberately killed as premature for a repo with one commit and zero issues.
+generated_by:
+  agent: claude-opus-5
+  at: '2026-07-26'
+  brief: multi-workflow audit + landscape benchmark synthesis
+retired: []
+items:
+- id: ci-proves-it-e1
+  kind: epic
+  title: Cross-OS CI matrix with lint, type and coverage gates
+  status: planned
+  summary: The repository has no .github/ directory at all — no workflow, no CI configuration of any kind
+    — so every suite, every gate and every portability fix is enforced only by the maintainer's memory.
+    This epic lands .github/workflows/ci.yml running {ubuntu-latest, macos-latest, windows-latest} x {node
+    20, 22} for build and test plus a python-3.12 job for the substrate, adds eslint/ruff/mypy/shellcheck
+    as non-blocking-then-required steps with committed violation baselines, makes the only goal-F performance
+    harness runnable off macOS, and establishes a coverage ratchet — deliberately here and not earlier,
+    because a coverage number taken while 333 of 593 Python tests fail to collect is meaningless.
+  priority: must
+  lane: now
+  size: L
+  acceptance:
+  - Given a clone at the M3 HEAD, when `ls .github/workflows/`, then ci.yml exists and `gh workflow list`
+    shows it enabled.
+  - Given a push to any branch, when the ci workflow completes, then the `build-test` job reports success
+    on all six {ubuntu-latest, macos-latest, windows-latest} x {node 20, 22} legs and the `substrate`
+    job reports success on the ubuntu-3.12 and macos-3.12 legs.
+  - Given the Windows leg, when it runs, then `npm test` executes (it does not skip) and the run log shows
+    the artifact-memory suite either passing or explicitly skipped with a named per-platform reason —
+    never silently absent.
+  - Given `npm run lint`, `npm run typecheck` and `ruff check` run locally, when each is invoked, then
+    each exits 0 against its committed baseline file.
+  - Given `python -m unittest` is replaced by `npm run test:py`, when a contributor runs `npm run test:py`
+    on macOS, Linux or WSL, then it runs the identical command CI runs (verified by grepping the workflow
+    for the script name rather than an inline incantation).
+  depends_on:
+  - starts-everywhere-e2
+  - gates-green-e1
+  - gates-green-e2
+  - gates-green-e4
+  tags:
+  - F013
+  - F094
+  - F148
+  - F172
+  - F155
+  - F166
+  - F017
+  - X005
+  - ci
+  - matrix
+  - portability
+- id: ci-proves-it-t-ci-node-matrix
+  kind: task
+  title: Create .github/workflows/ci.yml with the node build/test matrix over three OSes and two node
+    versions
+  status: planned
+  parent: ci-proves-it-e1
+  summary: 'Create the repository''s first workflow. `.github/workflows/ci.yml` gets a `build-test` job
+    with `strategy.matrix.os: [ubuntu-latest, macos-latest, windows-latest]` and `node: [20, 22]`, `fail-fast:
+    false`, running `npm ci`, `npm run build`, `npm test` and `npm run typecheck`. Triggers: `push` (all
+    branches) and `pull_request`. This is only landable after M1 fixes the win32 startup throw and M2
+    widens `npm test` from the three explicitly named files at package.json:13 to the full `src/**/*.test.ts`
+    glob — otherwise the Windows leg lands red on day one for reasons unrelated to CI. Concurrency group
+    cancels superseded runs on the same ref. Set `permissions: contents: read` at workflow level.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given .github/workflows/ci.yml at HEAD, when `python -c "import yaml,sys; d=yaml.safe_load(open('.github/workflows/ci.yml'));
+    print(d['jobs']['build-test']['strategy']['matrix'])"` is run, then it prints os values ubuntu-latest,
+    macos-latest and windows-latest and node values 20 and 22, and `fail-fast` is false.
+  - Given a push, when the workflow completes, then all six build-test legs are green and the run summary
+    shows `npm test` executed a test-file count equal to `ls src/**/*.test.ts | wc -l` (8 at time of writing)
+    on every leg.
+  - Given the win32 reproduction from F001/F107 (`node dist/index.js` under the default SERVER_PROFILE=personal),
+    when the windows-latest leg runs the mcp-contract suite, then the suite passes rather than dying at
+    `absoluteSocketPath()` — the regression fence for the startup throw is now executed by CI on every
+    push.
+  - Given the workflow file, when `grep -n 'uses:' .github/workflows/ci.yml` is run, then every third-party
+    action reference is a 40-char commit SHA (enforced by the supply-chain task in e3, asserted here as
+    a review checklist item).
+  - Given two pushes to the same branch within the run window, when the second starts, then the first
+    is cancelled by the `concurrency` block rather than both consuming runner minutes.
+  depends_on:
+  - starts-everywhere-e2
+  - gates-green-e2
+  tags:
+  - F013
+  - F094
+  - F148
+  - F172
+  - X005
+  - ci
+  - matrix
+- id: ci-proves-it-t-ci-python-job
+  kind: task
+  title: Add the python-3.12 substrate job and promote the README's unittest incantation into one shared
+    entrypoint
+  status: planned
+  parent: ci-proves-it-e1
+  summary: The Python suite is invoked by a `PYTHONPATH` + `unittest discover -t` command that exists
+    only as prose at workspace-tooling/README.md:73-79, so CI and humans would otherwise reconstruct it
+    independently. Add an npm script `test:py` (and a matching `workspace-tooling/run-tests.py` or documented
+    shell equivalent that works from any CWD) that is the single definition of how the substrate suite
+    runs, and add a `substrate` job to ci.yml using `actions/setup-python` at 3.12 over ubuntu-latest
+    and macos-latest that invokes exactly that entrypoint. Per F094's correction the substrate suite is
+    scoped to ubuntu+macos in this milestone; the Windows leg runs the node build and the generator gates
+    only, with the WSL path documented by M2's portability work. Cache pip by the lockfile hash.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given a clone, when `npm run test:py` is run from the repo root on macOS or Linux, then it runs the
+    full substrate suite and exits 0, and `grep -n 'test:py' .github/workflows/ci.yml` shows CI invoking
+    the same script name rather than an inline `python -m unittest ...` command.
+  - Given the substrate job, when it completes on ubuntu-latest, then the reported collected-test count
+    matches the count reported on macos-latest (no silent collection loss on Linux).
+  - Given the workflow, when `grep -c 'windows-latest' .github/workflows/ci.yml` is inspected against
+    the `substrate` job block, then windows-latest is absent from the substrate matrix and a `# scoped
+    to ubuntu+macos until <M2 portability epic>` comment names the reason and the milestone that lifts
+    it.
+  - Given workspace-tooling/README.md:73-87, when it is read after this task, then the prose incantation
+    is replaced by `npm run test:py` and the dangling `.gitlab-ci.yml` claim at :82 is gone (verified
+    by `grep -c 'gitlab-ci' workspace-tooling/README.md` returning 0).
+  depends_on:
+  - gates-green-e4
+  tags:
+  - F013
+  - F094
+  - F172
+  - X005
+  - ci
+  - substrate
+- id: ci-proves-it-t-eslint-typecheck-gate
+  kind: task
+  title: Add eslint + a typecheck script that covers test files, with a committed violation baseline
+  status: planned
+  parent: ci-proves-it-e1
+  summary: 'There is no ESLint, Prettier or formatter config anywhere; the only static gate is `npm run
+    build` (tsc), and tsconfig.json:17 excludes `src/**/*.test.ts` so roughly 1,500 lines of TypeScript
+    test code are never type-checked. Add `eslint.config.js` (flat config) with `@typescript-eslint` recommended
+    plus `no-floating-promises` and `no-misused-promises` (both require type-aware linting, so wire `parserOptions.projectService`),
+    add `eslint` and `typescript-eslint` to devDependencies, add `"lint": "eslint src"`, and add `"typecheck":
+    "tsc -p tsconfig.test.json --noEmit"` with a tsconfig that extends the root config but does not exclude
+    test files. Record the initial violation count in a committed `.lint-baseline.json` so the number
+    can only go down; run the step with `continue-on-error: true` for exactly one release cycle, then
+    flip it required.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given the repo at HEAD, when `npm run lint` is run, then it exits 0 and the reported error count is
+    less than or equal to the number in the committed baseline file.
+  - Given `npm run typecheck`, when it is run, then tsc reports on `src/**/*.test.ts` as well as `src/**/*.ts`
+    (verified by deliberately introducing a type error in a test file and observing a non-zero exit),
+    and exits 0 on clean HEAD.
+  - Given ci.yml, when the lint job runs, then `lint` and `typecheck` appear as separately named steps
+    so a failure in either is attributable without reading the log.
+  - Given a PR that adds a new floating promise in src/, when CI runs, then the lint step fails and names
+    the file and rule id.
+  depends_on:
+  - ci-proves-it-t-ci-node-matrix
+  tags:
+  - F166
+  - X005
+  - ci
+  - lint
+  - typescript
+- id: ci-proves-it-t-ruff-shellcheck-gate
+  kind: task
+  title: Add ruff over the Python tree and shellcheck over the 29 tracked shell scripts, each with a baseline
+  status: planned
+  parent: ci-proves-it-e1
+  summary: 'No linter exists for the bulk of the codebase: ~46 workspace-tooling modules plus 38 data/scripts
+    modules have no static analysis, and none of the tracked shell scripts is shellchecked. The concrete
+    cost is measurable — the ~189 encoding-less `read_text()`/`write_text()` calls and the 10 POSIX-only
+    `import fcntl` sites are exactly what a linter settles mechanically. Add a root `ruff.toml` selecting
+    at minimum E, F, I, UP and PLW1514/W1514-equivalent (unspecified-encoding), create `workspace-tooling/requirements-dev.txt`
+    pinning ruff, and add `ruff check workspace-tooling data/scripts` as a named CI step. Add a `lint-shell`
+    job running `shellcheck -S warning` over `data/scripts/*.sh tests/**/*.sh setup-local.sh data/hooks/*.sh`.
+    Commit baseline violation counts for both so they can only decrease.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given the repo at HEAD, when `ruff check workspace-tooling data/scripts` is run, then the violation
+    count is less than or equal to the committed `ruff-baseline.txt` value and the command exits 0 under
+    the baseline comparison wrapper.
+  - Given a newly added `read_text()` call with no `encoding=` argument in data/scripts/, when ruff runs,
+    then it reports the unspecified-encoding rule and the CI step fails.
+  - Given `shellcheck -S warning` over the tracked script set, when the lint-shell job runs, then it exits
+    0 against the committed shell baseline, and `shellcheck --version` is pinned in the workflow rather
+    than floating.
+  - Given ci.yml, when the lint jobs are inspected, then `ruff` and `shellcheck` are separate named steps
+    and both are listed in CONTRIBUTING.md's required-check set.
+  depends_on:
+  - ci-proves-it-t-ci-python-job
+  tags:
+  - F166
+  - X005
+  - ci
+  - lint
+  - python
+  - shell
+- id: ci-proves-it-t-mypy-baseline
+  kind: task
+  title: Add mypy over a declared module allowlist with a committed error baseline and a ratchet
+  status: planned
+  parent: ci-proves-it-e1
+  summary: 'Type-checking 46 flat modules on a hand-set PYTHONPATH all at once is not landable in one
+    step, and the packaging that would make it tractable is M4 work. Scope mypy narrowly and honestly:
+    add `mypy.ini` (or a `[tool.mypy]` block once a config file exists) configured with `python_version
+    = 3.12`, `warn_unused_ignores`, and an explicit `files =` allowlist starting with the data/scripts
+    generator modules that CI already gates (`catalog-generate.py`, `generate-adapter-packs.py`, `generate-root-contract.py`,
+    `model-policy-apply.py`, `skill-ref-check.py`). Commit `mypy-baseline.txt` with the current error
+    count, run the step non-blocking for one release cycle then required, and document in CONTRIBUTING.md
+    that adding a module to the allowlist is a one-way ratchet.'
+  priority: could
+  lane: later
+  size: M
+  acceptance:
+  - Given the repo at HEAD, when `mypy` is run with the committed config, then the error count is less
+    than or equal to the value in `mypy-baseline.txt`.
+  - Given a PR that introduces a new type error in one of the allowlisted generator modules, when CI runs,
+    then the mypy step fails and names the module and line.
+  - Given CONTRIBUTING.md, when the static-analysis section is read, then it states the allowlist ratchet
+    rule and lists which modules are currently covered.
+  - Given a module removed from the allowlist in a PR, when CI runs, then the step fails (the allowlist
+    may only grow) — verified by a test PR.
+  depends_on:
+  - ci-proves-it-t-ruff-shellcheck-gate
+  tags:
+  - F166
+  - ci
+  - mypy
+  - python
+- id: ci-proves-it-t-portable-perf-probe
+  kind: task
+  title: Make artifact_memory_load_test.py portable so the only goal-F performance evidence can run in
+    the matrix
+  status: planned
+  parent: ci-proves-it-e1
+  summary: 'workspace-tooling/artifact_memory_load_test.py is the closest thing the repo has to reproducible
+    performance evidence for the memory plane, and `_process()` at lines 57-63 shells out to a hardcoded
+    `["/bin/ps", "-p", str(pid), "-o", "rss=,%cpu="]` parsing BSD ps column output, with no `shutil.which`
+    lookup and no alternative. There is no `/bin/ps` on Windows, and on Linux ps lives at /bin/ps or /usr/bin/ps
+    depending on usrmerge state with a different `%cpu=` no-header form between procps and BSD ps. Replace
+    the subprocess with a portable RSS/CPU probe: add `psutil` to workspace-tooling/requirements-artifact-ingestion.txt
+    (and the per-platform locks) and read `psutil.Process(pid).memory_info().rss` and `.cpu_percent()`,
+    falling back behind the platform-compat module M2 introduces. Emit the harness output as a versioned
+    JSON record carrying platform, interpreter version and transport used, so results measured on different
+    OSes are explicitly labelled rather than silently compared.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given workspace-tooling/artifact_memory_load_test.py at HEAD, when `grep -n '/bin/ps' workspace-tooling/artifact_memory_load_test.py`
+    is run, then it returns nothing.
+  - Given a Linux runner with no `/bin/ps` on PATH, when the harness runs against a live service, then
+    it reports non-zero RSS and CPU for the target pid rather than raising FileNotFoundError.
+  - Given the harness output, when the emitted JSON is inspected, then it contains `schema_version`, `platform`,
+    `python_version` and `transport` fields, and two records from different platforms are distinguishable
+    without out-of-band knowledge.
+  - Given the ci workflow, when the nightly or on-demand perf leg runs on ubuntu-latest, then the harness
+    completes and uploads its JSON as a workflow artifact.
+  depends_on:
+  - gates-green-e4
+  tags:
+  - F017
+  - ci
+  - performance
+  - portability
+- id: ci-proves-it-t-coverage-ratchet
+  kind: task
+  title: Add coverage measurement for both languages and a ratchet seeded from a committed baseline
+  status: planned
+  parent: ci-proves-it-e1
+  summary: 'There is no `.coveragerc`, `pyproject.toml`, `setup.cfg`, `tox.ini`, `pytest.ini` or `.nycrc`,
+    and `package.json` does not pass `--experimental-test-coverage`. Add `"test:coverage": "node --import
+    tsx --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info
+    \"src/**/*.test.ts\""` and run it on the ubuntu/node-22 leg only. On the Python side add `coverage`
+    to workspace-tooling/requirements-dev.txt and a `.coveragerc` with `[run] source = workspace-tooling`
+    / `omit = */tests/*`, running `coverage run -m unittest ... && coverage xml` on the ubuntu/3.12 leg.
+    Publish the delta as a PR comment and enforce `coverage report --fail-under` seeded from a committed
+    `coverage-baseline.txt`. This lands last in the epic on purpose: a coverage number taken while 333
+    of 593 Python tests fail to collect is meaningless, so it must follow M2''s collection fixes. Do not
+    claim this measures goal F.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given the repo at HEAD, when `npm run test:coverage` is run, then coverage/lcov.info is produced and
+    reports a non-zero line-coverage percentage for src/.
+  - Given the substrate suite, when `coverage run -m unittest ... && coverage report --fail-under=$(cat
+    coverage-baseline.txt)` is run on ubuntu, then it exits 0.
+  - Given a PR that deletes tests without deleting code, when CI runs, then the coverage step fails because
+    the measured percentage dropped below the committed baseline.
+  - Given the coverage baseline file, when it is read, then a header comment states the date, the platform
+    it was measured on, and that it is a goal-A signal and explicitly not a goal-F ROI measurement.
+  depends_on:
+  - gates-green-e2
+  - gates-green-e4
+  - ci-proves-it-t-ci-python-job
+  tags:
+  - F155
+  - ci
+  - coverage
+- id: ci-proves-it-e2
+  kind: epic
+  title: One committed gate runner, and the removal of every phantom CI claim
+  status: planned
+  summary: Ten source files assert that the provider gates are enforced by a CI job named `data-lint`;
+    workspace-tooling/README.md:82 states "CI runs exactly this (`substrate-test` in `.gitlab-ci.yml`)";
+    bootstrap.sh:321 invokes an `install-cilint-hook.sh` that is not in the repo. None of it exists. Worst
+    of all, milestone-pipeline-review-prepare.py's `_assert_agreement_gate_registered()` — the tripwire
+    whose own docstring names "the precise 'the check never ran' failure this pipeline keeps re-learning"
+    — returns 0 unconditionally on GitHub because no .gitlab-ci.yml is present. This epic wires M2's committed
+    gate runner into a data-gates workflow with one named step per gate, makes the tripwire resolve GitHub
+    workflow paths and hard-fail naming what it searched, deletes or corrects every phantom claim, adds
+    a regression gate so no new phantom claim can land, and puts CODEOWNERS on the golden fixtures.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given a push, when the data-gates workflow completes, then the run shows one named step per gate covering
+    all 25 `--self-test` entrypoints (`grep -l -- --self-test data/scripts/*.py | wc -l` == 25), the four
+    generator `--check` gates and the four shell harnesses, and a single failing gate is identifiable
+    from the job summary without opening the log.
+  - Given `grep -rn 'gitlab-ci\|data-lint\|install-cilint-hook' --include='*.py' --include='*.md' --include='*.sh'
+    --include='*.ts' --include='*.json' data/ workspace-tooling/ src/ README.md`, when it is run at M3
+    HEAD, then it returns zero hits outside of a deliberate allowlist file documenting the removal.
+  - Given a repo with no `.github/workflows/` directory, when `python data/scripts/milestone-pipeline-review-prepare.py
+    --self-test` is run, then it exits non-zero and prints every path it searched — it no longer returns
+    0 silently.
+  - Given a PR that changes tests/fixtures/tools-list.golden.json, when it is opened, then GitHub requests
+    review from the CODEOWNERS entry and the PR cannot merge without it.
+  depends_on:
+  - gates-green-e1
+  - gates-green-e3
+  - ci-proves-it-t-ci-node-matrix
+  tags:
+  - F019
+  - F102
+  - F153
+  - F159
+  - ci
+  - gates
+  - phantom-ci
+- id: ci-proves-it-t-data-gates-workflow
+  kind: task
+  title: Add .github/workflows/data-gates.yml driving M2's committed gate runner with one named step per
+    gate
+  status: planned
+  parent: ci-proves-it-e2
+  summary: M2 delivers a committed gate runner that enumerates every gate rather than a hand-maintained
+    list. Wire it into `.github/workflows/data-gates.yml` (python 3.12 + pyyaml) so each gate appears
+    as its own named step and a failure is attributable without log archaeology. Coverage must be all
+    25 `--self-test` entrypoints (verified count, not the 5 the original finding assumed), the four generator
+    `--check` gates (catalog-generate, generate-adapter-packs, generate-root-contract, model-policy-apply),
+    model-policy-providers-check, mode-variant-agents --check, skill-ref-check, workspace-tooling/lock_check.py,
+    secret-scan.py --check and --self-test, and the four shell harnesses (tests/check-skill-prompts.sh,
+    tests/hooks/block-plaintext-secret-write.test.sh, data/scripts/milestone-pipeline-consolidate-memory-test.sh,
+    data/scripts/sealed-eval-test.sh). Add `npm run gates` as the identical local entrypoint. Per F148's
+    correction the generator `--check` gates only join the Windows leg once M2's separator and encoding
+    fixes have landed.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given a push, when data-gates.yml runs, then the job graph shows a distinct named step for each of
+    the 25 `--self-test` entrypoints and each `--check` gate, and `grep -l -- --self-test data/scripts/*.py
+    | wc -l` equals the number of self-test steps the runner reports.
+  - Given a deliberately stalled data/facts/catalog.json, when the workflow runs, then the step named
+    for `catalog-generate.py --check` fails and no other step is reported as the cause.
+  - Given a contributor's machine, when `npm run gates` is run, then it invokes the same committed runner
+    CI invokes (verified by grepping the workflow for the runner path) and its pass/fail set matches CI's
+    on the same commit.
+  - Given the four shell harnesses, when the workflow runs on ubuntu-latest and macos-latest, then all
+    four execute and none reports SKIP.
+  - Given data-gates.yml, when the Windows leg is inspected, then it runs the node build and the hook
+    harnesses, and a comment names which gates are deferred and the milestone that lifts the deferral.
+  depends_on:
+  - gates-green-e1
+  - gates-green-e3
+  tags:
+  - F019
+  - F148
+  - F153
+  - ci
+  - gates
+- id: ci-proves-it-t-agreement-tripwire-ci-aware
+  kind: task
+  title: Make the milestone-pipeline agreement tripwire resolve GitHub workflows and hard-fail instead
+    of returning 0
+  status: planned
+  parent: ci-proves-it-e2
+  summary: 'data/scripts/milestone-pipeline-review-prepare.py:826 sets `CI_CONFIG = SCRIPT_DIR.parent.parent
+    / ''.gitlab-ci.yml''` and `_assert_agreement_gate_registered()` at :830-853 exists specifically to
+    prove CI still invokes the `--self-test-agreement` cross-language checksum gate. Lines 841-842 read
+    `if not CI_CONFIG.is_file(): return 0` — on GitHub that branch is taken every single time, so the
+    flagship anti-''silent pass'' mechanism is a permanent no-op that reports success. Change the resolution
+    to search `.github/workflows/*.yml`, `.gitlab-ci.yml` and `.circleci/config.yml`, assert `--self-test-agreement`
+    appears in at least one resolved config, and on failure exit non-zero printing every path searched.
+    Register `--self-test-agreement` in the node job of ci.yml (it needs node, which the python job does
+    not have). Update the two docs that hardcode GitLab: data/agents/milestone-implementer.md:150 and
+    data/references/milestone-pipeline-phase-implement.md:100.'
+  priority: must
+  lane: next
+  size: S
+  acceptance:
+  - Given the repo with .github/workflows/ci.yml present and registering `--self-test-agreement`, when
+    `python data/scripts/milestone-pipeline-review-prepare.py --self-test` is run, then the ci assertion
+    prints ok and names the resolved workflow file.
+  - Given a temporary clone with the `--self-test-agreement` line removed from ci.yml, when the same command
+    is run, then it exits non-zero and the message lists `.github/workflows/*.yml`, `.gitlab-ci.yml` and
+    `.circleci/config.yml` as the paths searched.
+  - Given a clone with no CI config at all, when the same command is run, then it exits non-zero (the
+    previous `return 0` behaviour is gone) — verified by `git grep -n 'return 0' data/scripts/milestone-pipeline-review-prepare.py`
+    showing no such branch in `_assert_agreement_gate_registered`.
+  - Given `grep -rn 'gitlab-ci' data/agents/ data/references/`, when run after this task, then it returns
+    zero hits.
+  depends_on:
+  - ci-proves-it-t-ci-node-matrix
+  - ci-proves-it-t-data-gates-workflow
+  tags:
+  - F102
+  - F153
+  - ci
+  - tripwire
+  - phantom-ci
+- id: ci-proves-it-t-purge-phantom-ci-claims
+  kind: task
+  title: Correct or delete every file that claims an enforcement layer this repo does not have
+  status: planned
+  parent: ci-proves-it-e2
+  summary: Fix the named sites one by one. (1) workspace-tooling/README.md:82 ("CI runs exactly this (`substrate-test`
+    in `.gitlab-ci.yml`)") repoints at the real substrate job, and :24-25's claim that F-10 is closed
+    on the strength of that CI is restated honestly; :121's dangling `docs/f10-launchagent-cutover.md`
+    link is fixed or dropped. (2) data/scripts/catalog-generate.py:295 and generate-adapter-packs.py:616
+    emit `data-lint` into every generated artifact — change the `_comment` strings to name `data-gates`
+    and regenerate data/facts/catalog.json and tests/fixtures/adapter-packs.golden.json in the same commit.
+    (3) generate-adapter-packs.py:28-40 and catalog-generate.py:40 and milestone-pipeline-review-prepare.py:88,811,942
+    and milestone-pipeline-artifacts.py:8 and model-policy-apply.py:369 and secret-scan.py:4 drop the
+    `data-lint image` phrasing. (4) data/references/model-policy.md:95 names the real workflow. (5) bootstrap.sh:317
+    and :321 (and the check at :364) invoking the absent `install-cilint-hook.sh` are deleted. (6) data/scripts/environment-facts-lint.py
+    is deleted — its only input, data/facts/environment-map.json, was not carried over by the fork.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given the repo at HEAD, when `grep -rn 'gitlab-ci\|data-lint\|install-cilint-hook' --include='*.py'
+    --include='*.md' --include='*.sh' --include='*.ts' --include='*.json' data/ workspace-tooling/ src/
+    README.md` is run, then it returns zero hits.
+  - Given `ls data/scripts/environment-facts-lint.py`, when run, then it reports no such file, and `grep
+    -rn 'environment-facts-lint\|environment-map.json' .` returns zero hits outside .git.
+  - Given `bash data/scripts/bootstrap.sh --dry-run` on a bare clone, when it reaches the former step
+    8, then it neither references nor warns about install-cilint-hook.sh.
+  - Given `python data/scripts/catalog-generate.py --check` and `python data/scripts/generate-adapter-packs.py
+    --check`, when both are run after the regeneration commit, then both exit 0 and the committed catalog.json
+    `_comment` names `data-gates`.
+  - Given tests/fixtures/adapter-packs.golden.json, when it is diffed in the same commit, then the only
+    change is the `_comment` string — no rendered pack content changed.
+  depends_on:
+  - gates-green-e1
+  - ci-proves-it-t-data-gates-workflow
+  tags:
+  - F019
+  - F153
+  - docs
+  - phantom-ci
+  - ci
+- id: ci-proves-it-t-phantom-ci-regression-gate
+  kind: task
+  title: Add a regression gate that fails when a new claim about a nonexistent CI job lands
+  status: planned
+  parent: ci-proves-it-e2
+  summary: The phantom-CI defect class recurs because docstrings outlive the pipeline they describe. Add
+    a step to the data-gates workflow (and to the committed gate runner so it also runs locally) that
+    greps the tracked tree for `gitlab-ci`, `circleci`, `data-lint`, `substrate-test` and `install-cilint-hook`
+    and fails, printing each hit with file:line and the message that the only enforcement layer this repository
+    has is `.github/workflows/`. Maintain a tiny allowlist file (`data/facts/ci-claim-allowlist.txt`)
+    for legitimate historical mentions — for example the milestone-pipeline reference guidance that tells
+    an agent to read whatever CI config a *target* repo has — with a one-line justification per entry,
+    and fail if an allowlist entry no longer matches anything.
+  priority: should
+  lane: next
+  size: S
+  acceptance:
+  - Given the repo at HEAD, when the ci-claim gate runs, then it exits 0 and reports the allowlist entry
+    count.
+  - Given a PR that adds the string `gated in CI (data-lint)` to any tracked file, when CI runs, then
+    the ci-claim gate fails and names the file and line.
+  - Given an allowlist entry whose pattern no longer matches any tracked file, when the gate runs, then
+    it fails with a 'stale allowlist entry' message so the allowlist cannot silently rot.
+  - Given the committed gate runner from M2, when `npm run gates` is run locally, then the ci-claim gate
+    appears in its step list.
+  depends_on:
+  - ci-proves-it-t-purge-phantom-ci-claims
+  tags:
+  - F153
+  - F019
+  - ci
+  - gates
+  - phantom-ci
+- id: ci-proves-it-t-codeowners-goldens
+  kind: task
+  title: Create .github/CODEOWNERS forcing owner review on the two golden fixtures
+  status: planned
+  parent: ci-proves-it-e2
+  summary: 'Two golden fixtures gate the most drift-prone surfaces — tests/fixtures/tools-list.golden.json
+    (17 tools, name + inputSchema; the MCP wire contract every downstream provider depends on) and tests/fixtures/adapter-packs.golden.json
+    (48 rendered pack files, logical-path to sha256; the only proof the Codex and OpenCode packs render
+    deterministically). Both have a frictionless regeneration path (`npm run test:update-golden` at package.json:14,
+    and `generate-adapter-packs.py --update-golden`) and no review gate whatsoever. src/mcp-contract.test.ts:9-13
+    records that the golden exists precisely to catch a tool removal that landed without a corresponding
+    update. Create `.github/CODEOWNERS` with `/tests/fixtures/ @<owner>` and add one line to the PR template:
+    ''If a golden file changed, state the intended tool add/remove/schema change.'' Deliberately do not
+    add a PR-body-grep CI check — a machine check on prose is trivially satisfied without thought; the
+    CODEOWNERS review is the human gate.'
+  priority: should
+  lane: next
+  size: S
+  acceptance:
+  - Given `.github/CODEOWNERS` at HEAD, when a PR modifies tests/fixtures/tools-list.golden.json, then
+    GitHub automatically requests review from the owner and the branch ruleset blocks merge until that
+    review is approved.
+  - Given a PR that modifies only src/, when it is opened, then no CODEOWNERS review is requested (the
+    rule is scoped, not blanket).
+  - Given .github/pull_request_template.md, when a PR is opened, then the golden-change prompt line is
+    present in the body.
+  - Given `gh api repos/:owner/:repo/codeowners/errors`, when run after the file lands, then it reports
+    zero errors.
+  depends_on:
+  - ci-proves-it-t-community-health-files
+  tags:
+  - F159
+  - ci
+  - governance
+  - goldens
+- id: ci-proves-it-e3
+  kind: epic
+  title: Governance, published ADRs, and a hardened supply chain
+  status: planned
+  summary: The repository has no .github/ directory, no CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, CHANGELOG,
+    docs/ or examples/, and its history is one squashed commit of 293 files so `git blame` carries no
+    rationale for any decision. Meanwhile 27 code sites cite ADR-002, ADR-010 and a backup/DR policy that
+    exist nowhere in the tree — by line number — and the retention and archive modules refuse to delete
+    anything because of a rule in a document nobody outside the author can read. On the supply-chain side
+    there are zero workflows (which is the one moment SHA-pinning and scanning cost nothing), the ~53-package
+    Python closure is version-pinned but not hash-pinned and was captured on darwin/arm64 only, the ONNX
+    model digests are trust-on-first-use, the token log and cache snapshot are written world-readable
+    and non-atomically, and Qdrant key rotation is unscheduled and hardcodes a port. This epic lands all
+    of it.
+  priority: should
+  lane: next
+  size: L
+  acceptance:
+  - Given a fresh clone, when an enterprise OSS intake checklist greps for CONTRIBUTING.md, SECURITY.md,
+    CODE_OF_CONDUCT.md, .github/CODEOWNERS, .github/pull_request_template.md and .github/ISSUE_TEMPLATE/,
+    then every one is present and non-empty.
+  - Given `grep -rn 'ADR-002\|ADR-010\|artifact-memory-backup-dr-policy' workspace-tooling/ | wc -l`,
+    when each cited target is resolved, then every citation resolves to a committed file under docs/ with
+    a stable anchor, and the docs link-check gate exits 0.
+  - Given `grep -n 'uses:' .github/workflows/*.yml`, when run, then every third-party action is pinned
+    to a 40-char commit SHA, and `zizmor .github/workflows/` exits 0.
+  - Given `pip install --require-hashes -r workspace-tooling/requirements-artifact-ingestion.linux-x86_64.lock.txt`
+    in a clean venv, when run, then it succeeds, and `python workspace-tooling/lock_check.py` fails if
+    any lock line lacks a `--hash` entry.
+  - Given the MCP server started under the default profile, when it writes the token log and cache snapshot,
+    then `stat -c '%a'` on both reports 600 and a concurrent-writer test observes no lost entries and
+    no partial line.
+  depends_on:
+  - ci-proves-it-t-ci-node-matrix
+  tags:
+  - F100
+  - F133
+  - F143
+  - F146
+  - F142
+  - F141
+  - F128
+  - F053
+  - F064
+  - X004
+  - X006
+  - governance
+  - supply-chain
+  - docs
+  - security
+- id: ci-proves-it-t-community-health-files
+  kind: task
+  title: Write CONTRIBUTING, CODE_OF_CONDUCT, the PR template, YAML issue forms and a namespaced label
+    set
+  status: planned
+  parent: ci-proves-it-e3
+  summary: 'Stand up the community-health layer from zero. CONTRIBUTING.md must state: how to run the
+    gates locally (`npm run gates`, `npm test`, `npm run test:py`), the regenerate-before-commit rule
+    for data/facts/catalog.json, data/claude-md/AGENTS.md and CONTEXT.md, the dependency policy (no runtime
+    dependency lands without a named consumer in src/ — the rule that would have caught the four unused
+    @aws-sdk packages M1 removes), the static-analysis baselines and their ratchet direction, and the
+    exact set of required checks. Add CODE_OF_CONDUCT.md (Contributor Covenant 2.1), .github/pull_request_template.md,
+    .github/ISSUE_TEMPLATE/{bug_report.yml,feature_request.yml,provider_support.yml,config.yml}, and a
+    small namespaced label set (`area:`, `kind:`, `os:`, `needs:`) applied via a committed labels file.
+    Also replace the named-individual approval clauses with role nouns across data/references/milestone-pipeline-phase-implement.md:139,149,
+    data/references/milestone-pipeline-findings-schema.md:20, data/model-policy.json, data/commands/memory-sync.md
+    and the generated AGENTS.md — the workflows the kit teaches currently encode a single human as the
+    gate, so the product does not scale past its author.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given a fresh clone, when `ls CONTRIBUTING.md CODE_OF_CONDUCT.md .github/pull_request_template.md
+    .github/ISSUE_TEMPLATE/` is run, then all exist and the ISSUE_TEMPLATE directory contains at least
+    three .yml forms plus config.yml.
+  - Given CONTRIBUTING.md, when a new contributor follows its 'run the gates' section verbatim on a clean
+    clone, then every listed command exists as an npm script or committed runner and exits 0.
+  - Given `grep -rniE '\b(chris dare|@chris-dare-dev)\b' data/references/ data/commands/ data/model-policy.json
+    data/claude-md/`, when run after this task, then it returns zero hits in approval-authority clauses
+    (CODEOWNERS and the SECURITY.md contact are the deliberate exceptions).
+  - Given `python data/scripts/generate-root-contract.py --check`, when run after the AGENTS.md role-noun
+    edits and regeneration, then it exits 0.
+  - Given the repo Insights > Community Standards page, when viewed after this task, then every checklist
+    row except a release-notes config is satisfied.
+  depends_on:
+  - gates-green-e1
+  tags:
+  - F100
+  - F172
+  - X004
+  - governance
+  - docs
+- id: ci-proves-it-t-security-policy
+  kind: task
+  title: Publish SECURITY.md with private vulnerability reporting and the two caveats a reviewer must
+    be told
+  status: planned
+  parent: ci-proves-it-e3
+  summary: 'There is no SECURITY.md anywhere, so there is no private path to report a vulnerability in
+    a tool that reads workspace files and serves them into an agent''s context. Write it, enable GitHub
+    private vulnerability reporting on the repo, and state a supported-versions table and a response-time
+    commitment. Two contents are load-bearing and must not be omitted. (1) src/security/aidefence-rules.ts:16-23
+    records a deliberate deviation: PII-01''s internal-domain allowlist originally carried the originating
+    organisation''s mail domain, it was dropped rather than renamed, and the measured false-positive figure
+    was taken with that domain present — so SECURITY.md must state that deployments have to re-add their
+    own internal domains and re-measure before relying on the published numbers. (2) SECURITY.md carries
+    the credential-rotation cadence and the manual rotation runbook that the rotation task produces, so
+    operators have one place to look.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given the repo, when `ls SECURITY.md` is run and `gh api repos/:owner/:repo | jq .security_and_analysis`
+    is inspected, then the file exists and private vulnerability reporting is enabled.
+  - Given SECURITY.md, when it is read, then it contains a supported-versions table, a private reporting
+    route, a stated response window, and an explicit paragraph naming the aidefence-rules.ts:16-23 allowlist
+    deviation and its effect on the published FP figure.
+  - Given SECURITY.md, when the rotation section is read, then it names the maximum key age enforced by
+    the rotation task and links the runbook.
+  - Given a link check over SECURITY.md, when it runs in the docs link-check gate, then every internal
+    link resolves to a committed file.
+  tags:
+  - F100
+  - F133
+  - F139
+  - X004
+  - security
+  - governance
+  - docs
+- id: ci-proves-it-t-main-branch-ruleset
+  kind: task
+  title: '[OWNER DECISION] Put a ruleset on main and settle the DCO/CLA policy before the first outside
+    contribution'
+  status: planned
+  parent: ci-proves-it-e3
+  summary: 'Configure a GitHub ruleset on `main` requiring: a pull request with at least one approving
+    review, the named required status checks from ci.yml and data-gates.yml, linear history, and dismissal
+    of stale approvals on new commits. Two choices here are genuinely the owner''s and cannot be made
+    by an implementer: (a) whether to require signed commits — which changes the contribution friction
+    for every future contributor and interacts with the owner''s existing GPG setup; and (b) DCO versus
+    CLA versus neither, which is a legal posture that is expensive to retrofit once outside contributions
+    have landed. Decide both, record the decision and its rationale in CONTRIBUTING.md, and apply the
+    ruleset. Keep the required-check list in CONTRIBUTING.md in sync with the ruleset.'
+  priority: must
+  lane: next
+  size: S
+  acceptance:
+  - Given the decision is recorded, when `gh api repos/:owner/:repo/rulesets` is queried, then a ruleset
+    targeting `main` exists with pull_request, required_status_checks and non_fast_forward rules enabled.
+  - Given a direct push to main by the owner, when it is attempted, then it is rejected by the ruleset.
+  - Given a PR with a red ci.yml leg, when merge is attempted, then it is blocked and the failing required
+    check is named.
+  - Given CONTRIBUTING.md, when the governance section is read, then it states the signed-commit decision
+    and the DCO/CLA decision with one sentence of rationale each, and the listed required checks match
+    `gh api repos/:owner/:repo/rulesets` exactly.
+  depends_on:
+  - ci-proves-it-t-ci-node-matrix
+  - ci-proves-it-t-data-gates-workflow
+  - ci-proves-it-t-community-health-files
+  tags:
+  - F100
+  - X004
+  - governance
+  - ci
+- id: ci-proves-it-t-publish-adrs
+  kind: task
+  title: '[OWNER DECISION] Publish ADR-002, ADR-010 and the backup/DR policy the substrate cites 27 times'
+  status: planned
+  parent: ci-proves-it-e3
+  summary: 'The substrate''s most consequential behaviours are justified by design documents that were
+    never committed. ADR-002 is cited 25 times and ADR-010 twice, as binding text with line references
+    — artifact_outbox_retention.py:12-40 quotes ''it prohibits pruning the replay set WHILE IT IS THE
+    ONLY REBUILD REPRESENTATION OF A REVISION'' as ''ADR-002 line 44'' and ''Discovery of arbitrary outbox
+    directories is not sufficient authority to replay them'' as ''ADR-002 line 24''; artifact_unit_archive.py:13-38
+    repeats both; artifact_backup_offdevice.py:4-5 and :84 cite `plans/artifact-memory-backup-dr-policy-2026-07-18.md`
+    §3 and :23 cites ADR-010; artifact_memory.py:40-42 hardcodes RPO constants as ''Ratified 2026-07-18
+    — see plans/...''. Neither `plans/` nor `docs/` exists. Create docs/adr/ and publish adr-002-replay-authority.md
+    and adr-010-sealed-eval-custody.md with stable section anchors, plus docs/artifact-memory-backup-dr-policy.md
+    and docs/artifact-memory-restore-runbook.md (artifact_backup_offdevice.py:1008 embeds the runbook
+    path in the backup report, so an operator following a real restore currently lands on a missing file).
+    Add docs/adr/README.md as an index and an ADR-000 template so a future tiering decision has a home.
+    This is owner-gated: the documents are normative deletion-authority policy and must be ratified and
+    redacted by the owner, not reconstructed by an implementer.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given the repo, when `ls docs/adr/adr-002-replay-authority.md docs/adr/adr-010-sealed-eval-custody.md
+    docs/adr/README.md docs/adr/adr-000-template.md docs/artifact-memory-backup-dr-policy.md docs/artifact-memory-restore-runbook.md`
+    is run, then all six exist.
+  - Given adr-002-replay-authority.md, when it is searched for the two clauses the code quotes verbatim
+    ('prohibits pruning the replay set' and 'not sufficient authority to replay them'), then both are
+    present and each sits under a heading with a stable anchor id.
+  - Given docs/artifact-memory-backup-dr-policy.md, when §3 is read, then it enumerates the backup set
+    that artifact_backup_offdevice.py:5 and :84 cite as its authority.
+  - Given docs/artifact-memory-restore-runbook.md, when an operator follows the path embedded at artifact_backup_offdevice.py:1008,
+    then the path resolves to this committed file.
+  - Given the published documents, when the owner reviews them, then any private specifics are redacted
+    while every numbered clause the code quotes is preserved verbatim.
+  tags:
+  - F053
+  - F064
+  - docs
+  - adr
+  - governance
+- id: ci-proves-it-t-repoint-adr-citations
+  kind: task
+  title: Replace the fragile line-number ADR citations with stable anchors and add a docs link-check gate
+  status: planned
+  parent: ci-proves-it-e3
+  summary: 'Citations of the form ''ADR-002 line 44'' and ''ADR-002 line 24'' break the moment the document
+    is edited. Once the documents are published, sweep every citing site and repoint it at a stable section
+    anchor: workspace-tooling/artifact_outbox_retention.py:12-40, artifact_unit_archive.py:13-38, artifact_backup_snapshot.py,
+    artifact_backup_offdevice.py:4-5,:23,:84,:709-722,:1008 and artifact_memory.py:40-42. Then add a docs
+    link-check to the committed gate runner: parse every tracked Python and Markdown file for references
+    matching `docs/**` or `ADR-\d+` and fail the build when a referenced document or anchor does not exist.
+    Also fix the two remaining dangling doc links in workspace-tooling/README.md (:121''s docs/f10-launchagent-cutover.md).'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given the repo at HEAD, when `grep -rnE 'ADR-0(02|10) line [0-9]+' workspace-tooling/ data/` is run,
+    then it returns zero hits.
+  - Given the docs link-check gate, when it runs on clean HEAD, then it exits 0 and reports the number
+    of citations resolved (>= 27).
+  - Given a PR that renames a heading in docs/adr/adr-002-replay-authority.md without updating citers,
+    when CI runs, then the docs link-check step fails and names each stale anchor with its file:line.
+  - Given `grep -rn 'f10-launchagent-cutover' workspace-tooling/`, when run, then it returns zero hits
+    or resolves to a committed file.
+  depends_on:
+  - ci-proves-it-t-publish-adrs
+  - ci-proves-it-t-data-gates-workflow
+  tags:
+  - F053
+  - F064
+  - docs
+  - gates
+- id: ci-proves-it-t-supply-chain-workflows
+  kind: task
+  title: SHA-pin every action and add zizmor, CodeQL, dependabot, Scorecard and an npm audit gate
+  status: planned
+  parent: ci-proves-it-e3
+  summary: Zero workflows exist today, which is the one moment supply-chain hardening costs nothing —
+    pin from the start rather than retrofitting. (1) Pin every third-party `uses:` reference to a 40-char
+    commit SHA with a version comment, across ci.yml, data-gates.yml and every later workflow. (2) Add
+    `.github/workflows/zizmor.yml` running zizmor over `.github/workflows/` with SARIF upload. (3) Add
+    `.github/workflows/codeql.yml` for `javascript-typescript` and `python`. (4) Add `.github/dependabot.yml`
+    covering npm, pip and github-actions weekly, with a grouped-minor strategy so the maintainer is not
+    drowned. (5) Add an `npm audit --omit=dev --audit-level=high` step to ci.yml — the production tree
+    currently carries known high-severity advisories, and the four unused @aws-sdk packages M1 removes
+    are part of why. (6) Add OpenSSF Scorecard with SARIF upload. Set least-privilege `permissions:` blocks
+    on every job. Target OpenSSF Baseline Level 1 as the stated bar in SECURITY.md.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given `grep -hn 'uses:' .github/workflows/*.yml | grep -v '^.*@[0-9a-f]\{40\}'`, when run, then it
+    returns nothing (every third-party action is SHA-pinned).
+  - Given `zizmor .github/workflows/`, when run locally or in CI, then it exits 0 with no findings at
+    or above the configured severity.
+  - Given a push, when the codeql workflow completes, then both the javascript-typescript and python analyses
+    report success and results appear under Security > Code scanning.
+  - Given `.github/dependabot.yml`, when `gh api repos/:owner/:repo/dependabot/alerts` and the Insights
+    > Dependency graph page are checked, then npm, pip and github-actions ecosystems are all configured
+    and dependabot has opened or reported on at least one update.
+  - Given `npm audit --omit=dev --audit-level=high`, when the CI step runs on clean HEAD, then it exits
+    0.
+  - Given every job in every workflow, when `grep -c 'permissions:' .github/workflows/*.yml` is compared
+    to the job count, then no job runs with default write-all permissions.
+  depends_on:
+  - ci-proves-it-t-ci-node-matrix
+  - starts-everywhere-e5
+  tags:
+  - X006
+  - F133
+  - supply-chain
+  - security
+  - ci
+- id: ci-proves-it-t-python-hash-locks
+  kind: task
+  title: Publish per-platform hash-pinned Python locks and teach lock_check.py to enforce hashes
+  status: planned
+  parent: ci-proves-it-e3
+  summary: workspace-tooling/requirements-artifact-ingestion.lock.txt:1-19 admits in its own header that
+    it was 'captured with pip freeze from the PROVEN working virtualenv ... (Python 3.12.13, darwin/arm64)'
+    and is 'Version-pinned, NOT hash-pinned' — the file contains zero sha256 occurrences across 73 lines
+    — while workspace-tooling/README.md:50-58 instructs adopters to install it with no `--require-hashes`.
+    The tree being installed includes onnxruntime, numpy, tokenizers, fastembed, qdrant-client and graphiti-core,
+    running in the process with the widest read access in the system. Generate hash-pinned locks with
+    `uv pip compile --generate-hashes` (or pip-compile) for linux/x86_64, darwin/arm64 and win/x86_64,
+    committed as `requirements-artifact-ingestion.<platform>.lock.txt`. Change the install instruction
+    to `pip install --require-hashes -r <platform lock>`. Extend workspace-tooling/lock_check.py — already
+    the drift tripwire between the two requirements files — to assert every non-comment line in each lock
+    carries at least one `--hash` entry, and run it in the data-gates workflow. Retire the 'F-10 follow-up,
+    not claimed here' note from the header once done.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given a clean venv on ubuntu-latest, when `pip install --require-hashes -r workspace-tooling/requirements-artifact-ingestion.linux-x86_64.lock.txt`
+    is run, then it succeeds; the same holds for the darwin/arm64 lock on macos-latest.
+  - Given `grep -c -- '--hash=sha256:' workspace-tooling/requirements-artifact-ingestion.linux-x86_64.lock.txt`,
+    when run, then the count is greater than or equal to the number of pinned packages.
+  - Given a lock file with one `--hash` line deleted, when `python workspace-tooling/lock_check.py` is
+    run, then it exits non-zero and names the package missing a hash.
+  - Given the data-gates workflow, when it runs, then lock_check.py appears as a named step and passes
+    on clean HEAD.
+  - Given workspace-tooling/README.md:46-58, when read, then the install instruction uses `--require-hashes`
+    against a named per-platform lock and the 'not claimed here' caveat is gone.
+  depends_on:
+  - ci-proves-it-t-ci-python-job
+  tags:
+  - F143
+  - supply-chain
+  - security
+  - substrate
+- id: ci-proves-it-t-model-snapshot-pins
+  kind: task
+  title: Commit the ONNX embedding and reranker snapshot digests and verify them at load rather than trusting
+    first use
+  status: planned
+  parent: ci-proves-it-e3
+  summary: 'README.md:33-34 claims ''A pinned ONNX model (all-MiniLM-L6-v2, 384-dim) loaded from a digest-checked
+    local snapshot; runtime downloads are refused.'' The refusal half is real (artifact_memory_service.py:704-717
+    uses `local_files_only=True`, and :425-428 compares `_model_manifest_digest(config.embedding_model_snapshot)`
+    against `config.embedding_model_manifest_digest` and fails closed on mismatch) — but the digest it
+    compares against is trust-on-first-use: it is a plain field of the locally generated runtime configuration
+    (artifact_runtime.py:176-180, populated at :348-362), not a value pinned in the repo. No expected
+    upstream hash is committed anywhere and artifact_memory_provision.py contains zero references to snapshot_download,
+    huggingface, sha256 or the model name. Commit `data/facts/model-pins.json` carrying the expected manifest
+    digests for the pinned embedding and reranker snapshots; have artifact_runtime.py:348-362 compare
+    the runtime-config digest against that committed pin at load and fail closed on mismatch; add a provisioning
+    subcommand to artifact_memory_provision.py that performs the one-time verified fetch; add a ''Model
+    provisioning'' section to workspace-tooling/README.md; and soften README.md:34 to describe what is
+    actually checked.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given data/facts/model-pins.json at HEAD, when it is read, then it contains a named entry per model
+    with `model_id`, `revision`, `manifest_sha256` and the source URL the provisioner fetches from.
+  - Given a snapshot directory whose manifest digest differs from the committed pin, when the memory service
+    starts, then it refuses to load and the error names the expected pin, the observed digest and data/facts/model-pins.json.
+  - Given a machine with no snapshot present, when the new `artifact_memory_provision.py fetch-models`
+    subcommand is run, then it downloads into the private snapshot directory, verifies against the committed
+    pin, and exits non-zero without writing if verification fails.
+  - Given README.md:33-34, when read after this task, then the sentence describes verification against
+    a repo-committed pin rather than implying upstream verification that did not exist.
+  - Given workspace-tooling/README.md, when searched for 'Model provisioning', then the section exists
+    and its commands run as written.
+  depends_on:
+  - starts-everywhere-e3
+  tags:
+  - F146
+  - supply-chain
+  - security
+  - memory
+- id: ci-proves-it-t-ts-state-file-hardening
+  kind: task
+  title: Create the token log and cache snapshot 0600, write them atomically, and refuse an untrusted
+    snapshot on restore
+  status: planned
+  parent: ci-proves-it-e3
+  summary: 'The Python side enforces owner-only 0600/0700 on every derived file (artifact_security.py:108-122);
+    the TypeScript side enforces nothing. TokenLogger writes via `appendFile(this.logPath, ...)` (src/logging/token-logger.ts:343)
+    with no mode and no chmod — the constructor at :221-236 only mkdirs — so the log lands world-readable
+    under the common umask, and under the default `personal` profile it contains a raw preview of every
+    tool argument. The cache snapshot at `$WORKSPACE_ROOT/.claude/mcp-cache-snapshot.jsonl` (src/config.ts:123-140,
+    written by writeCacheSnapshotSync/Async at src/index.ts:261-288) is equally unprotected and is trusted
+    on restore (src/cache/response-cache.ts:211-221 validates only field types). Both are also full-file
+    rewrites at one fixed path per workspace, so two Claude Code windows on the same workspace clobber
+    each other. Fix all three: create both files with `openSync(path, ''a'', 0o600)` / chmod to 0600,
+    write via `${path}.${process.pid}.tmp` + fsync + rename, and on restore lstat the snapshot and refuse
+    it when it is a symlink, is not owned by the current uid, or has group/other bits — the ownership
+    walk at src/tools/artifact-memory.ts:219-245 is the in-repo model to copy. Shard per pid (with a startup
+    merge-and-prune older than RESTORE_MAX_AGE_MS) or take an O_EXCL advisory lock so the loser skips
+    its write.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given the server started under the default profile with umask 022, when it writes the token log and
+    cache snapshot, then `stat -c '%a'` reports 600 for both on POSIX (and the Windows equivalent grants
+    only the current user).
+  - Given a group-readable or symlinked cache snapshot placed at the configured path, when the server
+    starts, then it refuses to restore from it and logs one structured line naming the reason — asserted
+    by a new test under src/cache/.
+  - Given two writer processes started against the same workspace, when both run for 60 seconds and exit,
+    when the merged result is read, then no entry written by either is lost and no partially-written line
+    is ever observed — asserted by a new concurrency test.
+  - Given a kill -9 mid-write, when the file is read afterwards, then it parses as valid JSONL (the temp-file-plus-rename
+    discipline never exposes a truncated target).
+  - Given `npm test`, when it runs after this task, then the new privacy and concurrency tests are included
+    in the glob and pass on ubuntu, macOS and Windows.
+  depends_on:
+  - gates-green-e2
+  tags:
+  - F141
+  - F128
+  - security
+  - mcp-server
+  - concurrency
+- id: ci-proves-it-t-credential-rotation-policy
+  kind: task
+  title: Give Qdrant credential rotation a cadence, a runtime-config URL and a key-age signal
+  status: planned
+  parent: ci-proves-it-e3
+  summary: 'workspace-tooling/artifact_qdrant_rotate_keys.py rotates the admin and read-only keys, restarts
+    the container and proves old-key rejection by asserting 401 — a good design invoked by nothing: no
+    schedule, no documented cadence, no key-age tracking, so nothing detects a key that has never been
+    rotated. It hardcodes `http://127.0.0.1:6343/collections` at line 22 rather than reading the port
+    from artifact_runtime, so it breaks silently on any non-default port; it reads the restore-tier keys
+    from disk at lines 41-48 and writes them back unchanged, so the restore tier is never rotated at all;
+    and `shutil.which("docker") or "/usr/local/bin/docker"` at line 71 is a macOS-specific default. Fix
+    all four: read the URL from `artifact_runtime.load_runtime()`, mint fresh restore-admin and restore-read-only
+    keys rather than reading them back, make the docker fallback a hard error, and record `rotated_at`
+    into a tracked `key-age.json` that `artifact_memory_status` reads so the MCP tool itself warns when
+    any key exceeds a configured max age (default 90 days). Write the cadence and the manual runbook into
+    SECURITY.md. Also replace the launchctl probe in artifact_supervisor_receipt.py:144-162 with a backend
+    dispatched on sys.platform (launchd / `systemctl show` / `Get-ScheduledTask`) and relax LABEL_PATTERN
+    at :49 accordingly, so the audit trail exists on all three target platforms rather than only macOS.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given a runtime config pointing Qdrant at a non-default port, when `artifact_qdrant_rotate_keys.py`
+    runs, then it targets that port — verified by `grep -n '6343' workspace-tooling/artifact_qdrant_rotate_keys.py`
+    returning no hardcoded URL.
+  - Given a rotation run, when it completes, then the restore-tier keys differ from their pre-run values
+    and the old restore keys are rejected with 401 by the same assertion the admin tier already uses.
+  - Given a key-age.json whose newest `rotated_at` is older than the configured maximum, when `artifact_memory_status`
+    is called through the MCP server, then the response includes a warning naming the key tier and its
+    age in days.
+  - Given a machine with no docker on PATH, when the rotation script runs, then it exits non-zero with
+    a named error rather than silently attempting `/usr/local/bin/docker`.
+  - Given SECURITY.md, when the rotation section is read, then it states the cadence, the maximum age,
+    and the manual runbook steps.
+  - Given a Linux host running the substrate under systemd, when the supervisor receipt is produced, then
+    it is non-empty and reports the unit state — asserted by a test that runs on the ubuntu CI leg.
+  depends_on:
+  - ci-proves-it-t-security-policy
+  - gates-green-e4
+  tags:
+  - F142
+  - security
+  - supply-chain
+  - substrate
+  - portability
+- id: ci-proves-it-e4
+  kind: epic
+  title: A written threat model, guards that enforce, and hooks that run without bash or jq
+  status: planned
+  summary: The kit's only runtime security controls are (a) four PreToolUse bash hooks that require jq
+    and fail OPEN when it is missing — block-plaintext-secret-write.sh:95 swallows a missing jq with `2>/dev/null
+    || true`, yielding an empty file path, then exits 0 having checked nothing, while its own harness
+    at tests/hooks/block-plaintext-secret-write.test.sh:11 SKIPs on exactly the machines where the guard
+    is inert — and (b) an AIDefence guard that defaults to log-only, ships an instruction not to enable
+    enforcement, is compiled into TypeScript constants no adopter can tune, and scans only the caller's
+    input while the server's entire function is emitting Markdown it does not control into an agent's
+    context. This epic writes the threat model that names what is and is not defended, ports the hooks
+    to one Node implementation compiled to each provider's format with per-OS command variants, moves
+    the ruleset to data/ with env overrides, replaces the enforce/log dilemma with per-class enforcement
+    and a severity floor, wires the orphaned PII engine into a real output-side gate, and loopback-fences
+    the Graphiti egress paths if that pilot survived M1.
+  priority: should
+  lane: next
+  size: XL
+  acceptance:
+  - Given docs/THREAT-MODEL.md at HEAD, when it is read, then it names the three deployment shapes (single-user
+    laptop, shared host, team service) and, per shape, the trust boundary, the authenticated principal,
+    and what is explicitly out of scope.
+  - Given a windows-latest runner with no bash and no jq on PATH, when each of the four guards is fed
+    a known-bad payload on stdin, then each exits non-zero and prints a deny reason — the fail-open behaviour
+    is gone on every OS.
+  - Given `grep -rn 'hasPii\|\.pii' src/ --include='*.ts' | grep -v test`, when run, then it shows a real
+    non-test consumer in the output-side gate rather than only definitions.
+  - Given a served reference containing an injected instruction, when the tool response is produced, then
+    the content is wrapped in an explicit untrusted-content fence naming the discovery tier and the matched
+    rule, and the event is logged symmetrically with the input-side line at src/index.ts:676-680.
+  - Given AIDEFENCE_ENFORCE_CLASSES=prompt_injection,path_traversal, when the benign query encoded at
+    src/security/guard.test.ts:47-53 ('what does $(git rev-parse) do in helm values') is submitted, then
+    it is NOT blocked while a critical prompt-injection payload IS blocked.
+  depends_on:
+  - gates-green-e2
+  tags:
+  - F134
+  - F131
+  - F136
+  - F139
+  - F140
+  - F132
+  - F006
+  - F111
+  - F137
+  - X050
+  - security
+  - hooks
+  - threat-model
+- id: ci-proves-it-t-threat-model
+  kind: task
+  title: Write docs/THREAT-MODEL.md naming three deployment shapes, their trust boundaries and what is
+    out of scope
+  status: planned
+  parent: ci-proves-it-e4
+  summary: 'The only multi-user affordance is `SERVER_PROFILE=shared`, which does three narrow things:
+    excludes the personal-memory tier (src/index.ts:81-84), unregisters the artifact-memory tools (src/index.ts:159-165)
+    and forces guard enforce (src/security/guard.ts:44). There is no identity, no per-caller authorization,
+    no rate limit and no tenancy anywhere — src/transport-lock.test.ts:9-15 says so itself, listing the
+    unmet preconditions for any non-stdio transport. Below it, the substrate''s trust model is literally
+    ''same effective uid'' (artifact_memory_service.py:6-7: ''there is no TCP or bearer-token fallback'';
+    authorization is `st_uid != os.geteuid()` on a 0600 socket). README.md:84-85 nonetheless reads as
+    a team-ready posture. Write docs/THREAT-MODEL.md covering single-user laptop, shared host and team
+    service; per shape state the trust boundary, the authenticated principal, the assets, the assumed
+    adversary, and the explicit non-goals. State plainly that no multi-tenant mode exists today and link
+    the M8 write-path and retrieval work as the place tenancy would land. Fix README.md:84-85 to match.
+    Also, immediately and independently of the naming decision: make `graphiti_readiness` (workspace-tooling/artifact_ingestion.py:1490-1512)
+    raise when the password env var is unset or empty instead of passing `password=None`.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given docs/THREAT-MODEL.md, when read, then it contains one section per deployment shape and each
+    section states trust boundary, authenticated principal, assets, adversary and explicit out-of-scope
+    items.
+  - Given README.md:84-85, when read after this task, then the description of SERVER_PROFILE=shared states
+    it is a content filter and not a trust boundary, and links docs/THREAT-MODEL.md.
+  - Given an unset FalkorDB/Graphiti password env var, when `graphiti_readiness` is called, then it raises
+    a named error rather than returning a readiness verdict with `password=None` — asserted by a new unit
+    test.
+  - Given the docs link-check gate, when it runs, then every link in docs/THREAT-MODEL.md resolves to
+    a committed file.
+  tags:
+  - F134
+  - security
+  - threat-model
+  - docs
+- id: ci-proves-it-t-shared-profile-decision
+  kind: task
+  title: '[OWNER DECISION] Rename SERVER_PROFILE=shared, or commit to building tenancy'
+  status: planned
+  parent: ci-proves-it-e4
+  summary: '`shared` reads as a team-ready posture but is a content filter: a team standing up one artifact-memory
+    host gets a single shared credential pair (workspace-tooling/services/qdrant/compose.yaml:14-15 ships
+    one admin and one read key) with no per-engineer attribution, and one engineer''s ingested private
+    notes are readable by every holder of the read key. Two paths, and the choice is the owner''s because
+    it changes a published environment-variable value and sets the trajectory of the memory milestone:
+    (a) rename to `restricted` in src/config.ts:57-58, keep `shared` as a deprecated alias for one minor
+    version with a startup warning, and document that no multi-tenant mode exists; or (b) commit to building
+    identity, per-collection JWT read scopes, principal-partitioned token-log and cache-snapshot paths,
+    and an access log — which is M8-scale work and must be scheduled there, not here. Land the decision,
+    the alias or the schedule entry, and the corresponding paragraph in docs/THREAT-MODEL.md.'
+  priority: must
+  lane: next
+  size: S
+  acceptance:
+  - Given the decision is recorded in docs/THREAT-MODEL.md with a dated rationale, when the chosen path
+    is (a), then `SERVER_PROFILE=restricted` starts the server with the previous `shared` semantics and
+    `SERVER_PROFILE=shared` starts it too while emitting exactly one deprecation line to stderr — asserted
+    by src/server-profile.test.ts.
+  - Given path (a), when `grep -rn '"shared"' src/ --include='*.ts' | grep -v test` is run, then every
+    remaining occurrence is inside the deprecation alias path.
+  - Given path (b), when the decision lands, then a corresponding epic exists in the memory-that-earns-it
+    milestone file with the identity, scoping and access-log work enumerated, and THREAT-MODEL.md states
+    that until it ships there is no multi-tenant mode.
+  - Given either path, when README.md and docs/THREAT-MODEL.md are read together, then they use the same
+    profile name and make the same claim.
+  depends_on:
+  - ci-proves-it-t-threat-model
+  tags:
+  - F134
+  - security
+  - mcp-server
+  - naming
+- id: ci-proves-it-t-hooks-node-port
+  kind: task
+  title: Port the four PreToolUse guards to one Node implementation that fails closed without bash or
+    jq
+  status: planned
+  parent: ci-proves-it-e4
+  summary: 'The four security hooks — data/hooks/block-plaintext-secret-write.sh, block-kubectl-mutations.sh,
+    block-deploy-repo-edits.sh, validate-commit-subject.sh — all require bash plus jq (and awk, sed, `grep
+    -E`, head). jq is not present by default on macOS, Windows or a minimal Linux image, and every one
+    is documented to fail open: block-kubectl-mutations.sh:24 states ''Fails OPEN on parse errors'', validate-commit-subject.sh:22-30
+    returns 0 when the command cannot be parsed, and block-plaintext-secret-write.sh:95 and :112 swallow
+    a missing jq with `2>/dev/null || true`, yielding an empty value and exiting 0 having checked nothing.
+    Write one `data/hooks/guard.mjs` that reads the PreToolUse payload with `JSON.parse` off stdin, implements
+    all four guard behaviours behind a `--guard <name>` selector, and emits the identical `hookSpecificOutput`
+    shape. Node >= 20 is already a hard requirement (package.json engines) and the repo already ships
+    one .mjs generator, so this adds no dependency. Keep the four .sh files as thin shims that exec the
+    Node entrypoint so existing installs keep working. Consolidate the secret regexes with data/scripts/secret-scan.py''s
+    TOKEN_SHAPES — the duplication is self-documented as a drift hazard at block-plaintext-secret-write.sh:57-59.
+    Preserve the Windows path-separator fix already noted at :65-67 (''found live on the Windows port,
+    2026-07-22'').'
+  priority: must
+  lane: now
+  size: L
+  acceptance:
+  - Given data/hooks/guard.mjs and a machine with jq removed from PATH, when a known-bad payload (a plaintext
+    `sk-ant-` token written to `.mcp.json`) is piped to `node data/hooks/guard.mjs --guard block-plaintext-secret-write`,
+    then it exits non-zero and the deny reason names the matched shape.
+  - Given the same payload on windows-latest with no bash available, when the guard is invoked via `node`,
+    then it exits non-zero — the reproduction from F006/F111/F132 (guard silently allows on a jq-less
+    or bash-less machine) now fails closed.
+  - Given the pre-existing bash test cases in tests/hooks/block-plaintext-secret-write.test.sh, when they
+    are replayed against guard.mjs, then every DENY case denies and every ALLOW case allows with byte-identical
+    verdicts.
+  - Given the four .sh files after this task, when each is read, then it is a shim that execs the Node
+    entrypoint and contains no jq invocation — `grep -c jq data/hooks/*.sh` returns 0.
+  - Given data/scripts/secret-scan.py, when its TOKEN_SHAPES and guard.mjs's patterns are compared by
+    a new gate, then they are asserted equal (or generated from one source) so the documented drift hazard
+    cannot recur.
+  tags:
+  - F006
+  - F111
+  - F132
+  - X050
+  - security
+  - hooks
+  - portability
+- id: ci-proves-it-t-hooks-provider-compile
+  kind: task
+  title: Compile the one guard implementation to each provider's hook format with per-OS command variants
+  status: planned
+  parent: ci-proves-it-e4
+  summary: 'data/scripts/template-settings.json wires each guard as `"command": "bash -c ''h=...; [ -f
+    \"$h\" ] && exec bash \"$h\"; exit 0''"` — a fallthrough that fails OPEN when the file or bash is
+    missing — and hardcodes a `${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}` fallback path. Define
+    the portable event contract as the events every provider implements (SessionStart, UserPromptSubmit,
+    PreToolUse, PostToolUse, Stop) and generate, from the single Node implementation, (a) Claude Code
+    settings hooks in template-settings.json, (b) Codex `[hooks.*]` entries with `commandWindows` variants,
+    and (c) the OpenCode plugin wiring in data/scripts/template-opencode-plugin.mjs:70 (whose employer-specific
+    candidate paths at :53-60 are replaced by an AGENT_KIT_ROOT-based resolution). Change the fallthrough
+    to fail CLOSED: a missing guard must block the tool call and say so. Record any event outside the
+    portable five as provider-specific so M7''s capability manifests can carry it. Also drop the kubectl/AWS
+    entries from template-settings.json permissions.allow, which ship an employer-shaped allowlist to
+    every adopter.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given the generated template-settings.json, when `grep -c 'bash -c' data/scripts/template-settings.json`
+    is run, then it returns 0 and every hook command invokes `node`.
+  - Given a settings file whose referenced guard file has been deleted, when a matching tool call is made,
+    then the call is BLOCKED with a message naming the missing guard — asserted by a test, replacing the
+    current `exit 0` fallthrough.
+  - Given the generated Codex hook config, when it is inspected, then each hook entry carries both `command`
+    and `commandWindows` and the Windows variant runs under cmd/PowerShell without bash.
+  - Given `grep -rn 'Work/workspace\|kubectl get' data/scripts/template-settings.json`, when run after
+    this task, then it returns zero hits.
+  - Given the generator, when the pack `--check` gate runs, then the three provider hook renderings are
+    byte-stable and the adapter-packs golden reflects them.
+  depends_on:
+  - ci-proves-it-t-hooks-node-port
+  - gates-green-e1
+  tags:
+  - X050
+  - F006
+  - F111
+  - F132
+  - hooks
+  - packs
+  - portability
+- id: ci-proves-it-t-hook-harness-fail-closed
+  kind: task
+  title: Make the hook harnesses fail rather than SKIP, and run them on the Windows CI leg
+  status: planned
+  parent: ci-proves-it-e4
+  summary: 'tests/hooks/block-plaintext-secret-write.test.sh:11 does `command -v jq >/dev/null 2>&1 ||
+    { echo "SKIP: jq unavailable"; exit 0; }` — the suite goes green on exactly the machines where the
+    guard is inert, which is why the fail-open behaviour survived. Port the harness to Node (or add a
+    Node harness alongside) so it runs identically on all three OSes, add harnesses for the other three
+    guards which have none, and change any remaining SKIP path to FAIL under `AGENT_KIT_REQUIRE_HOOKS=1`
+    which CI sets. Add a windows-latest CI job that executes each guard against a known-bad input and
+    asserts a non-zero exit, and against a known-good input asserting exit 0. Register all four harnesses
+    in the committed gate runner so `npm run gates` covers them locally.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given `AGENT_KIT_REQUIRE_HOOKS=1` and a machine without jq, when the hook harness runs, then it FAILS
+    rather than printing SKIP — verified by `grep -rn 'SKIP' tests/hooks/` showing no unconditional exit-0
+    path.
+  - Given the windows-latest CI leg, when it runs, then all four guards are exercised with a known-bad
+    payload and each returns a non-zero exit, and the job log names each guard individually.
+  - Given a known-good payload, when each guard runs on each OS, then it exits 0 — proving the guards
+    are not simply blocking everything.
+  - Given `npm run gates` on macOS or Linux, when it runs, then all four hook harnesses appear in the
+    step list and pass.
+  - Given the four shell harnesses previously counted by the gate runner, when the data-gates workflow
+    runs, then none reports SKIP on any leg.
+  depends_on:
+  - ci-proves-it-t-hooks-node-port
+  - ci-proves-it-t-data-gates-workflow
+  tags:
+  - F006
+  - F132
+  - F111
+  - hooks
+  - ci
+  - security
+- id: ci-proves-it-t-aidefence-rules-as-data
+  kind: task
+  title: Move the AIDefence ruleset to data/ with env overrides so adopters tune rather than fork
+  status: planned
+  parent: ci-proves-it-e4
+  summary: 'The rules are compiled TypeScript constants: src/security/aidefence-rules.ts:92-236 hard-codes
+    25 injection, 5 traversal, 8 command-injection and 8 PII rules with `RULESET_VERSION = "1.0.0-tightened"`
+    frozen at line 27. There is no loader, no external rules file and no suppression mechanism, so a team
+    hitting a false positive must fork, edit TypeScript, `npm run build` and restart every session. The
+    file''s own header at :16-23 makes the problem explicit — it instructs deployments to ''re-add their
+    own internal domains here (and to the regex below) and re-measure'', which is a source-edit-as-configuration
+    instruction. Move the rule table to `data/security/aidefence-rules.json` with the schema `{id, cls,
+    sub, severity, pattern, flags}` plus a top-level `rulesetVersion`, and load it at startup in src/security/aidefence.ts
+    behind a strict validator (reject unknown classes, reject unbounded quantifiers, cap pattern length).
+    Add `AIDEFENCE_RULES_PATH` and `AIDEFENCE_SUPPRESS=PI-20,CI-01` env overrides plus an allowlist block
+    for internal email domains and account ids. Keep the current constants as the built-in default so
+    behaviour is unchanged when nothing is configured, and keep the byte-faithful patterns that carry
+    explicit do-not-touch comments (PT-01T at :172-177 and CI-01 at :190-191).'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given no AIDefence env vars set, when the full src/security/aidefence.test.ts suite runs, then every
+    existing assertion passes unchanged — the default behaviour is byte-identical to the compiled constants.
+  - Given `AIDEFENCE_RULES_PATH` pointing at a file with an unknown `cls` value or a pattern longer than
+    the cap, when the server starts, then it refuses to load that ruleset and logs one structured line
+    naming the offending rule id.
+  - Given `AIDEFENCE_SUPPRESS=CI-01`, when the benign query at src/security/guard.test.ts:47-53 is scanned,
+    then CI-01 does not match while every other rule still evaluates.
+  - Given an allowlist entry for an internal mail domain, when a message containing that domain is scanned,
+    then PII-01 does not fire — and the aidefence-rules.ts:16-23 header instruction to edit source is
+    replaced by a pointer to this configuration.
+  - Given data/security/aidefence-rules.json, when the data-gates workflow runs, then a schema-validation
+    step asserts the file parses against its committed JSON Schema.
+  depends_on:
+  - gates-green-e2
+  tags:
+  - F139
+  - security
+  - aidefence
+  - packs
+- id: ci-proves-it-t-guard-per-class-enforcement
+  kind: task
+  title: Replace the enforce/log dilemma with per-class enforcement, a severity floor and real soak telemetry
+  status: planned
+  parent: ci-proves-it-e4
+  summary: 'Out of the box the guard blocks nothing: `resolveGuardMode` (src/security/guard.ts:40-46)
+    returns ''log'' unless the profile is `shared` or `AIDEFENCE_GUARD_MODE === ''enforce''`, and the
+    default profile is ''personal''. src/index.ts:186-189 then instructs operators not to change that
+    (''do NOT set AIDEFENCE_GUARD_MODE=enforce ... without first reviewing the log-mode FP soak'') while
+    no soak tooling ships — the only artifact is a `process.stderr.write` at src/index.ts:676-680, with
+    no aggregation, no rate and no exit criterion. The reason enforce is unsafe is real and encoded as
+    a passing test: guard.test.ts:47-53 ''KNOWN enforce FP: a benign query quoting $(...) blocks under
+    CI-01''. Two changes. (1) Add `AIDEFENCE_ENFORCE_CLASSES` and `AIDEFENCE_ENFORCE_MIN_SEVERITY` read
+    in resolveGuardMode so a deployment can enforce prompt_injection:critical plus path_traversal while
+    leaving CI-01 in log mode. (2) Ship the soak: have TokenLogger record guard matches as structured
+    JSONL fields (ruleId, class, tool, blocked) instead of the stderr-only line, and extend `get_token_stats
+    {mode:"detail"}` (src/tools/token-stats.ts, which today has zero guard handling) with a guard section
+    reporting match rate per rule per 1k calls. Write the ramp exit criterion into README as a number.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given AIDEFENCE_ENFORCE_CLASSES=prompt_injection,path_traversal, when the benign query at src/security/guard.test.ts:47-53
+    is submitted, then it is not blocked; and when a critical prompt-injection payload is submitted, then
+    it is blocked with the rule id in the error.
+  - Given AIDEFENCE_ENFORCE_MIN_SEVERITY=critical, when a high-but-not-critical match occurs in an enforced
+    class, then it is logged and not blocked — asserted by a new unit test on resolveGuardMode.
+  - Given a session with guard matches, when `get_token_stats {mode:"detail"}` is called, then the response
+    contains a guard section reporting per-rule match counts and a rate per 1k calls.
+  - Given the token log after a guard match, when the JSONL is read, then the entry carries ruleId, class,
+    tool and blocked as structured fields — `grep -c 'AIDEFENCE' <log>` on stderr is no longer the only
+    record.
+  - 'Given README.md, when the guard ramp section is read, then it states a numeric exit criterion (for
+    example: flip a rule to enforce when its 7-day match rate is below 0.1% and every match was manually
+    confirmed a true positive).'
+  depends_on:
+  - ci-proves-it-t-aidefence-rules-as-data
+  - ci-proves-it-t-ts-state-file-hardening
+  tags:
+  - F140
+  - security
+  - aidefence
+  - mcp-server
+- id: ci-proves-it-t-output-side-gate
+  kind: task
+  title: Scan and provenance-fence served content, and wire the orphaned PII engine into that gate
+  status: planned
+  parent: ci-proves-it-e4
+  summary: 'The server''s entire function is to load Markdown from directories it does not control and
+    emit it into an agent''s context — src/index.ts:55-67 discovers skills/agents/references from `WORKSPACE_ROOT/.claude/*`
+    and CLAUDE.md files anywhere under PLATFORM_ROOT/WORKSPACE_ROOT, and src/discovery/skills.ts:44-58
+    reads any SKILL.md it finds with no validation. Every handler returns that content verbatim (src/tools/references.ts:52,
+    src/tools/search.ts:44-50, src/tools/artifact-memory.ts:455-540). The only defence, `guardToolInput`
+    at src/index.ts:637, scans `JSON.stringify(argObj)` — the agent''s own query — and never touches `outputText`
+    at :793; the comment at :631-632 states the mistaken model explicitly. Separately, src/security/aidefence.ts:102-128
+    implements `hasPii` carefully and `scan()` computes `pii` on every call at :166, but guard.ts:75-94
+    discards `result.pii` entirely — a repo-wide grep finds zero non-test consumers, and guard.ts:22-23
+    explains why by referring to `wiki.ts`, which does not exist in this repo. Add `guardToolOutput(text,
+    tier)` in src/security/guard.ts reusing `scan()`, call it in src/index.ts immediately after `const
+    outputText = ...` and before `responseCache.record`, and on a SAFETY match wrap rather than drop:
+    emit the content inside an explicit untrusted-data fence (for example `<untrusted-content source="skills/foo"
+    tier="workspace">`) plus a one-line notice naming the matched rule, logged symmetrically with the
+    input-side line at :676-680. Redact PII matches to `[redacted:PII-05]`. Tag every served block with
+    its discovery tier (bundled data/ vs WORKSPACE_ROOT/.claude vs artifact-memory) — artifact_retrieval.py:1184
+    already sets `untrusted_content`, so extend the same idea to references.ts, skills.ts, memory.ts and
+    search.ts. Correct the rationale comment at src/index.ts:631-632 and guard.ts:22-23, and delete the
+    `src/tools/wiki.test.ts` entry from data/scripts/secret-scan-allowlist.json:52-56 which makes the
+    allowlist unverifiable against a nonexistent file.'
+  priority: must
+  lane: next
+  size: L
+  acceptance:
+  - Given a fixture skill under a temporary WORKSPACE_ROOT containing an injected instruction, when `get_skill`
+    is called for it, then the response body is wrapped in an untrusted-content fence naming the discovery
+    tier and the matched rule id — asserted by a new test using the existing mcp-contract fixture harness.
+  - Given a fixture reference containing a `sk-ant-` shaped token, when it is served, then the token is
+    replaced by `[redacted:PII-xx]` in the response and the original is never written to the response
+    cache.
+  - Given `grep -rn 'hasPii' src/ --include='*.ts' | grep -v '\.test\.'`, when run after this task, then
+    it shows a call site in the output-side gate, not only the definition.
+  - Given src/security/guard.ts:22-23 and src/index.ts:631-632, when read after this task, then neither
+    refers to a nonexistent wiki.ts and both describe the output-side gate that now exists.
+  - Given `python data/scripts/secret-scan.py --check`, when run after removing the src/tools/wiki.test.ts
+    allowlist entry, then it exits 0 and the allowlist contains no entry pointing at a nonexistent file.
+  - Given a clean served response with no matches, when it is emitted, then it is byte-identical to today's
+    output apart from the tier tag — the gate adds no noise on the happy path.
+  depends_on:
+  - ci-proves-it-t-aidefence-rules-as-data
+  - gates-green-e2
+  tags:
+  - F131
+  - F136
+  - security
+  - mcp-server
+  - aidefence
+- id: ci-proves-it-t-graphiti-loopback-fence
+  kind: task
+  title: Loopback-fence the Graphiti LLM, embedding and FalkorDB endpoints, gated on the M1 Graphiti decision
+  status: planned
+  parent: ci-proves-it-e4
+  summary: 'The substrate has exactly one rigorous egress validator — `require_loopback_qdrant_url` (workspace-tooling/artifact_ingestion.py:874-895)
+    rejects any non-127.0.0.1 host, any credential in the URL, any query or fragment. The Graphiti path
+    has nothing equivalent: graphiti_pilot.py:993 declares `--llm-base-url` as a free-form argparse string
+    and `_run_cases_async` at :626-704 feeds it straight into `AsyncOpenAI(base_url=...)` and `OpenAIEmbedderConfig(base_url=...)`;
+    the only mention of loopback at :663-667 merely decides whether an API key is required. So `graphiti_pilot.py
+    apply --llm-base-url https://api.openai.com/v1` ships canonical Markdown chunk bodies off the machine,
+    falsifying README.md:22-25''s ''Nothing leaves the machine'' for the exact tier goal D names. Extract
+    `artifact_runtime.require_loopback_http_url(url, label)` modelled on the Qdrant validator and apply
+    it to `--llm-base-url` and `--embedding-base-url` in graphiti_pilot.py (parser :993-998, consumed
+    in _run_cases_async) and artifact_ingestion.py (:2069-2074, :2097-2100), defaulting to reject. Gate
+    any non-loopback value behind an explicit `--allow-remote-llm` flag that requires a justification
+    string recorded in the run''s evidence JSON and forces every episode body (`_graphiti_episode_body`,
+    artifact_ingestion.py:1425-1436) through PII redaction first. Make `_require_falkordb_endpoint` (:1438-1446)
+    reject non-loopback hosts by default. Amend README.md:25. THIS TASK IS CONDITIONAL: if M1''s owner
+    decision retired the Graphiti pilot, close it as not-applicable and delete the dead paths instead.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given the M1 Graphiti decision retained the pilot, when `graphiti_pilot.py run --llm-base-url https://api.openai.com/v1`
+    is invoked without `--allow-remote-llm`, then it exits non-zero naming the rejected host and the flag
+    required to override.
+  - Given `--allow-remote-llm` without a justification string, when the command runs, then it exits non-zero;
+    and with a justification, then the run's evidence JSON contains the justification verbatim.
+  - Given `--allow-remote-llm` with a justification, when an episode body is built, then it passes through
+    PII redaction before any outbound call — asserted by a test that injects a `sk-ant-` shaped token
+    and observes the redacted form in the request payload.
+  - Given a non-loopback FalkorDB endpoint, when `_require_falkordb_endpoint` is called without an explicit
+    override, then it raises.
+  - Given README.md:22-25, when read after this task, then it states 'nothing leaves the machine by default'
+    and names the single flag that changes that.
+  - Given the M1 decision retired the pilot instead, when this task closes, then `grep -rn 'graphiti'
+    src/ workspace-tooling/ --include='*.py' --include='*.ts' | grep -v test` returns only removal-notice
+    comments.
+  depends_on:
+  - starts-everywhere-e3
+  tags:
+  - F137
+  - security
+  - memory
+  - egress

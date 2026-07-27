@@ -1,0 +1,98 @@
+{
+  "native-everywhere-e1": {
+    "number": 137,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/137"
+  },
+  "native-everywhere-e2": {
+    "number": 138,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/138"
+  },
+  "native-everywhere-e3": {
+    "number": 139,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/139"
+  },
+  "native-everywhere-spike-1": {
+    "number": 140,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/140"
+  },
+  "native-everywhere-t-alert-dispatch": {
+    "number": 154,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/154"
+  },
+  "native-everywhere-t-catalog-reads-projection": {
+    "number": 160,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/160"
+  },
+  "native-everywhere-t-loopback-fallback": {
+    "number": 146,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/146"
+  },
+  "native-everywhere-t-project-map-example": {
+    "number": 157,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/157"
+  },
+  "native-everywhere-t-py-transport-backends": {
+    "number": 142,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/142"
+  },
+  "native-everywhere-t-render-launchd": {
+    "number": 150,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/150"
+  },
+  "native-everywhere-t-render-schtasks": {
+    "number": 152,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/152"
+  },
+  "native-everywhere-t-render-systemd": {
+    "number": 151,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/151"
+  },
+  "native-everywhere-t-rewrite-supervision-tests": {
+    "number": 155,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/155"
+  },
+  "native-everywhere-t-security-backend-split": {
+    "number": 144,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/144"
+  },
+  "native-everywhere-t-security-fixtures": {
+    "number": 145,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/145"
+  },
+  "native-everywhere-t-service-contract-schema": {
+    "number": 148,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/148"
+  },
+  "native-everywhere-t-service-manager-cli": {
+    "number": 149,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/149"
+  },
+  "native-everywhere-t-stub-projection": {
+    "number": 159,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/159"
+  },
+  "native-everywhere-t-supervision-probe": {
+    "number": 153,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/153"
+  },
+  "native-everywhere-t-transport-conformance": {
+    "number": 147,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/147"
+  },
+  "native-everywhere-t-transport-contract": {
+    "number": 141,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/141"
+  },
+  "native-everywhere-t-ts-transport-backends": {
+    "number": 143,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/143"
+  },
+  "native-everywhere-t-vault-build-python": {
+    "number": 158,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/158"
+  },
+  "native-everywhere-t-vault-entrypoints": {
+    "number": 156,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/156"
+  }
+}

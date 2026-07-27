@@ -1,0 +1,1338 @@
+schema: roadmap/1
+slug: author-and-measure
+project: agent-kit
+title: M6 Author and Measure — a real skills corpus, and a ledger that says whether it pays
+status: draft
+phase: sequenced
+brief: 'Today data/skills/ holds exactly one skill (handoff/), nine divergent frontmatter parsers disagree
+  about what any of these files declare, and the outcome ledger''s only ROI signal is a self-graded (critical+high)/milestone
+  proxy against three of one person''s frozen internal milestone ids. This milestone settles the input
+  contract before M7 generalises the renderer: one published Draft 2020-12 schema per kind, one parser,
+  a structured round-trip that stops YAML block-sequence `allowed-tools` leaking Agent/AskUserQuestion
+  into Codex and OpenCode packs, a scaffold and templates, and the five commands promoted to real skills
+  so the measurable population goes from 1 to 6. On that corpus it lands content identity (bodySha256
+  + a 12-hex revision in catalog.json, before M7 signs anything), a bundled/team/personal tier model with
+  an ordered content-pack root list, an 8-10 case offline golden task set as a required check, and outcome
+  ledger v2 — git provenance, a real run_id joining the MCP token log to a diff and a test result, churn
+  metrics and a stdlib statistics layer with bootstrap intervals. Stopping after this milestone still
+  leaves a kit that can honestly say what a run cost and whether a skill edit made things worse.'
+goal:
+  hmw: How might we give a contributor one documented, validated way to author a skill — and give the
+    maintainer a corpus large enough, and a ledger honest enough, to say with statistics rather than self-grading
+    whether a skill change actually paid?
+  objective: Make the skills corpus authorable, schema-validated and larger than n=1, and make the outcome
+    ledger join a run to a diff, a test result and a cost, so a skill change can be gated in CI and evaluated
+    with confidence intervals instead of a self-graded proxy.
+  key_results:
+  - data/facts/catalog.json reports counts.skills >= 6 (handoff plus the five migrated entrypoints) and
+    every skill, agent and command passes `python3 data/scripts/frontmatter-lint.py --check` against a
+    published Draft 2020-12 schema.
+  - 'Exactly one frontmatter parser definition survives: `grep -rn "def split_frontmatter\|def parse_frontmatter\|def
+    _frontmatter\|def normalize_frontmatter\|def frontmatter_value\|def _frontmatter_fields" data/scripts
+    workspace-tooling` returns one site (data/scripts/lib/frontmatter.py), and the block-sequence reproduction
+    (`allowed-tools:` with `- Agent` on the next line) no longer leaks into any rendered non-Claude pack.'
+  - 8-10 golden task cases run offline with no model call as a required CI check in under 5 minutes, and
+    a deliberately broken skill body fails the check naming the case and the assertion.
+  - Every outcome record emitted by the milestone, spike and roadmap pipelines carries schema_version
+    2 with a non-null run_id, base/head sha, insertions/deletions and test_exit_code; `pipeline-outcome-log.py
+    join --run-id <id>` returns one row combining cost, diff and test result.
+  - '`python3 data/scripts/sealed-eval.py metric` prints every metric with a 95% bootstrap interval and
+    fires the overclaim guard when the interval crosses zero; `grep -rn "MIN_N\|BASELINE_IDS\|POST_IDS\|PIPELINE_METRICS\|_RUN_BUCKET_HEX"
+    data/scripts` returns nothing.'
+  - '`python3 data/scripts/catalog-generate.py --check` exits 2 on a one-character skill body edit that
+    was not regenerated (bodySha256 is in the drift comparison), and `_schemaVersion` is 1.2.'
+  wont:
+  - No model-in-the-loop evaluation in the required CI check — the gate is assertion-only and offline;
+    any model-in-the-loop set is nightly and advisory.
+  - No Codex or OpenCode telemetry, edit beacons or instrumented delivery (F085, F088) — deliberately
+    held to M7, where the renderer is already being rewritten, so the same generator is not edited twice.
+  - No provider capability manifests, conformance suite, tier-0 .agents/ output or signed packs — all
+    M7 (X011, F018, F021, X009, X051).
+  - No skill-optimisation harness, SkillHone decision ledger, shadow A/B, interleaving or per-skill regression
+    sets — on the KILLED list, and the corpus is still six, not sixty.
+  - 'No Prometheus, OTel or metric-push path: the documented one is deleted, not implemented (F079), and
+    the trace-projection rewrite is on the KILLED list.'
+  - No retrieval, Qdrant tiering, memory write-path or gold-set work — M8.
+  - 'No publishing to npm, PyPI, the MCP Registry or skills.sh: blocked on the M1 naming decision (the
+    OpenAI AgentKit collision).'
+  - No changes to the four PreToolUse security hooks' language or the AIDefence ruleset — M3.
+generated_by:
+  agent: claude-opus-5
+  at: '2026-07-26'
+  brief: multi-workflow audit + landscape benchmark synthesis
+retired: []
+items:
+- id: author-and-measure-e1
+  kind: epic
+  title: One frontmatter contract, one parser
+  status: planned
+  summary: YAML frontmatter is the core data model of the whole product and there are nine independent
+    implementations of it — eight in Python plus gray-matter in TypeScript — that disagree materially
+    about the same file. The MCP server drops a malformed skill silently (`catch { continue; }` at src/discovery/skills.ts:84),
+    catalog-generate.py recovers it via a lenient line-regex fallback, and generate-adapter-packs.py returns
+    `{}` and renders an over-permitted agent. Publish one schema per kind, collapse to one parser, and
+    fix the line-based tool strip that leaks Claude-only tools into non-Claude packs.
+  priority: should
+  lane: later
+  size: L
+  acceptance:
+  - Given the repo at HEAD, when `python3 data/scripts/frontmatter-lint.py --check` runs, then it exits
+    0 and reports every file under data/skills, data/agents and data/commands as validated against data/schemas/frontmatter-{skill,agent,command}.schema.json.
+  - 'Given `grep -rn "def split_frontmatter\|def parse_frontmatter\|def _frontmatter\|def normalize_frontmatter\|def
+    frontmatter_value\|def _frontmatter_fields" data/scripts workspace-tooling src`, then exactly one
+    definition site is returned: data/scripts/lib/frontmatter.py.'
+  - Given a SKILL.md whose `allowed-tools` is the YAML block sequence `- Read` / `- Agent` / `- AskUserQuestion`,
+    when `python3 data/scripts/generate-adapter-packs.py --check` runs, then the rendered codex and opencode
+    frontmatter parses (yaml.safe_load) to exactly ["Read"] — the documented reproduction from F023 now
+    passes.
+  - Given tests/fixtures/frontmatter/ with at least 20 hostile cases, when `npm test` and the Python gate
+    runner both run, then Python and gray-matter return the same (frontmatter, body) for every case and
+    reject the same invalid ones.
+  - Given the parser swap, when the four generator gates run, then data/facts/catalog.json, data/claude-md/AGENTS.md,
+    data/claude-md/CONTEXT.md and tests/fixtures/adapter-packs.golden.json are byte-identical to the pre-refactor
+    outputs (no silent output drift).
+  depends_on:
+  - gates-green-e1
+  - gates-green-e3
+  tags:
+  - F022
+  - F116
+  - F023
+  - frontmatter
+  - schema
+  - parser
+  - packs
+- id: author-and-measure-t-frontmatter-schemas
+  kind: task
+  title: Publish Draft 2020-12 frontmatter schemas for skill, agent and command
+  status: planned
+  parent: author-and-measure-e1
+  summary: 'The frontmatter contract the catalog gate actually enforces exists only in catalog-generate.py''s
+    module docstring (lines 15-22). Publish data/schemas/frontmatter-skill.schema.json, -agent and -command
+    as Draft 2020-12 with additionalProperties:false, required name+description (commands carry no `name`
+    — the filename is the /slash id), and model-class constrained to the six keys of data/model-policy.json
+    `classes` (deep-reasoning-max, deep-reasoning-high, balanced-high, balanced-standard, fast-mechanical,
+    specialist-default). allowed-tools/tools must accept all three shapes in the tree today: comma string,
+    YAML block sequence, and the Agent-Skills-spec space-separated string. Declare a `metadata:` object
+    as the escape hatch for non-spec keys.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given each of the three schema files, when `python3 -m json.tool` runs on it, then `$schema` equals
+    `https://json-schema.org/draft/2020-12/schema` and `additionalProperties` is false at the root.
+  - Given data/skills/handoff/SKILL.md frontmatter, when validated against frontmatter-skill.schema.json
+    with jsonschema, then it passes; given the same frontmatter with an added top-level `trigger:` key,
+    validation fails with an additionalProperties error naming `trigger` (the invented field third-party
+    spec writeups circulate).
+  - 'Given an agent with `model-class: nonsense`, when validated, then it fails and the reported enum
+    equals `list(json.load(open(''data/model-policy.json''))[''classes''].keys())` — asserted by a test
+    that derives the enum from model-policy.json rather than duplicating it.'
+  - 'Given the three shapes `allowed-tools: Read, Bash`, `allowed-tools:\n  - Read\n  - Bash` and `allowed-tools:
+    Read Bash`, when each is validated, then all three pass and a fourth shape (a nested map) fails.'
+  - Given data/commands/*.md, when validated against frontmatter-command.schema.json, then all five pass
+    with argument-hint as a string and codex-adapter constrained to the enum {skill, prompt-policy}.
+  depends_on:
+  - gates-green-e3
+  tags:
+  - F022
+  - schema
+  - frontmatter
+  - model-policy
+  - packs
+- id: author-and-measure-t-shared-frontmatter-lib
+  kind: task
+  title: Extract data/scripts/lib/frontmatter.py and replace all eight Python parsers
+  status: planned
+  parent: author-and-measure-e1
+  summary: 'Add data/scripts/lib/frontmatter.py exporting `split_frontmatter(text, *, strict=True) ->
+    tuple[dict, str]` (line-anchored `^---$` close, as catalog-generate.py:88-96 already does) and `tool_list(value)
+    -> list[str]` handling comma, YAML sequence and space-separated forms. Replace every call site: data/scripts/catalog-generate.py:85,
+    generate-adapter-packs.py:86, handoff-validate.py:57, model-policy-apply.py:112-161 (hand-rolled zero-indent
+    line scanner), mode-variant-agents.py, and workspace-tooling/{artifact_quarantine.py:297, frontmatter-stamp.py:39,
+    obsidian_vault_validate.py:292, project-linker.py:168, roadmap_status_excalidraw.py:359}. Delete the
+    lenient fallback at catalog-generate.py:100-115 once the lint gate guarantees the corpus is valid,
+    and make generate-adapter-packs.py raise instead of returning {} — a file it cannot parse must abort
+    the pack, never render an over-permitted agent.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - 'Given the frontmatter `description: Phase 2. Inputs: {X}. Done.` with `tools: Read, Grep` (the divergence
+    case reproduced in F022, real shape from data/agents/spike-writer.md), when each former call site
+    parses it through the shared module, then all return identical dicts — asserted by data/scripts/tests/test_frontmatter_lib.py.'
+  - Given a file with YAML-invalid frontmatter placed under data/agents/, when `python3 data/scripts/generate-adapter-packs.py
+    --check` runs, then it exits non-zero naming the file and no pack file is written (previously it returned
+    {} and rendered the agent with no tool restrictions).
+  - Given `grep -n "yaml.safe_load" data/scripts/*.py workspace-tooling/*.py`, then no frontmatter-parsing
+    site appears outside data/scripts/lib/frontmatter.py.
+  - Given the refactor, when `python3 data/scripts/catalog-generate.py --check`, `generate-root-contract.py
+    --check` and `generate-adapter-packs.py --check` run, then all exit 0 and their committed outputs
+    are byte-identical to the pre-refactor tree.
+  - 'Given `python3 data/scripts/lib/frontmatter.py --self-test`, then it exits 0 covering: no frontmatter,
+    unterminated block, `---` inside a value, unquoted `: ` in a description, block-sequence tools, space-separated
+    tools, and CRLF input.'
+  depends_on:
+  - author-and-measure-t-frontmatter-schemas
+  tags:
+  - F116
+  - F022
+  - parser
+  - refactor
+  - packs
+- id: author-and-measure-t-frontmatter-lint-gate
+  kind: task
+  title: Add frontmatter-lint.py --check as a fifth mandatory generator gate
+  status: planned
+  parent: author-and-measure-e1
+  summary: 'Add data/scripts/frontmatter-lint.py validating every file under data/skills, data/agents
+    and data/commands against the published schemas via the shared parser, and wire it into the committed
+    gate runner from M3 and the npm `gates` script. This is what lets catalog-generate.py''s lenient fallback
+    be deleted safely: the gate guarantees the corpus is strict-YAML-valid before any generator reads
+    it.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a clean tree, when `python3 data/scripts/frontmatter-lint.py --check` runs, then it exits 0
+    and prints one line per validated file plus a total count matching `ls data/skills/*/SKILL.md data/agents/*.md
+    data/commands/*.md | wc -l`.
+  - Given an injected data/agents/_bad.md with no `description:`, when --check runs, then it exits 2 and
+    the message names the file path and the failing JSON pointer (`/description`).
+  - Given the committed gate runner, when `grep -n frontmatter-lint` runs against it, then a hit is returned,
+    and the CI job fails on the injected file (asserted by a unit test that drives the runner against
+    a temp tree).
+  - 'Given `python3 data/scripts/frontmatter-lint.py --self-test`, then it exits 0 with cases for: missing
+    description, unknown top-level key, invalid model-class, block-sequence allowed-tools, space-separated
+    allowed-tools, and a template file correctly excluded.'
+  - Given the gate runs on windows-latest with a CRLF checkout, then it exits 0 (no line-ending-dependent
+    parse).
+  depends_on:
+  - author-and-measure-t-shared-frontmatter-lib
+  - ci-proves-it-e2
+  tags:
+  - F022
+  - gate
+  - ci
+  - frontmatter
+  - packs
+- id: author-and-measure-t-hostile-frontmatter-corpus
+  kind: task
+  title: Build the hostile frontmatter fixture corpus and a cross-language parity test
+  status: planned
+  parent: author-and-measure-e1
+  summary: Add tests/fixtures/frontmatter/ with roughly 20 hostile cases and an expected.json per case,
+    plus data/scripts/tests/test_frontmatter_parity.py and src/discovery/frontmatter-parity.test.ts asserting
+    Python and gray-matter agree. This is the artifact that keeps the single-parser property true after
+    the refactor lands.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - 'Given tests/fixtures/frontmatter/, then it contains at least 20 cases covering: `---` inside a value,
+    unquoted `: ` in a description, YAML block sequence, space-separated tools, nested map value, no frontmatter,
+    unterminated block, empty frontmatter, CRLF line endings, a UTF-8 BOM, tab-indented keys, a duplicate
+    key, and three deliberately invalid files.'
+  - Given the corpus, when the Python parity test and `npm test` both run, then every valid case produces
+    the expected.json (frontmatter, body) in both languages.
+  - Given the three invalid cases, then both languages reject them — the TypeScript side must not silently
+    skip where Python raises (asserted per case).
+  - Given a clone made with `git -c core.autocrlf=true clone`, when the corpus test runs on windows-latest,
+    then it exits 0 — proving the parser is line-ending safe.
+  depends_on:
+  - author-and-measure-t-shared-frontmatter-lib
+  tags:
+  - F116
+  - F022
+  - testing
+  - fixtures
+  - packs
+- id: author-and-measure-t-strip-tools-roundtrip
+  kind: task
+  title: Replace line-based strip_skill_tools with a structured round-trip and gate the leak
+  status: planned
+  parent: author-and-measure-e1
+  summary: 'strip_skill_tools (data/scripts/generate-adapter-packs.py:162-173) splits the text of the
+    `allowed-tools:` line on commas. For the YAML block-sequence form the line''s value is empty, so it
+    rewrites the key to `allowed-tools: ` and leaves every following `- Agent` item intact — shipping
+    Claude-only tools into the OpenCode and neutral packs. Replace it with parse via the shared strict
+    parser, drop STRIP_TOOLS members through tool_list(), re-emit in the target provider''s declared form.
+    Extend the self-test at :649-655 to the block form and promote the check to a hard gate in linkcase_problems
+    (:497-513) so the golden can never hash a leak again.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the input frontmatter `allowed-tools:\n  - Read\n  - Agent\n  - AskUserQuestion`, when `transform_skill(text,
+    'codex')` runs, then yaml.safe_load of the emitted frontmatter's allowed-tools returns exactly ["Read"].
+  - 'Given the comma form `allowed-tools: Read, Agent, AskUserQuestion, Bash`, then the emitted value
+    resolves to ["Read", "Bash"] and the existing self-test assertion at generate-adapter-packs.py:649-655
+    still passes.'
+  - Given any rendered codex or opencode pack file whose frontmatter names a member of STRIP_TOOLS ({Agent,
+    AskUserQuestion}), when linkcase_problems runs, then it reports a problem naming the file and the
+    tool — asserted by injecting a leak into a temp pack dict.
+  - Given `python3 data/scripts/generate-adapter-packs.py --self-test`, then it exits 0 with explicit
+    cases for the comma form, the block-sequence form and the space-separated form.
+  - Given `python3 data/scripts/generate-adapter-packs.py --check`, then it exits 0 and tests/fixtures/adapter-packs.golden.json
+    is regenerated and committed in the same change.
+  depends_on:
+  - author-and-measure-t-shared-frontmatter-lib
+  tags:
+  - F023
+  - packs
+  - degradation
+  - gate
+- id: author-and-measure-t-ts-parser-contract
+  kind: task
+  title: Make the TypeScript discovery path reject loudly and share one normalization
+  status: planned
+  parent: author-and-measure-e1
+  summary: src/discovery/skills.ts:84 and src/discovery/agents.ts:71 swallow every parse error with `catch
+    { continue; }`, so a malformed file silently disappears from the MCP server while still appearing
+    in the catalog. src/discovery/memory.ts:26 carries a ninth, hand-rolled parseFrontmatter. Delete the
+    hand-rolled one, use gray-matter everywhere, and make a schema-invalid file produce one stderr line
+    and a rejected count in the startup summary instead of vanishing.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - 'Given a SKILL.md that fails frontmatter-skill.schema.json, when the server starts, then stderr carries
+    one `[agent-kit-mcp] rejected <path>: <reason>` line and the summary prints `Skills: N (1 rejected)`
+    — asserted in a new src/discovery/skills.test.ts.'
+  - Given `grep -n "function parseFrontmatter" src/discovery/memory.ts`, then no match, and gray-matter
+    is the only frontmatter parser referenced under src/.
+  - Given tests/fixtures/frontmatter/, when the TypeScript suite runs, then allowedTools normalization
+    matches Python's tool_list() output for the comma, block-sequence and space-separated forms on every
+    case.
+  - Given `npm test`, then it exits 0 on ubuntu-latest, macos-latest and windows-latest.
+  depends_on:
+  - author-and-measure-t-hostile-frontmatter-corpus
+  - gates-green-e2
+  tags:
+  - F022
+  - F116
+  - mcp-server
+  - discovery
+- id: author-and-measure-e2
+  kind: epic
+  title: An authoring path and a real corpus
+  status: planned
+  summary: 'The kit''s value proposition is that a team authors skills once and compiles them per provider,
+    but there is no documented way to add one: no template, no scaffold, no CONTRIBUTING authoring section,
+    and `owner` silently defaults to the hardcoded string "platform-tooling" at catalog-generate.py:235.
+    data/skills/ contains exactly one entry. This epic ships templates, a scaffold and docs, makes the
+    one shipped skill Agent-Skills-spec-clean, and promotes the five commands to real skills with the
+    command files rendered as a compiled view — taking the measurable population from 1 to 6 and discharging
+    the binding research correction.'
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given a clean clone, when `python3 data/scripts/new-skill.py demo-skill --owner me --domain demo`
+    runs followed by the four gate commands it prints, then every gate exits 0 and data/facts/catalog.json
+    contains an entry with id `skill/demo-skill`.
+  - Given data/facts/catalog.json at epic close, then counts.skills >= 6 and every skill entry validates
+    against data/schemas/frontmatter-skill.schema.json.
+  - Given the pinned Agent Skills reference validator, when `python3 data/scripts/skill-spec-gate.py --check`
+    runs over data/skills, then it exits 0 for every skill and non-zero when name != parent directory.
+  - Given data/commands/*.md, then each carries a GENERATED banner and `python3 data/scripts/generate-command-views.py
+    --check` exits 2 after a single hand-edited byte.
+  - Given the five new skills, when `python3 data/scripts/generate-root-contract.py --check` runs, then
+    it exits 0 and prints the measured AGENTS.md router body size, which is within its declared budget.
+  depends_on:
+  - author-and-measure-e1
+  tags:
+  - F185
+  - X008
+  - X010
+  - authoring
+  - corpus
+  - skills
+  - packs
+- id: author-and-measure-t-authoring-templates
+  kind: task
+  title: Add annotated skill and agent templates and make `owner` required
+  status: planned
+  parent: author-and-measure-e2
+  summary: Add data/skills/_template/SKILL.md and data/agents/_template.md with every required frontmatter
+    key annotated inline against the published schema, excluded from the catalog by the leading-underscore
+    convention. Remove the hardcoded `owner` default at data/scripts/catalog-generate.py:235 ("platform-tooling")
+    and the silent `sensitivity` default at :239 so provenance is authored, not invented, then set an
+    explicit owner on all 26 existing entries.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given data/skills/_template/SKILL.md and data/agents/_template.md, when `python3 data/scripts/catalog-generate.py`
+    runs, then no catalog entry has an id beginning `skill/_` or `agent/_` — asserted by a --self-test
+    case, not by a manual check.
+  - Given a skill or agent with no `owner:` key, when `python3 data/scripts/catalog-generate.py --check`
+    runs, then it exits non-zero naming the file; `grep -n 'platform-tooling' data/scripts/catalog-generate.py`
+    returns nothing.
+  - Given the templates, when `python3 data/scripts/frontmatter-lint.py --check --include-templates` runs,
+    then it exits 0 — the templates are themselves schema-valid.
+  - Given each template, when a test compares its annotated keys to the schema's `required` list plus
+    the documented optional set, then every key carries an inline comment and no required key is missing.
+  - Given the 26 existing entries, when `python3 -c "import json;d=json.load(open('data/facts/catalog.json'));assert
+    all(e['owner'] for e in d['entries'])"` runs, then it exits 0.
+  depends_on:
+  - author-and-measure-t-frontmatter-schemas
+  tags:
+  - F185
+  - authoring
+  - templates
+  - catalog
+  - packs
+- id: author-and-measure-t-new-skill-scaffold
+  kind: task
+  title: Ship `agent-kit new skill` — a scaffold that ends in green gates
+  status: planned
+  parent: author-and-measure-e2
+  summary: Add data/scripts/new-skill.py NAME writing the template, and expose it as an `agent-kit new
+    skill` subcommand on the package bin added in M4. It must validate the name against the spec regex,
+    refuse to overwrite, run the generators, and print the exact gate commands the contributor must run
+    before committing.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - 'Given a clean tree, when `python3 data/scripts/new-skill.py demo-skill --owner me --domain demo`
+    runs, then it exits 0, writes data/skills/demo-skill/SKILL.md with `name: demo-skill`, and prints
+    the four gate commands verbatim.'
+  - Given an existing skill name, when the command runs, then it exits 2 and the existing SKILL.md is
+    byte-identical afterwards.
+  - Given an invalid name such as `Demo Skill`, when the command runs, then it exits 2 quoting the spec's
+    name regex from data/schemas/frontmatter-skill.schema.json.
+  - Given the scaffolded skill, when data/scripts/tests/test_new_skill.py runs the printed commands in
+    order inside a temp clone, then catalog-generate.py --check, generate-root-contract.py --check, generate-adapter-packs.py
+    --check and frontmatter-lint.py --check all exit 0.
+  - Given `agent-kit new skill demo-skill` invoked through the package bin on windows-latest, then it
+    produces the same file as the Python entry point (path handling asserted, no POSIX-only separator).
+  depends_on:
+  - author-and-measure-t-authoring-templates
+  - named-and-installable-e1
+  tags:
+  - F185
+  - authoring
+  - cli
+  - dx
+  - packs
+- id: author-and-measure-t-authoring-docs
+  kind: task
+  title: Write the Authoring section and make its command block executable in CI
+  status: planned
+  parent: author-and-measure-e2
+  summary: Add an Authoring section to CONTRIBUTING.md plus docs/authoring-skills.md documenting owner,
+    domain, sensitivity, allowed-tools and catalog-exclude against the published schemas, and the author
+    -> regenerate -> commit loop. Wire the doc's command block into CI so the documentation cannot drift
+    from the tooling.
+  priority: should
+  lane: later
+  size: S
+  acceptance:
+  - Given CONTRIBUTING.md, when grepped for each of `owner`, `domain`, `sensitivity`, `allowed-tools`
+    and `catalog-exclude`, then each returns a hit and each is accompanied by a relative link to the schema
+    file that defines it.
+  - Given docs/authoring-skills.md, when the repo's markdown link checker runs over it, then every relative
+    link resolves to a tracked file.
+  - Given the doc's fenced command block, when the CI docs-as-executable step extracts and runs it against
+    a scaffolded demo skill, then every command exits 0 — a doc edit that breaks the loop fails CI.
+  depends_on:
+  - author-and-measure-t-new-skill-scaffold
+  tags:
+  - F185
+  - docs
+  - onboarding
+- id: author-and-measure-t-spec-clean-handoff
+  kind: task
+  title: Make data/skills/handoff spec-clean and gate it with the reference validator
+  status: planned
+  parent: author-and-measure-e2
+  summary: data/skills/handoff/SKILL.md carries five non-spec top-level keys (type, status, tags, project,
+    authorship) and a comma-string allowed-tools. Move the non-spec keys under `metadata:` with `agent-kit.`
+    prefixes, switch allowed-tools to the spec's space-separated form, and add data/scripts/skill-spec-gate.py
+    as a fifth generator gate running the pinned Agent Skills reference validator — enforcing name ==
+    parent directory, the name regex and the spec's length caps (name and description caps read from the
+    pinned revision, not hardcoded guesses). This is a one-file change now and a migration once the corpus
+    is six.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given data/skills/handoff/SKILL.md, when yaml.safe_load parses its frontmatter, then the top-level
+    key set is exactly {name, description, allowed-tools, metadata} and metadata carries agent-kit.type,
+    agent-kit.status, agent-kit.tags, agent-kit.project and agent-kit.authorship.
+  - Given `python3 data/scripts/skill-spec-gate.py --check`, then it exits 0; given a skill whose `name`
+    differs from its parent directory, then it exits non-zero naming both; given a description longer
+    than the pinned spec cap, then it exits non-zero quoting the cap and the measured length (handoff's
+    is 869 chars today — the gate must assert the cap, not the current value).
+  - Given the moved keys, when data/scripts/obsidian-clean-filter.py and any workspace-tooling consumer
+    of type/status/tags/project/authorship run their tests, then they exit 0 (updated in the same change
+    if the key path moved).
+  - Given `python3 data/scripts/catalog-generate.py --check` after the move, then it exits 0 and the catalog
+    entry `skill/handoff` carries the same description and the same ioSchema.tools list as before.
+  - Given data/facts/spec-pins.json, then it records the Agent Skills spec revision the validator was
+    pinned to, and a test asserts the file parses and the key exists.
+  depends_on:
+  - author-and-measure-t-frontmatter-schemas
+  tags:
+  - X008
+  - agent-skills-spec
+  - gate
+  - skills
+  - packs
+- id: author-and-measure-t-commands-to-skills
+  kind: task
+  title: Promote the five commands to skills and render commands as a compiled view
+  status: planned
+  parent: author-and-measure-e2
+  summary: Migrate roadmap, milestone-pipeline, spike, skill-to-command and memory-sync from data/commands/*.md
+    into data/skills/<name>/SKILL.md, moving argument-hint under metadata and setting the spec's disable-model-invocation
+    flag. Render the Claude and OpenCode command views from the skill via a new data/scripts/generate-command-views.py,
+    never the reverse — commands are the least portable primitive in the ecosystem, and keeping them canonical
+    means the five most valuable entrypoints are the ones that cannot travel. This is the change that
+    takes the measurable corpus from 1 to 6.
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given the migration, when `python3 data/scripts/catalog-generate.py` runs, then counts.skills == 6
+    and each of roadmap, milestone-pipeline, spike, skill-to-command and memory-sync has a `skill/<name>`
+    id.
+  - Given each new SKILL.md, then `name` equals its directory name, `metadata` carries agent-kit.argument-hint
+    (and agent-kit.codex-adapter for milestone-pipeline), the spec's disable-model-invocation flag is
+    set, and `python3 data/scripts/frontmatter-lint.py --check` plus `skill-spec-gate.py --check` both
+    exit 0.
+  - Given data/commands/*.md, then each begins with a GENERATED banner and `python3 data/scripts/generate-command-views.py
+    --check` exits 2 after a single hand-edited byte (verified by a test that mutates one character in
+    a temp tree).
+  - Given the enlarged corpus, when `python3 data/scripts/generate-root-contract.py --check` and `generate-adapter-packs.py
+    --check` run, then both exit 0, the adapter-packs golden is regenerated and committed, and the AGENTS.md
+    router body size is printed and is within its declared byte budget.
+  - Given data/agents/skill-to-command-author.md and skill-to-command-reviewer.md, then the change records
+    one of two outcomes in its commit body — both deleted (and catalog counts.agents drops by 2) or both
+    rewritten to describe the inverted skill-first direction — and `grep -rn "skill-to-command" data/claude-md/AGENTS.md`
+    resolves only to entries that exist in data/facts/catalog.json.
+  depends_on:
+  - author-and-measure-t-spec-clean-handoff
+  - author-and-measure-t-strip-tools-roundtrip
+  - gates-green-e1
+  tags:
+  - X010
+  - skills
+  - commands
+  - corpus
+  - portability
+  - packs
+- id: author-and-measure-e3
+  kind: epic
+  title: Content identity, tiers and content packs
+  status: planned
+  summary: catalog.json gives every capability a stable id but no content hash, so two materially different
+    revisions of a skill are indistinguishable and an outcome can only ever be attributed to a name. Discovery
+    is a fixed two-root merge (discoverSkillsMerged(primaryDir, overlayDir)) with no third root and no
+    record of which source won. Land bodySha256 + a 12-hex revision, an ordered content-pack root list,
+    and a bundled/team/personal tier model with declared precedence — before M7 renders and signs packs,
+    so nothing has to be re-rendered later.
+  priority: should
+  lane: later
+  size: L
+  acceptance:
+  - Given a one-character edit to a skill body with no regeneration, when `python3 data/scripts/catalog-generate.py
+    --check` runs, then it exits 2 naming the entry id and both bodySha256 values.
+  - Given AGENT_KIT_CONTENT_PACKS naming two extra roots, when the server starts, then the startup log
+    lists every root in precedence order and names each shadowed skill, and `get_skill` responses carry
+    a `tier` field naming the winning source.
+  - Given SERVER_PROFILE unset, then the enabled tier set is {bundled, personal}; given SERVER_PROFILE=shared,
+    then personal is excluded — asserted by the expanded src/server-profile.test.ts tier matrix.
+  - Given examples/team-pack/ and a CI step that starts the server with AGENT_KIT_CONTENT_PACKS pointed
+    at it, then list_skills includes the example skill with tier `team`.
+  depends_on:
+  - author-and-measure-e1
+  tags:
+  - F084
+  - F176
+  - F130
+  - catalog
+  - tiers
+  - content-packs
+  - mcp-server
+- id: author-and-measure-t-catalog-body-digest
+  kind: task
+  title: Add bodySha256 and a 12-hex revision to every catalog entry
+  status: planned
+  parent: author-and-measure-e3
+  summary: Add bodySha256 (sha256 over the body plus the schema-required frontmatter keys, with volatile
+    keys such as `freshness` excluded) and `revision` (its 12-hex prefix) to each entry in data/scripts/catalog-generate.py,
+    bumping _schemaVersion from 1.1 to 1.2 since the entry schema is declared frozen at catalog-generate.py:11.
+    Include bodySha256 in the --check drift comparison so a body edit fails the gate until the catalog
+    is regenerated. This is what lets an outcome name a specific skill revision rather than a name.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given data/facts/catalog.json, when `python3 -c "import json;d=json.load(open('data/facts/catalog.json'));assert
+    d['_schemaVersion']=='1.2';assert all(len(e['bodySha256'])==64 and e['revision']==e['bodySha256'][:12]
+    for e in d['entries'])"` runs, then it exits 0.
+  - Given a one-character body edit to data/skills/handoff/SKILL.md and no regeneration, when `python3
+    data/scripts/catalog-generate.py --check` runs, then it exits 2 and the message names `skill/handoff`
+    and both digests.
+  - Given only a change to a volatile field (a new commit changing `freshness`), when --check runs, then
+    it exits 0 — asserted by a --self-test case that mutates freshness alone.
+  - Given `python3 data/scripts/catalog-generate.py --self-test`, then it exits 0 with an explicit case
+    asserting the digest is stable across a CRLF/LF round-trip of the same content.
+  depends_on:
+  - author-and-measure-t-shared-frontmatter-lib
+  tags:
+  - F084
+  - catalog
+  - provenance
+  - digest
+  - packs
+- id: author-and-measure-t-content-pack-roots
+  kind: task
+  title: Replace the fixed two-root merge with an ordered content-pack root list
+  status: planned
+  parent: author-and-measure-e3
+  summary: 'src/discovery/skills.ts:101-113 takes exactly two directories; agents and references follow
+    the same shape (src/index.ts:57-59), and the primary root is not configurable at all (src/config.ts:79-83
+    derives it from the module''s own location). Replace discoverSkillsMerged/discoverAgentsMerged/discoverReferencesMerged
+    with discoverMerged(roots: string[]) fed by a new AGENT_KIT_CONTENT_PACKS path list plus a contentPacks
+    config key, defaulting to [bundledDataDir, workspaceClaudeDir] so today''s behaviour is unchanged.
+    Extend data/scripts/generate-adapter-packs.py:61 and catalog-generate.py:68 with the same --content-root
+    list so a team pack compiles into the provider packs too.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given the default configuration, when discovery runs, then the discovered skill/agent/reference sets
+    are identical to HEAD's — asserted by a test comparing against a committed snapshot.
+  - Given AGENT_KIT_CONTENT_PACKS set to two directories separated by `path.delimiter`, when the server
+    starts, then each root's skills are discovered and the last root wins on a name collision; a windows-latest
+    CI leg asserts the `;` delimiter and a POSIX leg asserts `:`.
+  - Given `python3 data/scripts/catalog-generate.py --content-root <dir>`, then the extra root's skills
+    appear in the generated catalog with provenance recorded relative to that root's declared pack id
+    (POSIX separators, per the M2 fix).
+  - Given a configured root that does not exist, when the server starts, then it logs one warning naming
+    the path and continues serving — it does not throw.
+  depends_on:
+  - starts-everywhere-e3
+  tags:
+  - F130
+  - extensibility
+  - discovery
+  - config
+  - mcp-server
+- id: author-and-measure-t-tier-provenance
+  kind: task
+  title: Add a tier field with declared precedence and expand the profile test to a matrix
+  status: planned
+  parent: author-and-measure-e3
+  summary: Define three explicit tiers — bundled (this repo's data/), team (a resolved content pack),
+    personal ($WORKSPACE_ROOT/.claude/) — with declared precedence, add a `tier` field to SkillDefinition,
+    AgentDefinition and ReferenceFile in src/types.ts, and surface it in every get_skill/get_agent/get_reference/list_*
+    response so a caller can see which source served the answer and whether a local file shadowed a team
+    one. Replace the SERVER_PROFILE boolean at src/config.ts:53-58 with a config block declaring which
+    tiers are enabled, and expand src/server-profile.test.ts:86-136 from a single shared/personal pair
+    into a tier matrix. Drop the auth/audit/server-deployment scope — it conflicts with the stdio-only
+    transport lock.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - 'Given `get_skill("handoff")` with default config, then the response names `tier: bundled` and the
+    resolved root path; given a personal overlay defining the same name, then it names `tier: personal`
+    and a `shadows: bundled` note.'
+  - 'Given a shadowed name at startup, then stderr carries exactly one line of the form `[agent-kit-mcp]
+    shadowed skill ''handoff'': personal overrides bundled`.'
+  - Given SERVER_PROFILE=shared, then the personal tier is excluded and every other tier still serves
+    — asserted by src/server-profile.test.ts covering the four combinations {bundled}, {bundled,team},
+    {bundled,personal}, {bundled,team,personal}, each asserting the tier field in the tool output.
+  - Given the response shape change, then tests/fixtures/tools-list.golden.json is regenerated and `npm
+    test` (mcp-contract) exits 0.
+  depends_on:
+  - author-and-measure-t-content-pack-roots
+  tags:
+  - F176
+  - tiers
+  - provenance
+  - mcp-server
+- id: author-and-measure-t-content-pack-docs
+  kind: task
+  title: Document the content-pack layout and prove the documented precedence in CI
+  status: planned
+  parent: author-and-measure-e3
+  summary: Add docs/content-packs.md declaring the pack layout (skills/, agents/, references/, optional
+    provider-adapters/), the three tiers and their precedence, and the env var and config key that select
+    them. Ship examples/team-pack/ as a runnable example wired into CI so the documented precedence and
+    the runtime precedence cannot drift.
+  priority: could
+  lane: later
+  size: S
+  acceptance:
+  - Given docs/content-packs.md, then it declares the three tiers and their precedence in one table and
+    names AGENT_KIT_CONTENT_PACKS and the config key.
+  - 'Given examples/team-pack/ containing skills/, agents/ and references/, when the CI step starts the
+    server with AGENT_KIT_CONTENT_PACKS pointed at it, then list_skills includes the example skill with
+    `tier: team` and the step exits 0.'
+  - Given the documented precedence order, when a test parses the order out of the doc's table and compares
+    it to the runtime order, then they match — a doc edit that contradicts the code fails CI.
+  depends_on:
+  - author-and-measure-t-tier-provenance
+  tags:
+  - F130
+  - F176
+  - docs
+  - content-packs
+- id: author-and-measure-e4
+  kind: epic
+  title: A golden task set that gates skill changes in CI
+  status: planned
+  summary: There is no behavioural evaluation of any skill anywhere in the repo. The closest artifact,
+    tests/check-skill-prompts.sh, is 145 lines of `grep -q` substring assertions on prompt bodies that
+    verify a paragraph still mentions `ruff format` — and nothing runs it. Build 8-10 cases in the Harbor
+    layout, drawn from real pipeline history, with deterministic assertions and budgets, running offline
+    as a required check, so a skill edit that degrades task success is caught before merge rather than
+    argued about. Scheduled here and not earlier because it is meaningless against a corpus of one.
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given data/evals/tasks/, then there are between 8 and 10 case directories in the pinned Harbor layout
+    (task.toml, instruction.md, environment/, solution/, tests/) and `python3 data/scripts/eval-case-validate.py
+    --check` exits 0.
+  - Given `python3 data/scripts/skill-eval-run.py --case-glob 'data/evals/tasks/*' --offline --out evidence.json`
+    on a clean tree, then it exits 0 with no network and no model call, in under 5 minutes on the CI runner
+    (time printed and asserted).
+  - Given a deliberate regression — a required section deleted from data/skills/milestone-pipeline/SKILL.md
+    on a scratch branch — then the required eval job fails and the log names the case_id and the failing
+    assertion; the branch and run are recorded as the reproduction.
+  - Given `git ls-files tests/check-skill-prompts.sh`, then no output, and `grep -rn "check-skill-prompts"
+    .` returns nothing.
+  depends_on:
+  - author-and-measure-e2
+  - ci-proves-it-e1
+  tags:
+  - F077
+  - X044
+  - evals
+  - harbor
+  - ci
+- id: author-and-measure-spike-1
+  kind: spike
+  title: Pin the Harbor task layout and confirm an offline, adapter-free deterministic path
+  status: planned
+  parent: author-and-measure-e4
+  summary: Time-boxed one-day investigation, closed by an ADR. Establish the exact task.toml key set at
+    a pinned Harbor revision, whether Harbor's own validators can be vendored or invoked with no network,
+    and whether the deterministic (no-model) subset can run without Harbor at all — so the repo's cases
+    are Harbor-compatible without taking a runtime dependency on a harness whose upstream dataset (Terminal-Bench)
+    is already moving to 3.0. Pin the harness, not the dataset.
+  priority: must
+  lane: later
+  size: S
+  acceptance:
+  - 'Given the spike output, then docs/adr/adr-011-eval-task-format.md exists and records: the pinned
+    Harbor revision (a commit sha), the exact task.toml key set adopted, and a yes/no decision on vendoring
+    the validator with the reason stated.'
+  - Given data/facts/spec-pins.json, then it carries a `harbor` entry with {revision, url, fetched_at}
+    and a test asserts the file parses and the key exists.
+  - Given the ADR's decision, then one throwaway case was built by hand and the chosen validator invocation
+    exits 0 on it, with the command recorded verbatim in the ADR.
+  - Given the one-working-day time box, then the ADR is merged within it; if the conclusion is 'do not
+    depend on Harbor at runtime', the ADR says so explicitly and the case-schema task proceeds against
+    a repo-local schema that is layout-compatible.
+  depends_on:
+  - ci-proves-it-e3
+  tags:
+  - X044
+  - evals
+  - harbor
+  - spike
+  - adr
+- id: author-and-measure-t-eval-case-schema
+  kind: task
+  title: Publish the eval-case schema and a validator
+  status: planned
+  parent: author-and-measure-e4
+  summary: Add data/schemas/eval-case.schema.json (Draft 2020-12, same style as the frontmatter schemas)
+    plus data/scripts/eval-case-validate.py and data/evals/tasks/_template/. A case declares case_id,
+    catalog_id, catalog_revision, instruction path, a closed assertion type enum and a budget block. Binding
+    catalog_revision here is what makes an eval result attributable to a specific skill revision rather
+    than a name.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given data/schemas/eval-case.schema.json, then it requires case_id, catalog_id, catalog_revision,
+    instruction, assertions[] with type constrained to {file_exists, file_matches, command_exits, diff_within,
+    json_schema_valid}, and budget {max_tokens, max_edits}; additionalProperties is false.
+  - Given a case whose catalog_id is absent from data/facts/catalog.json, when `python3 data/scripts/eval-case-validate.py
+    --check` runs, then it exits 2 naming the unknown id.
+  - Given a case whose catalog_revision does not match the current catalog entry's revision, when --check
+    runs, then it exits 2 naming both revisions — so a skill body change forces an explicit eval-case
+    review.
+  - Given a case referencing a fixture file that does not exist under environment/, when --check runs,
+    then it exits 2 naming the path.
+  - 'Given `python3 data/scripts/eval-case-validate.py --self-test`, then it exits 0 with cases for: a
+    valid case, an unknown catalog_id, a stale catalog_revision, a missing fixture and an unknown assertion
+    type.'
+  depends_on:
+  - author-and-measure-spike-1
+  - author-and-measure-t-catalog-body-digest
+  tags:
+  - F077
+  - X044
+  - evals
+  - schema
+- id: author-and-measure-t-eval-runner-offline
+  kind: task
+  title: Build the offline eval runner with non-binary rewards
+  status: planned
+  parent: author-and-measure-e4
+  summary: Add data/scripts/skill-eval-run.py executing each case in a throwaway git fixture and recording
+    pass/fail plus files_changed, lines_added, lines_deleted and wall time. Split the harness so the assertion-only
+    subset needs no model call and no network; score deterministic-first and emit non-binary reward.json
+    with separate floats rather than one boolean, so a partially-correct run is legible. Must run on all
+    three operating systems.
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given `python3 data/scripts/skill-eval-run.py --case-glob 'data/evals/tasks/*' --offline --out evidence.json`,
+    then it materialises each case's environment/ into a throwaway git repo under a temp dir, applies
+    solution/, runs tests/, and writes per-case {case_id, catalog_id, catalog_revision, passed, assertions[],
+    files_changed, lines_added, lines_deleted, wall_ms}.
+  - Given --offline with HTTP_PROXY and HTTPS_PROXY pointed at a closed port, when the runner executes,
+    then it exits 0 — proving no network call is made.
+  - Given reward.json emission, then each case yields four separate floats in [0,1] (schema_valid, refs_resolve,
+    gate_passed, tokens_under_budget), never a single boolean — asserted by a test reading the file's
+    types.
+  - Given two consecutive runs on the same input, then evidence.json is byte-identical apart from wall_ms,
+    which is excluded from the baseline comparison.
+  - Given `grep -n "fcntl\|os.geteuid\|'/tmp/'\|AF_UNIX" data/scripts/skill-eval-run.py`, then no output,
+    and the runner's own test passes on ubuntu-latest, macos-latest and windows-latest.
+  depends_on:
+  - author-and-measure-t-eval-case-schema
+  tags:
+  - F077
+  - X044
+  - evals
+  - harness
+  - portability
+- id: author-and-measure-t-eval-cases-seed
+  kind: task
+  title: Author 8-10 golden cases drawn from real pipeline history
+  status: planned
+  parent: author-and-measure-e4
+  summary: 'Seed data/evals/tasks/ with 8-10 cases (not 25 — a containerised suite of 25 is over-built
+    for a corpus of 26 canonical entries) covering the skills that now exist: handoff, spike, roadmap,
+    milestone-pipeline, and the milestone-adversary severity calibration. Each case''s task.toml must
+    name the real pipeline run or commit it was drawn from, and each case''s assertions must actually
+    discriminate.'
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given data/evals/tasks/, then there are between 8 and 10 case directories covering at minimum skill/handoff,
+    skill/spike, skill/roadmap, skill/milestone-pipeline and agent/milestone-adversary, and each task.toml
+    carries a `provenance` key naming the run id or commit sha it was drawn from.
+  - Given every case, when `python3 data/scripts/eval-case-validate.py --check` runs, then it exits 0;
+    when `skill-eval-run.py --offline` runs against the committed solution/, then every case reports passed=true.
+  - Given a meta-test that runs each case with its solution/ withheld, then every case reports passed=false
+    — an assertion that cannot fail is a defect and the meta-test names it.
+  - Given the full set on the CI runner, then total offline runtime is printed and is under 5 minutes.
+  depends_on:
+  - author-and-measure-t-eval-runner-offline
+  - author-and-measure-t-commands-to-skills
+  tags:
+  - F077
+  - X044
+  - evals
+  - corpus
+- id: author-and-measure-t-eval-ci-gate
+  kind: task
+  title: Make the offline eval a required check and delete the unrun prompt-grep harness
+  status: planned
+  parent: author-and-measure-e4
+  summary: Add .github/workflows/eval.yml running the offline suite against a committed data/evals/baseline.json
+    on every pull request, register it as a required check on the main ruleset, provide a reviewable baseline-update
+    path, and delete tests/check-skill-prompts.sh (145 lines of grep assertions that nothing invokes and
+    that verify prose, not behaviour).
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a pull request, then .github/workflows/eval.yml runs `skill-eval-run.py --offline` on ubuntu-latest
+    and compares evidence.json to data/evals/baseline.json, failing when any case regresses from pass
+    to fail.
+  - Given a scratch branch with a deliberately broken skill body, then the job fails and the log names
+    the case_id and the failing assertion; the branch name and run URL are recorded in the PR description
+    as the reproduction.
+  - Given `git ls-files tests/check-skill-prompts.sh`, then no output, and `grep -rn "check-skill-prompts"
+    .` returns nothing.
+  - Given a legitimate improvement, then `skill-eval-run.py --update-baseline` rewrites data/evals/baseline.json
+    deterministically sorted by case_id (one block per case, so the diff is reviewable) and .github/CODEOWNERS
+    covers /data/evals/ so a baseline change requires owner review.
+  - Given the branch ruleset on main, then `gh api repos/:owner/:repo/rulesets` shows the eval job among
+    the required status checks.
+  depends_on:
+  - author-and-measure-t-eval-cases-seed
+  - ci-proves-it-e1
+  tags:
+  - F077
+  - X044
+  - ci
+  - evals
+  - gate
+- id: author-and-measure-t-eval-budgets
+  kind: task
+  title: Enforce per-case token and edit budgets, and never pass a budget silently
+  status: planned
+  parent: author-and-measure-e4
+  summary: Make budget.max_tokens and budget.max_edits real gates in skill-eval-run.py rather than decorative
+    schema fields. A budget violation must be distinguishable from an assertion failure in evidence.json,
+    and an absent token log must report null rather than a passing score — a missing instrument must never
+    read as success.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given a case with budget.max_edits = 3 and a run producing 5 changed files, then evidence.json records
+    a `budget_violation` distinct from `assertion_failure` and the case fails.
+  - Given budget.max_tokens and an MCP token log filtered by run_id, then tokens_under_budget is 1.0 or
+    0.0 from the real total; given no token log present, then tokens_under_budget is null and the case
+    is reported as unscored on that axis, never 1.0.
+  - Given data/schemas/eval-case.schema.json, then budget with both keys is required and every seeded
+    case declares it — asserted by eval-case-validate.py --check.
+  - Given `python3 data/scripts/skill-eval-run.py --self-test`, then it exits 0 with cases for over-budget
+    edits, over-budget tokens and an absent token log.
+  depends_on:
+  - author-and-measure-t-eval-runner-offline
+  - author-and-measure-t-run-id-correlation
+  tags:
+  - F077
+  - X044
+  - evals
+  - budgets
+- id: author-and-measure-e5
+  kind: epic
+  title: Outcome ledger v2 and an honest ROI statistic
+  status: planned
+  summary: 'Goal F asks for return on code churned and nothing in the repo measures churn: grepping data/scripts
+    and workspace-tooling for numstat|shortstat|files_changed|insertions|deletions|revert returns zero
+    hits. run_id is hardcoded to None (pipeline-outcome-log.py:261), token_cost is null in every record,
+    the milestone emit site does not exist while the schema doc claims ten sites across six families,
+    a Prometheus push is documented in detail and implemented nowhere, and the only reported metric is
+    a self-graded (critical+high)/milestone proxy against three frozen internal ids. This epic makes a
+    run join to a diff, a test result and a cost, and replaces the n<5 heuristic with confidence intervals.'
+  priority: must
+  lane: later
+  size: XL
+  acceptance:
+  - Given a fixture milestone pipeline driven to `complete`, then the emitted outcomes.jsonl record has
+    schema_version 2, a non-null run_id, base_sha, head_sha, files_changed, insertions, deletions, test_command
+    and test_exit_code — asserted end to end, not by unit stubs.
+  - Given that record and the MCP token log, when `python3 data/scripts/pipeline-outcome-log.py join --run-id
+    <id>` runs, then it returns one row combining cost, diff and test result.
+  - Given `python3 data/scripts/sealed-eval.py metric`, then every metric prints a point estimate, n and
+    a 95% bootstrap interval, and the overclaim guard fires when the interval crosses zero rather than
+    when n < 5.
+  - Given `grep -rn "PIPELINE_METRICS\|_emit_metric\|_RUN_BUCKET_HEX\|BASELINE_IDS\|POST_IDS\|MIN_N" data/`,
+    then no output.
+  - Given `python3 data/scripts/churn-metrics.py --repo . --since 90d --json`, then it prints assisted-vs-unassisted
+    splits for 14-day churn, revert rate and change-failure rate, each with a bootstrap 95% interval.
+  depends_on:
+  - gates-green-e3
+  - author-and-measure-e2
+  tags:
+  - F074
+  - F078
+  - F079
+  - F080
+  - F081
+  - F083
+  - F086
+  - F090
+  - F092
+  - X036
+  - X037
+  - X038
+  - X039
+  - roi
+  - ledger
+  - evals
+- id: author-and-measure-t-outcome-schema-v2
+  kind: task
+  title: Bump the outcome record to schema v2 with code, identity and cost blocks
+  status: planned
+  parent: author-and-measure-e5
+  summary: 'Bump SCHEMA_VERSION from 1 to 2 in data/scripts/pipeline-outcome-log.py and widen RECORD_FIELDS
+    with three additive blocks named after the OTel gen_ai keys (field naming only — the trace-projection
+    rewrite is out of scope): code (repo, branch, base_sha, head_sha, files_changed, insertions, deletions,
+    test_command, test_exit_code, time_to_green_s, reverted_by), identity (run_id, agent_id, provider,
+    pack_version, kit_commit, model, model_release_date, skill_revisions[]) and cost (input_tokens, output_tokens,
+    cache_tokens, wall_ms). Every sha/id column must join STRING_FIELDS so a numeric-looking SHA cannot
+    coerce to a float — the bug caught by sealed-eval-spike-1. Update data/references/pipeline-outcome-log-schema.md
+    and make summary() switch on schema_version.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given SCHEMA_VERSION == 2, then RECORD_FIELDS contains every named column and `python3 -c "import
+    importlib.util,sys;..."` asserts each new sha/id column is a member of STRING_FIELDS.
+  - Given a --field value of `10365e3` for base_sha, then the emitted record's base_sha is the string
+    "10365e3", not 10365000.0 — asserted by a regression test named for the original defect.
+  - Given a log containing both v1 and v2 records, when `pipeline-outcome-log.py summary --json` runs,
+    then it returns all records without error and reports the per-version counts.
+  - Given the largest realistic v2 record, when the test serialises it, then its byte length is printed
+    and the test fails if it reaches PIPE_BUF (4096) — forcing the atomic single-write guarantee to be
+    re-decided rather than silently degrading.
+  - Given data/references/pipeline-outcome-log-schema.md, when a test parses the v2 column table out of
+    the doc and compares it to RECORD_FIELDS, then the two sets are equal.
+  depends_on:
+  - gates-green-e3
+  tags:
+  - F074
+  - X036
+  - ledger
+  - schema
+  - evals
+- id: author-and-measure-t-churn-probe
+  kind: task
+  title: Add pipeline-churn-probe.py and pass the milestone's already-persisted commit range through
+  status: planned
+  parent: author-and-measure-e5
+  summary: 'The raw material for churn already exists and is thrown away: milestone state.json persists
+    implementation_base, implementation_commit_range, implementation_commits, implementation_branch and
+    rectification_commit (data/scripts/milestone-pipeline-checkpoint.py:69-72, :78, :99). Add data/scripts/pipeline-churn-probe.py
+    shelling `git diff --numstat base..head` and `git log --grep ''^Revert'' base..head` to fill the v2
+    code block, and have the milestone terminal pass the persisted range straight through with no hand
+    entry.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given `python3 data/scripts/pipeline-churn-probe.py --base <sha> --head <sha> --repo <path> --json`,
+    then it prints {files_changed, insertions, deletions, reverted_by} derived from git, with no third-party
+    dependency.
+  - Given a fixture repo with 2 changed files, +10/-3 lines and one revert commit, then the probe returns
+    exactly those numbers — asserted in data/scripts/tests/test_churn_probe.py.
+  - Given a state.json carrying implementation_base and rectification_commit, when the milestone emit
+    runs, then the resulting record's base_sha and head_sha equal those values with no --field hand entry
+    — asserted end to end against a fixture state file.
+  - Given a directory with no git repository, then the probe exits 0 with every field null and one stderr
+    note, never aborting the host pipeline's terminal transition (the non-blocking guarantee at pipeline-outcome-log.py's
+    contract (b) must hold).
+  - Given windows-latest, then the probe's test passes (no shell-quoting or path-separator assumption).
+  depends_on:
+  - author-and-measure-t-outcome-schema-v2
+  tags:
+  - F074
+  - X036
+  - churn
+  - git
+  - evals
+- id: author-and-measure-t-run-id-correlation
+  kind: task
+  title: Introduce AGENT_KIT_RUN_ID and stamp it on every token-log entry
+  status: planned
+  parent: author-and-measure-e5
+  summary: 'Two cost instruments exist and cannot be joined: the MCP token logger keys entries on a per-process
+    random sessionId (src/logging/token-logger.ts:225) while run_id is hardcoded to None (data/scripts/pipeline-outcome-log.py:261).
+    Read AGENT_KIT_RUN_ID in src/config.ts, stamp it on every TokenLogEntry, add get_token_stats {mode:''run'',
+    runId}, and pass --field run_id from the emit blocks. Because the MCP logger never sees Edit/Write/Bash,
+    also add the Claude-side edit hook writing {run_id, tool, file, bytes_delta} to a sibling edit-log.jsonl;
+    the Codex and OpenCode legs are explicitly M7.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given AGENT_KIT_RUN_ID=abc123, then every line appended to the MCP token log carries "runId":"abc123";
+    given it unset, then the line carries the random session id plus "runIdSource":"session" — asserted
+    in src/logging/token-logger.test.ts.
+  - Given `get_token_stats {mode:"run", runId:"abc123"}`, then the returned totals cover only entries
+    with that runId — asserted with a fixture log containing two runs.
+  - 'Given `grep -n ''"run_id": None'' data/scripts/pipeline-outcome-log.py`, then no match remains in
+    build_record, and an emit passing --field run_id produces a non-null run_id.'
+  - Given a Claude session with the edit hook installed, then an Edit and a Write each append one {run_id,
+    tool, file, bytes_delta} line to edit-log.jsonl beside the token log — asserted by driving the hook
+    with a fixture stdin JSON payload.
+  - Given the sealed-eval corpus note, then data/references/pipeline-outcome-log-schema.md records that
+    the existing 327185 token_cost value in sealed-eval-v0-corpus.jsonl was hand-entered and is not evidence
+    the path works.
+  depends_on:
+  - author-and-measure-t-outcome-schema-v2
+  tags:
+  - F080
+  - X036
+  - run-id
+  - telemetry
+  - evals
+- id: author-and-measure-t-resource-id-attribution
+  kind: task
+  title: Preserve per-skill attribution under SERVER_PROFILE=shared
+  status: planned
+  parent: author-and-measure-e5
+  summary: 'The only record of which skill a session pulled is the args preview on a get_skill/get_agent
+    token-log entry, and under SERVER_PROFILE=shared — the profile a team deployment uses — src/logging/token-logger.ts:297-300
+    replaces it with an 8-hex sha256 salted by the per-process session id, so the digests cannot even
+    be grouped across runs. Add `resourceId?: string` to TokenLogEntry populated from the validated catalog
+    id (a public identifier, never user content) for get_skill|get_agent|get_reference|get_context_guide,
+    emitted under both profiles, and rewrite the token-stats aggregation to key on it.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given SERVER_PROFILE=shared and a get_skill("handoff") call, then the log entry carries "resourceId":"skill/handoff"
+    in plain text while search_platform_knowledge.query args remain hashed — asserted in src/server-profile.test.ts.
+  - Given both profiles, then resourceId is populated identically for all four resource-serving tools
+    — asserted with one test case per tool.
+  - Given a call naming a resource that is not in data/facts/catalog.json, then the entry omits resourceId
+    entirely rather than recording the raw string — proving user content cannot leak into the field.
+  - Given `get_token_stats {mode:"skills"}`, then it ranks catalog ids by calls and output tokens, and
+    the 'Hot queries' aggregation at src/tools/token-stats.ts:176-195 no longer keys on the redacted `${tool}
+    ${args}` composite for those four tools.
+  depends_on:
+  - author-and-measure-t-run-id-correlation
+  tags:
+  - F081
+  - attribution
+  - telemetry
+  - privacy
+  - evals
+- id: author-and-measure-t-wire-milestone-emit
+  kind: task
+  title: Wire the milestone emit and delete the phantom emit sites and the Prometheus fiction
+  status: planned
+  parent: author-and-measure-e5
+  summary: data/references/pipeline-outcome-log-schema.md:218-237 documents an emit-point map of ten sites
+    across six families, each supposedly covered by TestPerPipelineEmitSmoke; only two exist (roadmap.md:211
+    and spike-checkpoint.py:512-531). Six of the named families have no command file at all. Add the concrete
+    emit block to the milestone entrypoint immediately after the terminal checkpoint call, rewrite the
+    map to the three real sites, and make TestPerPipelineEmitSmoke scan actual entrypoint bodies rather
+    than iterate a hardcoded list. In the same change delete the documented-but-absent Prometheus push
+    (schema-doc lines 134-178), the orphan _RUN_BUCKET_HEX constant (pipeline-outcome-log.py:333-339)
+    and the two empty test classes (pipeline-outcome-log-test.py:621-626), and replace the hardcoded POST_IDS
+    at sealed-eval.py:46.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the milestone entrypoint body (data/skills/milestone-pipeline/SKILL.md after the M6 migration,
+    and its compiled data/commands view), then it contains a concrete `pipeline-outcome-log.py emit --pipeline
+    milestone --id "$ID" --state ...` invocation immediately after the terminal `checkpoint.py "$ID" complete`.
+  - Given TestPerPipelineEmitSmoke, then it scans the real entrypoint bodies for an emit invocation and
+    fails when one is missing — asserted by temporarily removing the roadmap emit line in a temp tree.
+  - Given `grep -c "capability-scout\|mesh-as-code\|interop-discovery\|cicd-uplift\|frontend-uplift\|zerotrust-scout\|argoops"
+    data/references/pipeline-outcome-log-schema.md`, then it returns 0, and the map lists exactly milestone,
+    spike and roadmap.
+  - Given `grep -rn "PIPELINE_METRICS\|_emit_metric\|_RUN_BUCKET_HEX\|TestMetricEmitBestEffort\|TestRunBucket"
+    data/`, then no output, and the test-count claim in pipeline-outcome-log-test.py's header matches
+    the real class count (asserted by a self-check).
+  - Given a fixture corpus with three milestone records outside the baseline window, when sealed-eval
+    computes n_post, then it counts all three — the hardcoded POST_IDS set at sealed-eval.py:46 is gone.
+  depends_on:
+  - author-and-measure-t-outcome-schema-v2
+  - author-and-measure-t-commands-to-skills
+  tags:
+  - F078
+  - F079
+  - ledger
+  - cleanup
+  - evals
+- id: author-and-measure-t-cost-unit-honesty
+  kind: task
+  title: 'Give cost a unit: rename the estimator, price the models, measure the error'
+  status: planned
+  parent: author-and-measure-e5
+  summary: The entire cost side rests on `estimateTokens(text) { return Math.ceil(text.length / 4) }`
+    (src/logging/token-logger.ts:145-147) applied to MCP payloads only — excluding the system prompt,
+    tool definitions, cache reads/writes and every non-MCP token — yet sealed-eval and the outcome schema
+    treat token_cost as a measurement. Rename the estimate fields, document the exclusions, add a committed
+    per-model price table so a dollar figure is derivable, and make the estimator's error a measured number
+    rather than an assumption.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given TokenLogEntry, then the estimate fields are named inputCharsEst/outputCharsEst and `grep -n
+    "Measurement caveats" data/references/pipeline-outcome-log-schema.md` returns a hit listing all four
+    exclusions.
+  - Given data/facts/model-pricing.json keyed by model id with input/output/cache unit prices plus `source`
+    and `as_of` per row, then a test asserts every model alias referenced by data/model-policy.json resolves
+    to a pricing row or appears in an explicit `unpriced` list.
+  - Given a v2 record, then provider-reported usage populates the cost block and the chars-based estimate
+    is written to a separate field, so the two can never be confused — asserted with a fixture record
+    carrying both.
+  - Given tests/fixtures/tokenization/ (a committed set of (text, token_count) pairs produced once from
+    a real tokenizer), when the calibration test runs offline, then it prints the estimator's mean absolute
+    percentage error and fails if it exceeds a committed threshold.
+  - Given `python3 data/scripts/mcp-token-stats.py`, then its output header still says 'estimated' and
+    now names the price table it did or did not apply.
+  depends_on:
+  - author-and-measure-t-outcome-schema-v2
+  tags:
+  - F090
+  - cost
+  - pricing
+  - ledger
+  - evals
+- id: author-and-measure-t-trajectory-rules
+  kind: task
+  title: Make the trajectory heuristics declarative and calibration a reviewable diff
+  status: planned
+  parent: author-and-measure-e5
+  summary: The only closed feedback loop is an inline Python heredoc at data/scripts/milestone-pipeline-consolidate-memory.sh:147-340
+    with five hardcoded rules, every emitted lesson stamped with the single hardcoded milestone id `self-improving-tooling-m3`
+    (line 194), appending prose to machine-local gitignored lessons.md files that nothing reads programmatically.
+    Replace it with data/scripts/trajectory-extract.py driven by declarative rows in data/references/trajectory-rules.json,
+    emit machine-readable calibration to data/evals/calibration/<catalog_id>.json, and make agent bodies
+    carry a generated CALIBRATION block so re-calibration becomes a reviewable diff instead of the hand
+    edit at data/agents/milestone-adversary.md:158-167 that has been stale since 2026-07-02.
+  priority: should
+  lane: later
+  size: L
+  acceptance:
+  - Given the heredoc removed, when both the old and new implementations run against the same fixture
+    outcomes.jsonl, then the emitted lessons are identical (behaviour parity), and the shell script's
+    line count drops by at least 180.
+  - Given data/references/trajectory-rules.json, then all five rules are rows of {rule_id, applies_to,
+    predicate, min_n, target, message_template} validated by a Draft 2020-12 schema; adding a sixth rule
+    to a temp rules file makes it fire with no Python change — asserted by a test.
+  - Given `grep -n "self-improving-tooling-m3" data/scripts/milestone-pipeline-consolidate-memory.sh data/scripts/trajectory-extract.py`,
+    then no output — each lesson is stamped with the record's own id.
+  - Given `python3 data/scripts/calibration-apply.py --check`, then it exits 2 when the `<!-- CALIBRATION:agent/milestone-adversary
+    -->` block in data/agents/milestone-adversary.md does not match data/evals/calibration/agent-milestone-adversary.json,
+    and --write produces a diff that passes the generator gates.
+  - Given `python3 data/scripts/docs-link-check.py data/references/self-improvement-operations.md`, then
+    it exits 0 — trajectory-extraction.md, sealed-eval.md, sealed-eval-v1-corpus.jsonl and plans/self-improving-tooling-m3-baseline.md
+    are either restored or the fresh-machine procedure is rewritten to stop citing them.
+  depends_on:
+  - author-and-measure-t-outcome-schema-v2
+  tags:
+  - F083
+  - feedback-loop
+  - calibration
+  - evals
+- id: author-and-measure-t-churn-metrics-trailer
+  kind: task
+  title: Implement the GitClear churn definitions locally and an opt-in Assisted-by trailer
+  status: planned
+  parent: author-and-measure-e5
+  summary: 'Add data/scripts/churn-metrics.py computing the GitClear-style definitions from a local clone
+    with no SaaS, segmented by whether a commit carries an Assisted-by trailer, and extend the commit
+    hook with an opt-in mode emitting `Assisted-by: <pipeline>:<model>` plus a machine-readable `Agent-Run-Id`
+    matching the ledger run_id. The trailer is the join key that survives a machine rebuild the gitignored
+    ledger does not. Keep the format behind one constant: the kernel is publicly re-litigating the attribution
+    requirement and may drop it.'
+  priority: should
+  lane: later
+  size: L
+  acceptance:
+  - 'Given `python3 data/scripts/churn-metrics.py --repo <path> --since 90d --json`, then it emits, split
+    by assisted vs unassisted: 14-day churn percentage, revert rate, within-commit copy/paste share, duplicated-block
+    count (runs of 5+ consecutive repeated meaningful lines), refactor-move share and change-failure rate,
+    each with a bootstrap 95% interval.'
+  - Given a fixture repo where one line is added then rewritten within 14 days, then the script reports
+    exactly one churned line — asserted in data/scripts/tests/test_churn_metrics.py.
+  - 'Given AGENT_KIT_TRAILER=1 and a pipeline run, then the commit carries `Assisted-by: milestone:<model>`
+    and `Agent-Run-Id: <run_id>`; given the variable unset, then a human-authored commit message is byte-identical
+    before and after the hook — asserted, because the hook must never silently rewrite.'
+  - Given a fixture repo with 3 assisted and 2 unassisted commits, when `python3 data/scripts/run-join.py`
+    runs, then `git interpret-trailers --parse` yields exactly 3 rows joined to outcomes.jsonl by run_id.
+  - Given the trailer format constant, when a test changes it, then both the emitter and the parser follow
+    with no other edit — so a convention change is a one-line edit.
+  depends_on:
+  - author-and-measure-t-churn-probe
+  - author-and-measure-t-run-id-correlation
+  tags:
+  - X037
+  - X038
+  - churn
+  - git
+  - roi
+  - evals
+- id: author-and-measure-t-roi-statistics
+  kind: task
+  title: Replace the self-graded proxy and the n<5 heuristic with a stdlib statistics layer
+  status: planned
+  parent: author-and-measure-e5
+  summary: 'sealed-eval.py''s sole metric registry contains three variants of ch_per_milestone — mean(critical+high)
+    per run — computed from the same agent family the pipeline dispatches, so a less aggressive adversary
+    lowers the metric without improving anything, and the adversary body is itself the calibration target.
+    Its baseline is frozen to three of one person''s internal milestone ids and its whole inference layer
+    is `MIN_N = 5`. Add data/scripts/lib/stats.py (stdlib only: bootstrap percentile CIs, paired-difference
+    tests on the same task ids, cluster-robust standard errors, minimum detectable effect), extend METRIC_NAME_TABLE
+    with outcome-grounded metrics from the v2 schema, and replace both hardcoded id sets with a --baseline-window
+    so each adopter''s baseline is their own first runs. OWNER GATE: retiring the custodian-sealed v0
+    baseline (CUSTODIAN="Chris Dare", SEAL_VERSION=v0, BASELINE_IDS frozen at sealed-eval.py:39-45) is
+    a custody decision, not an engineering one — it must be decided before this work starts.'
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given data/scripts/lib/stats.py, then it exposes bootstrap_ci(samples, statistic, alpha), paired_diff_test(before,
+    after) keyed on task id, cluster_se(samples, cluster_key) and minimum_detectable_effect(n, sd, power),
+    and `grep -nE "^(import|from) " data/scripts/lib/stats.py` shows no third-party import.
+  - Given `python3 data/scripts/lib/stats.py --self-test`, then it reproduces a known bootstrap interval
+    on a fixed seed to three decimal places and exits 0.
+  - Given `python3 data/scripts/sealed-eval.py metric`, then each metric prints point estimate, n and
+    a 95% bootstrap interval, and the overclaim guard fires when the interval crosses zero; `grep -n "MIN_N"
+    data/scripts/sealed-eval.py` returns nothing.
+  - 'Given METRIC_NAME_TABLE, then it carries task_success_rate (test_exit_code == 0 and human_verdict
+    != reject), edit_churn_per_accepted_line, revert_rate_30d, tokens_per_accepted_line and time_to_green_p50
+    computed from v2 records, and ch_per_milestone retains a `grader_independence: "self-graded"` key
+    that is printed in the output.'
+  - Given `--baseline-window 2026-01-01..2026-03-01`, then `grep -n "BASELINE_IDS\|POST_IDS" data/scripts/sealed-eval.py`
+    returns nothing and the baseline is computed from the window.
+  - Given a corpus of 4 records, then `metric` exits 0 printing 'interval crosses zero — no claim' rather
+    than exiting 1; given a missing corpus, then it still exits 1 (unchanged).
+  depends_on:
+  - author-and-measure-t-outcome-schema-v2
+  - author-and-measure-t-churn-metrics-trailer
+  - gates-green-e3
+  tags:
+  - X039
+  - F086
+  - statistics
+  - sealed-eval
+  - roi
+  - evals
+- id: author-and-measure-t-outcome-export-merge
+  kind: task
+  title: Add export/merge for the outcome corpus and stop depending on a bash script for gitignore
+  status: planned
+  parent: author-and-measure-e5
+  summary: Every outcome corpus is per-clone with no export, merge, anonymise or upload path, and its
+    exclusion from git depends on data/scripts/ensure-claude-gitignore.sh having been run per clone —
+    a bash-only script that exits 0 silently when it is not, and which evidently never ran in agent-kit's
+    own clone (`git status` reports `?? .claude/` rather than an ignored path). Add export and merge subcommands
+    and put `.claude/` in the tracked .gitignore, whose six lines today are node_modules, dist, __pycache__,
+    *.pyc, .DS_Store and npm-debug.log*.
+  priority: could
+  lane: later
+  size: M
+  acceptance:
+  - Given `pipeline-outcome-log.py export --since <ts> --format jsonl --redact`, then the output contains
+    no absolute paths, hostnames or usernames — asserted by seeding a record with `/Users/alice/...` in
+    source_state_path and grepping the output for `alice` and `/Users/`.
+  - Given `pipeline-outcome-log.py merge a.jsonl b.jsonl`, then records are unioned by (pipeline, id,
+    emitted_at) and the count is printed; merging a file with itself yields the same record count as the
+    input.
+  - Given `git check-ignore -q .claude/notes/pipeline-outcomes/outcomes.jsonl`, then it exits 0 because
+    `.claude/` is in the tracked .gitignore — the exclusion no longer depends on ensure-claude-gitignore.sh
+    having been run.
+  - Given data/references/self-improvement-operations.md, then it documents the pooling procedure as a
+    runnable command block, and the CI docs-as-executable step runs that block against a fixture corpus
+    and exits 0.
+  - Given `--format csv`, then the header row equals RECORD_FIELDS flattened in canonical order — asserted
+    by a test.
+  depends_on:
+  - author-and-measure-t-outcome-schema-v2
+  tags:
+  - F092
+  - ledger
+  - export
+  - gitignore
+  - evals

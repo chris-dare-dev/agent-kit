@@ -1,0 +1,134 @@
+{
+  "gates-green-e1": {
+    "number": 40,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/40"
+  },
+  "gates-green-e2": {
+    "number": 41,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/41"
+  },
+  "gates-green-e3": {
+    "number": 42,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/42"
+  },
+  "gates-green-e4": {
+    "number": 43,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/43"
+  },
+  "gates-green-spike-1": {
+    "number": 58,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/58"
+  },
+  "gates-green-t-artifacts-selftest-extract": {
+    "number": 57,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/57"
+  },
+  "gates-green-t-data-schemas": {
+    "number": 62,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/62"
+  },
+  "gates-green-t-data-scripts-tests": {
+    "number": 56,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/56"
+  },
+  "gates-green-t-fcntl-datascripts": {
+    "number": 67,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/67"
+  },
+  "gates-green-t-fcntl-substrate": {
+    "number": 66,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/66"
+  },
+  "gates-green-t-fix-red-gates": {
+    "number": 64,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/64"
+  },
+  "gates-green-t-gate-runner": {
+    "number": 63,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/63"
+  },
+  "gates-green-t-geteuid": {
+    "number": 68,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/68"
+  },
+  "gates-green-t-gitattributes": {
+    "number": 46,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/46"
+  },
+  "gates-green-t-npm-gate-entrypoints": {
+    "number": 54,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/54"
+  },
+  "gates-green-t-outcome-log-lock": {
+    "number": 69,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/69"
+  },
+  "gates-green-t-packs-out-dir": {
+    "number": 50,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/50"
+  },
+  "gates-green-t-platform-compat": {
+    "number": 65,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/65"
+  },
+  "gates-green-t-posix-provenance": {
+    "number": 45,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/45"
+  },
+  "gates-green-t-referential-integrity": {
+    "number": 48,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/48"
+  },
+  "gates-green-t-regen-gates-green": {
+    "number": 51,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/51"
+  },
+  "gates-green-t-reseal-corpus": {
+    "number": 59,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/59"
+  },
+  "gates-green-t-router-content": {
+    "number": 47,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/47"
+  },
+  "gates-green-t-sealed-eval-cwd": {
+    "number": 60,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/60"
+  },
+  "gates-green-t-self-improvement-refs": {
+    "number": 61,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/61"
+  },
+  "gates-green-t-skip-to-green": {
+    "number": 55,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/55"
+  },
+  "gates-green-t-suite-collects": {
+    "number": 70,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/70"
+  },
+  "gates-green-t-supported-platforms": {
+    "number": 71,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/71"
+  },
+  "gates-green-t-test-glob": {
+    "number": 52,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/52"
+  },
+  "gates-green-t-tool-example-names": {
+    "number": 49,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/49"
+  },
+  "gates-green-t-typecheck-tests": {
+    "number": 53,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/53"
+  },
+  "gates-green-t-utf8-io": {
+    "number": 44,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/44"
+  },
+  "gates-green-t-wsl-path": {
+    "number": 72,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/72"
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "starts-everywhere-e1": {
+    "number": 1,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/1"
+  },
+  "starts-everywhere-e2": {
+    "number": 2,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/2"
+  },
+  "starts-everywhere-e3": {
+    "number": 3,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/3"
+  },
+  "starts-everywhere-e4": {
+    "number": 4,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/4"
+  },
+  "starts-everywhere-e5": {
+    "number": 5,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/5"
+  },
+  "starts-everywhere-spike-1": {
+    "number": 14,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/14"
+  },
+  "starts-everywhere-t-agent-kit-init": {
+    "number": 26,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/26"
+  },
+  "starts-everywhere-t-artifact-memory-capability-probe": {
+    "number": 10,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/10"
+  },
+  "starts-everywhere-t-artifact-policy-example": {
+    "number": 38,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/38"
+  },
+  "starts-everywhere-t-aws-sdk-deps": {
+    "number": 32,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/32"
+  },
+  "starts-everywhere-t-dead-modules-and-metadata": {
+    "number": 33,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/33"
+  },
+  "starts-everywhere-t-derived-root-profile": {
+    "number": 18,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/18"
+  },
+  "starts-everywhere-t-derived-root-resolver": {
+    "number": 17,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/17"
+  },
+  "starts-everywhere-t-doctor-preflight": {
+    "number": 30,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/30"
+  },
+  "starts-everywhere-t-embedded-search-fallback": {
+    "number": 21,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/21"
+  },
+  "starts-everywhere-t-failsoft-tool-group-registration": {
+    "number": 9,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/9"
+  },
+  "starts-everywhere-t-fork-provenance-ledger": {
+    "number": 8,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/8"
+  },
+  "starts-everywhere-t-gitattributes-exec-bits": {
+    "number": 34,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/34"
+  },
+  "starts-everywhere-t-gitignore-runtime-logs": {
+    "number": 35,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/35"
+  },
+  "starts-everywhere-t-graphiti-decision": {
+    "number": 15,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/15"
+  },
+  "starts-everywhere-t-graphiti-resolve-tool": {
+    "number": 16,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/16"
+  },
+  "starts-everywhere-t-homedir-personal-memory": {
+    "number": 11,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/11"
+  },
+  "starts-everywhere-t-init-safe-planting": {
+    "number": 27,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/27"
+  },
+  "starts-everywhere-t-licence-split": {
+    "number": 7,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/7"
+  },
+  "starts-everywhere-t-mcp-registration-templates": {
+    "number": 29,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/29"
+  },
+  "starts-everywhere-t-name-collision-decision": {
+    "number": 6,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/6"
+  },
+  "starts-everywhere-t-platform-root-default": {
+    "number": 23,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/23"
+  },
+  "starts-everywhere-t-purge-employer-code-paths": {
+    "number": 36,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/36"
+  },
+  "starts-everywhere-t-purge-employer-content": {
+    "number": 37,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/37"
+  },
+  "starts-everywhere-t-readme-quickstart-verify": {
+    "number": 24,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/24"
+  },
+  "starts-everywhere-t-retire-dead-installers": {
+    "number": 28,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/28"
+  },
+  "starts-everywhere-t-revive-drift-test": {
+    "number": 20,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/20"
+  },
+  "starts-everywhere-t-socket-path-resolution": {
+    "number": 19,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/19"
+  },
+  "starts-everywhere-t-startup-degradation-log": {
+    "number": 12,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/12"
+  },
+  "starts-everywhere-t-substrate-readme-truth": {
+    "number": 22,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/22"
+  },
+  "starts-everywhere-t-supported-platforms-statement": {
+    "number": 25,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/25"
+  },
+  "starts-everywhere-t-template-settings": {
+    "number": 39,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/39"
+  },
+  "starts-everywhere-t-uninstall-receipt": {
+    "number": 31,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/31"
+  },
+  "starts-everywhere-t-win32-startup-regression-test": {
+    "number": 13,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/13"
+  }
+}

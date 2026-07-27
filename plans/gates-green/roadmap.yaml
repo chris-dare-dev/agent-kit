@@ -1,0 +1,1226 @@
+schema: roadmap/1
+slug: gates-green
+project: agent-kit
+title: M2 Gates Green — the repo passes its own four mandatory gates and actually runs its own tests,
+  everywhere
+status: draft
+phase: sequenced
+brief: 'agent-kit declares four mandatory generator gates in README.md:106-112 and two of them are red
+  on the repo''s only commit; `npm test` names 3 of the 8 TypeScript suites that exist; the committed
+  sealed-eval corpus fails its own manifest; `data/schemas/` does not exist so two shipped gate scripts
+  cannot execute; and 333 of ~593 Python substrate tests never collect off macOS.
+
+  M2 makes the repo pass its own checks on macOS, Linux and Windows before M3 automates them. Order inside
+  the milestone is forced by the evidence: the UTF-8/newline and POSIX-separator fixes must land before
+  anything is regenerated on Windows (regenerating today mojibakes AGENTS.md and flips 26 catalog provenance
+  strings to backslashes), and the `platform_compat` shim must land before M3''s matrix so the Python
+  leg arrives green rather than red for a reason no CI config can fix.
+
+  Everything here is independently valuable without CI: a contributor on any OS can run four `--check`
+  commands, one test command and one gate runner and get a truthful answer. Nothing publishes, nothing
+  renames, nothing new is authored.'
+goal:
+  hmw: How might we make the repo's own declared gates and test suites run truthfully on every supported
+    OS — so that green means green, red means a real defect, and skipped means a declared, budgeted reason?
+  objective: Every quality signal the repository already claims to have — four generator gates, eight
+    TypeScript suites, the Python substrate suite, 25 `--self-test` entrypoints and four shell harnesses
+    — executes on macOS, Linux and Windows and reports an honest result, with no skip-to-green test, no
+    committed artifact that fails its own seal, and no generated output that references something absent
+    from the tree.
+  key_results:
+  - From a clean clone on each of macOS, Linux and Windows, all four gates — `catalog-generate.py --check`,
+    `generate-adapter-packs.py --check`, `generate-root-contract.py --check`, `model-policy-apply.py --check`
+    — exit 0 (today 2 of 4 exit 2).
+  - Running each generator without `--check` on Windows and on Linux from the same commit produces a byte-identical
+    working tree (`git status --porcelain` empty on both); today the Windows run rewrites AGENTS.md/CONTEXT.md
+    with mojibake + CRLF and flips 26 catalog provenance strings.
+  - '`npm test` executes all 8 files matching `src/**/*.test.ts` (today 3), with 0 failures on all three
+    OSes; a tripwire test asserts the loaded-file count equals the glob count.'
+  - '`python -m unittest discover -s workspace-tooling/tests -p ''test_*.py'' -t workspace-tooling/tests`
+    collects the full ~593 tests with 0 import errors on Windows, Linux and macOS (today: 260 collected,
+    14 modules fail at import, 169 red on Windows).'
+  - '`bash data/scripts/sealed-eval-test.sh` exits 0 including case T3 `clean-match` (today it fails T3:
+    sealed=3dac0bb… vs actual=310723cb…).'
+  - One committed runner reports a pass/skip/quarantined verdict for all 25 `data/scripts/*.py --self-test`
+    entrypoints and the 4 shell harnesses, exits non-zero on any unexpected failure, and its committed
+    expected-status file lists 0 unexplained failures (today 12 fail and nothing invokes them).
+  - '`python data/scripts/pipeline-outcome-log-test.py` reports 0 failures on Windows and on POSIX, asserting
+    1000/1000 threaded and 400/400 multiprocess records (today 817/1000 and 371/400 on Windows).'
+  - A documented, scripted WSL2 path exists and its smoke script round-trips one memory query end-to-end
+    on a Windows host.
+  wont:
+  - No `.github/` workflows, no CI matrix, no coverage ratchet — M2 makes the commands green and committed;
+    M3 automates them (`ci-proves-it`).
+  - No eslint/prettier/ruff/mypy configuration and no tsconfig strictness ratchet beyond adding a `typecheck`
+    script that includes test files — static analysis config is M3.
+  - No native Windows named-pipe or loopback transport for the resident memory service — WSL2 is the supported
+    Windows path in M2; the transport port is M5 (`native-everywhere`).
+  - No npm/PyPI packaging, `bin`, `files`, `exports`, pyproject or release automation — blocked on the
+    M1 naming decision and delivered in M4 (`named-and-installable`).
+  - No new skills, no golden task set, no ROI statistic — the corpus is n=1 and that work is sequenced
+    into M6 (`author-and-measure`).
+  - No provider capability manifests or conformance suite; M2 only stops `generate-adapter-packs.py` writing
+    outside the clone (M7 owns the data-driven redesign).
+  - No rewrite of the AGENTS.md router's *semantics* into a provider-neutral contract — M2 only removes
+    references to things that do not exist and gates that they cannot come back.
+  - No removal of the four unused @aws-sdk dependencies or other clone-hygiene work — that is M1's `starts-everywhere-e5`.
+generated_by:
+  agent: claude-opus-5
+  at: '2026-07-26'
+  brief: multi-workflow audit + landscape benchmark synthesis
+retired: []
+items:
+- id: gates-green-e1
+  kind: epic
+  title: Turn the four generator gates green, make them platform-independent, and make them assert that
+    what they emit exists
+  status: planned
+  summary: 'README.md:106-112 declares four generator gates that "all must be clean before committing
+    data/ changes"; on the repo''s only commit two of them exit 2. The causes are mechanical and platform-shaped:
+    `catalog-generate.py` serialises OS-native path separators into `provenance`, and `generate-root-contract.py`
+    does all nine of its reads and writes with bare `read_text()`/`write_text()` so a Windows run mis-decodes
+    UTF-8 (inflating the router body from 5109 B to a phantom 5159 B, past its own 5120 B budget) and,
+    worse, rewrites AGENTS.md and CONTEXT.md as cp1252 + CRLF. Beyond being red, the generators emit things
+    that do not resolve: the router routes to 8 agents and 5 commands absent from the tree, the coverage
+    map''s `escalation_extract` names a missing file, the MCP tool descriptions advertise four removed
+    skills/agents that the golden fixture then freezes in, and `--apply` writes 26 files two directories
+    above the clone and deletes .toml files there. Outcome: all four `--check` gates exit 0 on all three
+    OSes, regenerating anywhere yields a byte-identical tree, and a build-time assertion makes it impossible
+    to emit a route to something that does not exist.'
+  priority: must
+  lane: now
+  size: L
+  acceptance:
+  - Given a clean clone on ubuntu-latest, macos-latest and windows-latest, when `python data/scripts/catalog-generate.py
+    --check && python data/scripts/generate-adapter-packs.py --check && python data/scripts/generate-root-contract.py
+    --check && python data/scripts/model-policy-apply.py --check` is run, then every command exits 0 on
+    every OS.
+  - Given the same commit checked out on Windows and on Linux, when every generator is run in write mode
+    (no `--check`), then `git status --porcelain` is empty on both and `git diff` between the two produced
+    trees is empty.
+  - Given a route added to `data/references/agents-md-coverage-map.md` that names an agent, command, reference
+    or MCP tool absent from the tree, when `python data/scripts/generate-root-contract.py --check` is
+    run, then it exits non-zero naming the unresolved identifier and the file it was declared in.
+  tags:
+  - F119
+  - F151
+  - F031
+  - F163
+  - F181
+  - F032
+  - F162
+  - F182
+  - F096
+  - F110
+  - F109
+  - generators
+  - gates
+  - determinism
+  - packs
+- id: gates-green-t-utf8-io
+  kind: task
+  title: Give every data/scripts text I/O explicit encoding='utf-8' and newline='\n'
+  status: planned
+  parent: gates-green-e1
+  summary: '`grep -rn ''read_text()\|write_text('' data/scripts/*.py | grep -v encoding` returns 189 call
+    sites that use the platform locale encoding. On Windows (cp1252) this is not merely a false gate failure
+    — it is destructive: running the exact command README.md:106-112 prescribes rewrites data/claude-md/AGENTS.md
+    and CONTEXT.md with replacement characters for every em dash and converts all LF to CRLF. It is also
+    the true root cause of the `BUDGET: AGENTS.md router body 5159 B > 5120 B` failure: with UTF-8 reads
+    the same render measures 5109 B and both drift comparisons pass. This lands first because every other
+    regeneration task in this epic is unsafe until it does.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given HEAD on Windows, when `grep -rn 'read_text()\|write_text(' data/scripts/*.py | grep -v encoding`
+    is run after the change, then it returns zero lines.
+  - 'Given generate-root-contract.py:76, :82, :213, :215, :267, :287, :288, :292, :293 are all updated,
+    when `python data/scripts/generate-root-contract.py --check` is run on Windows with the default (non-UTF-8)
+    locale and no PYTHONUTF8 set, then it prints `OK: AGENTS.md router 5109 B (<= 5120)` and reports no
+    DRIFT, exiting 0.'
+  - Given the byte budget check at generate-root-contract.py:208, when the body length is computed, then
+    it is computed as `len(body.encode('utf-8'))` explicitly rather than from whatever the platform decoded,
+    and `generate-root-contract.py --self-test` (which asserts `BYTE_BUDGET == 5120` at :405) still passes.
+  - Given a fresh Windows clone, when `python data/scripts/generate-root-contract.py` is run in write
+    mode, then `git diff --stat data/claude-md/` reports no changes (today it reports 16 insertions /
+    16 deletions of mojibake).
+  - Given the change, when `python -c "import ast,pathlib,sys; sys.exit(0)"`-style lint is replaced by
+    a committed check script, then a re-introduced bare `read_text()`/`write_text()` in data/scripts/*.py
+    fails that check with a non-zero exit.
+  tags:
+  - F032
+  - F162
+  - F182
+  - encoding
+  - portability
+  - generators
+- id: gates-green-t-posix-provenance
+  kind: task
+  title: Emit POSIX separators in catalog provenance so catalog-generate.py --check can pass on Windows
+  status: planned
+  parent: gates-green-e1
+  summary: 'data/scripts/catalog-generate.py builds each entry''s `provenance` with `str(p.relative_to(ROOT))`
+    at :266 (skills), :274 (agents) and :282 (commands), assigned at :237. On Windows a fresh render yields
+    `data\\agents\\context-curator.md` against the committed `data/agents/context-curator.md`, so `--check`
+    reports ''data/facts/catalog.json is stale''. A diff of all JSON leaves after applying the script''s
+    own `_strip_freshness` shows exactly 52 differing values and every one is a separator flip or the
+    excluded `freshness` field — zero content differs. The remediation the error message suggests is worse
+    than the failure: a Windows contributor who regenerates commits 26 backslash provenance strings that
+    then red the gate for every Linux and macOS teammate.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given catalog-generate.py:266, :274 and :282 use `p.relative_to(ROOT).as_posix()`, when `python data/scripts/catalog-generate.py
+    --check` is run on Windows against the committed data/facts/catalog.json, then it exits 0.
+  - Given a committed catalog whose any entry's `provenance` contains a backslash, when `catalog-generate.py
+    --check` is run on any OS, then it exits non-zero with a message naming the offending entry id.
+  - Given `python data/scripts/catalog-generate.py --self-test` is run, then it includes and passes an
+    assertion that no generated entry's provenance contains a backslash.
+  - Given a determinism test that renders the catalog twice with `os.sep` monkeypatched to '\\', when
+    it runs, then it asserts byte equality of the two renders.
+  - Given `grep -rn 'str(.*relative_to' data/scripts/*.py` is run after the change, then any remaining
+    hit is in console output only and is documented as such in a code comment (generate-root-contract.py:284-285).
+  tags:
+  - F031
+  - F163
+  - F181
+  - catalog
+  - portability
+  - determinism
+- id: gates-green-t-gitattributes
+  kind: task
+  title: Add a root .gitattributes so byte-sensitive gates cannot be reddened by a checkout
+  status: planned
+  parent: gates-green-e1
+  summary: 'The repo has no `.gitattributes` while its correctness machinery is byte- and digest-sensitive
+    in at least four places: the 5120-byte router budget in generate-root-contract.py:49, `tests/fixtures/adapter-packs.golden.json`,
+    `tests/fixtures/tools-list.golden.json`, and the sha256 seal over `data/scripts/sealed-eval-v0-corpus.jsonl`.
+    A Windows contributor with the default `core.autocrlf=true` gets a checkout that is structurally unable
+    to pass them. This is a prerequisite for the sealed-eval re-seal in gates-green-e3 (a CRLF-normalised
+    .jsonl produces a false MISMATCH).'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given a root `.gitattributes` containing `* text=auto eol=lf` plus explicit `*.md text eol=lf`, `*.json
+    text eol=lf`, `*.ts text eol=lf`, `*.py text eol=lf`, `*.sh text eol=lf`, `*.mjs text eol=lf`, `*.jsonl
+    -text` and `*.gz binary`, when a Windows machine runs `git -c core.autocrlf=true clone` of the repo
+    into a fresh directory, then `grep -rc $'\r' data/claude-md/AGENTS.md data/scripts/sealed-eval-v0-corpus.jsonl
+    tests/fixtures/*.json` reports 0 for every file.
+  - Given that same autocrlf=true clone, when `python data/scripts/generate-root-contract.py --check`
+    and `bash data/scripts/sealed-eval-test.sh` are run, then both exit 0.
+  - 'Given the file is committed, when `git check-attr text eol -- data/scripts/sealed-eval-v0-corpus.jsonl`
+    is run, then it reports `text: unset`.'
+  tags:
+  - F119
+  - F162
+  - gitattributes
+  - line-endings
+  - portability
+- id: gates-green-t-router-content
+  kind: task
+  title: Remove the eight phantom agents and five phantom commands from the generated root contract, and
+    re-measure its byte budget
+  status: planned
+  parent: gates-green-e1
+  summary: '`data/claude-md/AGENTS.md` is the generated, provider-neutral router every provider loads.
+    Its inventory header at :14-16 is accurate (''Agents (20)'', ''Skills (1)'') but its normative body
+    at :24-52 is internal-platform residue: it tells agents to ''dispatch one `cluster-health` agent per
+    cluster'' (:25), names gitlab-workflow, release-manager, tenant-onboarding, helm-apps, ci-pipelines,
+    service-mesh and security in coordination rules (:31, :34-36), points escalation at `cluster-health`
+    (:40), calls `get_app_context({app})` (:18, :44, :51) which is not among the 17 tools, and links `get_reference("escalation-matrix")`
+    against a missing file. None of the eight agents exists in data/agents/ (which holds 20 milestone/roadmap/spike
+    agents). AGENTS.md is generated — the edit is to `data/references/agents-md-coverage-map.md` (the
+    `dispatch.*`, `coord.*`, `webapps.*` and `escalation_extract` statements), then regenerate. Note the
+    byte budget is measured *after* this trim and after the UTF-8 fix: at HEAD with UTF-8 reads the body
+    is already 5109 B (under 5120), so trim further only if the re-measured number still exceeds the budget
+    — and do not raise BYTE_BUDGET, which generate-root-contract.py:405 self-tests as exactly 5120.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given the regenerated data/claude-md/AGENTS.md, when `grep -nE 'cluster-health|gitlab-workflow|release-manager|tenant-onboarding|helm-apps|ci-pipelines|service-mesh|get_app_context|escalation-matrix'
+    data/claude-md/AGENTS.md data/claude-md/CONTEXT.md` is run, then it returns zero lines.
+  - Given every agent name appearing in the regenerated router, when each is checked against `ls data/agents/`,
+    then all resolve; the same holds for every command name against `ls data/commands/` and every reference
+    name against `ls data/references/`.
+  - Given the coverage map's `escalation_extract` field (agents-md-coverage-map.md:72), when the generator
+    runs, then the file it names exists in the tree (or the field is removed).
+  - Given the trimmed coverage map, when `python data/scripts/generate-root-contract.py --check` is run
+    on Linux, macOS and Windows, then all three print the same `AGENTS.md router body = N B` value, N
+    <= 5120, and exit 0.
+  - Given `python data/scripts/generate-root-contract.py --self-test` is run, then it passes with `BYTE_BUDGET
+    == 5120` unchanged.
+  depends_on:
+  - gates-green-t-utf8-io
+  tags:
+  - F096
+  - F151
+  - router
+  - agents-md
+  - content
+  - packs
+- id: gates-green-t-referential-integrity
+  kind: task
+  title: Add a referential-integrity assertion to the generators so an unresolvable route fails the build
+  status: planned
+  parent: gates-green-e1
+  summary: Removing the phantom routes once is not a fix — the generator has no assertion preventing them
+    coming back, and the same class of defect exists on the server surface (src/index.ts tool descriptions)
+    and in the coverage map's own `escalation_extract` target. Add one check, invoked from `generate-root-contract.py
+    --check` and from a TypeScript test, that resolves every identifier a generated artifact names against
+    the discovered content sets. This is what makes gates-green-t-router-content permanent.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given a new `check_referential_integrity()` in data/scripts/generate-root-contract.py that resolves
+    every agent, command, reference and MCP tool name appearing in the rendered router and CONTEXT.md
+    against `data/agents/`, `data/commands/`, `data/references/` and the tool-name list in `tests/fixtures/tools-list.golden.json`,
+    when a deliberately broken route (e.g. `get_agent("does-not-exist")`) is added to the coverage map,
+    then `generate-root-contract.py --check` exits non-zero naming the identifier, the coverage-map statement
+    id, and the set it failed to resolve against.
+  - 'Given the coverage map''s `escalation_extract` names a path that does not exist, when `--check` runs,
+    then it fails with ''declared extract target missing: <path>''.'
+  - Given `src/mcp-contract.test.ts`, when a test asserts every quoted identifier inside every tool description
+    resolves against the discovered skill/agent/reference sets, then reverting gates-green-t-tool-example-names
+    makes that test fail.
+  - Given the clean tree, when `python data/scripts/generate-root-contract.py --check` and `npm test`
+    are run, then both exit 0.
+  depends_on:
+  - gates-green-t-router-content
+  tags:
+  - F096
+  - F110
+  - referential-integrity
+  - gates
+  - packs
+- id: gates-green-t-tool-example-names
+  kind: task
+  title: Fix the MCP tool descriptions that advertise removed skills and agents, and regenerate the frozen
+    golden fixture
+  status: planned
+  parent: gates-green-e1
+  summary: src/index.ts:407 describes get_skill's argument as `"Skill name (e.g., argocd-debug)"` and
+    src/index.ts:529 describes get_agent's as `"Agent name (e.g., argocd-ops, gitops, cluster-health)"`.
+    `ls data/skills/` returns only `handoff/` and `ls data/agents/` returns 20 milestone/roadmap/spike
+    agents; none of the four named identifiers exists. The strings are baked into `tests/fixtures/tools-list.golden.json`,
+    so `src/mcp-contract.test.ts` actively certifies the stale text — correcting it without regenerating
+    the fixture produces a failing test. Prefer deriving the examples from the first N discovered names
+    at server start so they cannot drift again.
+  priority: should
+  lane: now
+  size: S
+  acceptance:
+  - Given the change, when `grep -n 'argocd-debug\|argocd-ops\|gitops\|cluster-health' src/index.ts tests/fixtures/tools-list.golden.json`
+    is run, then it returns zero lines.
+  - 'Given the descriptions now name shipping content (get_skill: `(e.g., handoff)`; get_agent: `(e.g.,
+    milestone-implementer, roadmap-decomposer, spike-designer)`) or are derived at startup from discovered
+    names, when `npm run test:update-golden` is run and `tests/fixtures/tools-list.golden.json` is committed,
+    then `npm test` exits 0.'
+  - Given a skill or agent is later deleted from data/, when `npm test` is run, then the referential-integrity
+    assertion from gates-green-t-referential-integrity fails naming the now-unresolvable example.
+  tags:
+  - F110
+  - mcp-tools
+  - golden-fixture
+  - mcp-server
+- id: gates-green-t-packs-out-dir
+  kind: task
+  title: Give generate-adapter-packs.py an --out default inside the clone and stop it deleting files two
+    directories up
+  status: planned
+  parent: gates-green-e1
+  summary: 'data/scripts/generate-adapter-packs.py:59 sets `PLATFORM_ROOT = ROOT.parents[1]` (two directories
+    above the clone) and `_anchor()` at :528-534 sends every `PLATFORM/...` path there, so `--apply` on
+    a bare clone at ~/src/agent-kit writes `~/.opencode/`. The codex half is worse: `_resolve_workspace()`
+    at :521-527 falls back to `~/Work/workspace`, and `apply()` at :544-551 then runs `for stale in codex_agents_dir.glob(''*.toml''):
+    stale.unlink()` against whatever is there. An adopting team cannot get the packs into their own repo,
+    review them in a PR diff, or run the generator in CI.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given a bare clone with no PERSONAL_WORKSPACE_ROOT or WORKSPACE_ROOT set and no `~/Work/workspace`
+    directory, when `python data/scripts/generate-adapter-packs.py --apply` is run, then it writes only
+    under `<repo>/build/provider-packs/{codex,opencode}/`, `git status --porcelain` shows no changes outside
+    the ignored build directory, and nothing is created in `$HOME` or in `ROOT.parents[1]`.
+  - Given the `~/Work/workspace` fallback at :524 is deleted, when the workspace cannot be resolved and
+    `--install-to WORKSPACE` is requested, then the script exits non-zero with a message naming the `--workspace`
+    flag and the env var it accepts.
+  - Given files exist in the target codex agents directory, when `--apply` is run without `--prune`, then
+    no file is unlinked; when run with `--prune --dry-run`, then each file it would remove is printed
+    and none is removed.
+  - Given `python data/scripts/generate-adapter-packs.py --check` is run on a bare clone on all three
+    OSes, then it exits 0 and `tests/fixtures/adapter-packs.golden.json` is unchanged.
+  tags:
+  - F109
+  - adapter-packs
+  - safety
+  - generators
+  - packs
+- id: gates-green-t-regen-gates-green
+  kind: task
+  title: Regenerate and commit the generated artifacts on Linux so all four gates are green at HEAD
+  status: planned
+  parent: gates-green-e1
+  summary: 'The closing move of the epic: once the encoding, separator and content fixes have landed,
+    regenerate `data/facts/catalog.json`, `data/claude-md/AGENTS.md` and `data/claude-md/CONTEXT.md` on
+    Linux (never on Windows before the fixes) and commit them, then verify the four gates from a fresh
+    clone on all three OSes. Also add `npm run gates` invoking all four `--check` commands so the gate
+    set is one command rather than four README lines, and update README.md:106-112 to point at it.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given the regenerated artifacts are committed, when a fresh clone on ubuntu-latest, macos-latest and
+    windows-latest runs `npm run gates`, then it exits 0 on all three and prints one named line per gate.
+  - Given `npm run gates` fails any single gate, when it is run, then it exits non-zero and the failing
+    gate's name appears in the output (no silent short-circuit hiding later gates).
+  - Given the regenerated tree, when the generators are re-run in write mode on each OS, then `git status
+    --porcelain` is empty on each.
+  - Given README.md, when its Testing section is read, then it documents `npm run gates` as the single
+    gate entrypoint and no longer lists four commands two of which fail on a fresh clone.
+  depends_on:
+  - gates-green-t-utf8-io
+  - gates-green-t-posix-provenance
+  - gates-green-t-gitattributes
+  - gates-green-t-router-content
+  - gates-green-t-referential-integrity
+  - gates-green-t-packs-out-dir
+  tags:
+  - F119
+  - F151
+  - F163
+  - gates
+  - regeneration
+  - packs
+- id: gates-green-e2
+  kind: epic
+  title: Run every test file that exists — and delete the ones that assert nothing
+  status: planned
+  summary: '`package.json:13` names exactly three test files while `find src tests -name ''*.test.ts''`
+    returns eight: canonicalize, token-logger, aidefence, guard and artifact-memory never run, i.e. 1,150
+    lines and 52 tests, 73% of the TypeScript test code. Two of the orphans are the security suites, and
+    `src/security/aidefence.test.ts:2` and `src/security/guard.test.ts:4` both claim they run ''via `npm
+    test`'' against a glob that does not exist. `tsconfig.json:17` excludes `src/**/*.test.ts` so no test
+    file is even type-checked. Seven gate scripts (`sealed-eval-test.sh`, `pipeline-outcome-log-test.py`,
+    `milestone-pipeline-consolidate-memory-test.sh`, `skill-ref-check.py`, `artifact-memory-eval-manifest-check.py`,
+    `tests/check-skill-prompts.sh`, `tests/hooks/block-plaintext-secret-write.test.sh`) are referenced
+    by no runner. And two suites are green-by-absence: `test_f10_mirror.py` skips unless a former employer''s
+    directory layout exists, and the hook suite `exit 0`s when jq is missing. Meanwhile `data/scripts/`
+    holds 33,891 lines of executable code — including a single 13,244-line file — verified only by its
+    own `--self-test`. Outcome: one command runs everything that exists, nothing reports success without
+    asserting, and data/scripts gains a real external test root.'
+  priority: should
+  lane: now
+  size: L
+  acceptance:
+  - Given a clean clone on each OS, when `npm test` is run, then all 8 files matching `src/**/*.test.ts`
+    are loaded and 0 tests fail; a tripwire test asserts loaded-file count == glob count.
+  - Given `grep -rn 'exit 0' tests/hooks/block-plaintext-secret-write.test.sh` and the substrate suite's
+    skip reasons, when the suite runs, then no test path reports success without executing an assertion,
+    and every skip carries a machine-readable reason string.
+  - Given `PYTHONPATH=$PWD/data/scripts python -m unittest discover -s data/scripts/tests -p 'test_*.py'
+    -t data/scripts/tests` is run, then it discovers and passes a non-empty suite (today the directory
+    does not exist).
+  tags:
+  - F015
+  - F087
+  - F117
+  - F149
+  - F160
+  - F165
+  - F115
+  - tests
+  - test-discovery
+  - ci
+- id: gates-green-t-test-glob
+  kind: task
+  title: Make npm test glob every src/**/*.test.ts and platform-split the artifact-memory socket cases
+  status: planned
+  parent: gates-green-e2
+  summary: 'Change `package.json:13` from the three-file list to `node --import tsx --test ''src/**/*.test.ts''`.
+    The reason it was never done is `src/tools/artifact-memory.test.ts`: its `socketFixture` at :42 binds
+    an AF_UNIX path and fails EACCES on Windows — measured 12/12 red. Split the socket-bound cases behind
+    a `process.platform === ''win32''` skip carrying an explicit reason string (or a separate `test:unix`
+    script), rather than hiding the whole file by omission. Also fix the two headers at src/security/aidefence.test.ts:2
+    and src/security/guard.test.ts:3-4 that assert a glob which did not exist, and add a tripwire test
+    that globs `src/**/*.test.ts` and asserts each file was loaded so a future file cannot be silently
+    orphaned.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given package.json's `test` script, when `npm test` is run on Linux and macOS, then 8 test files execute
+    and 0 tests fail.
+  - Given `npm test` is run on Windows 11, then 8 test files execute, 0 tests fail, and each skipped artifact-memory
+    case prints a reason containing 'PLATFORM:win32' (today the file is not run at all, and running it
+    directly gives 12 fail / 0 pass).
+  - Given a new `src/foo/bar.test.ts` is added and not otherwise referenced, when `npm test` is run, then
+    the tripwire test passes because the glob picked it up; when the glob is reverted to an explicit file
+    list, then the tripwire test fails.
+  - Given `grep -n 'Run via' src/security/aidefence.test.ts src/security/guard.test.ts` is run, then the
+    headers describe the actual runner.
+  - Given `npm run test:update-golden` is run, then it still targets only `src/mcp-contract.test.ts`.
+  depends_on:
+  - starts-everywhere-e2
+  tags:
+  - F015
+  - F117
+  - F149
+  - F087
+  - npm-test
+  - test-glob
+  - ci
+- id: gates-green-t-typecheck-tests
+  kind: task
+  title: Type-check the test files that npm run build has never compiled
+  status: planned
+  parent: gates-green-e2
+  summary: '`tsconfig.json:17` lists `src/**/*.test.ts` in `exclude`, so `npm run build` type-checks no
+    test file and the 1,150 lines of orphaned test code could rot without a compile error. Add `tsconfig.test.json`
+    extending the base without that exclusion, plus a `typecheck` npm script running `tsc --noEmit -p
+    tsconfig.test.json`. Scope note: tightening `tsconfig.json` compiler options (noUncheckedIndexedAccess,
+    exactOptionalPropertyTypes, noUnusedLocals) and adding eslint/prettier belongs to M3''s lint/type
+    gate epic — this task only makes the existing strictness apply to test files.'
+  priority: should
+  lane: now
+  size: S
+  acceptance:
+  - Given `tsconfig.test.json` exists and extends `tsconfig.json` without the `src/**/*.test.ts` exclusion,
+    when `npm run typecheck` is run on a clean tree, then it exits 0.
+  - Given a deliberate type error is introduced into `src/security/guard.test.ts`, when `npm run typecheck`
+    is run, then it exits non-zero naming that file and line.
+  - Given `npm run build` is run, then `dist/` still contains no compiled test files.
+  depends_on:
+  - gates-green-t-test-glob
+  tags:
+  - F117
+  - F149
+  - typescript
+  - typecheck
+  - ci
+- id: gates-green-t-npm-gate-entrypoints
+  kind: task
+  title: Give the seven orphan gate scripts npm entrypoints and one test:all chain
+  status: planned
+  parent: gates-green-e2
+  summary: '`data/scripts/sealed-eval-test.sh`, `data/scripts/pipeline-outcome-log-test.py`, `data/scripts/milestone-pipeline-consolidate-memory-test.sh`,
+    `data/scripts/skill-ref-check.py`, `data/scripts/artifact-memory-eval-manifest-check.py`, `tests/check-skill-prompts.sh`
+    and `tests/hooks/block-plaintext-secret-write.test.sh` are invoked by no runner, no npm script and
+    no documentation (the last is named only inside `data/scripts/secret-scan-allowlist.json:3` as a scan
+    exemption). Add `test:unit`, `test:gates`, `test:eval` and `test:all` npm scripts. `test:gates` delegates
+    the `--self-test` enumeration to the committed runner from gates-green-t-gate-runner so the two lists
+    cannot diverge. Update README.md''s Testing section to name `npm run test:all` as the single entrypoint.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given package.json, when `npm run test:all` is executed on Linux, then it runs the 8 TypeScript suites,
+    the four generator `--check` gates, the committed gate runner, the four shell harnesses and the workspace-tooling
+    unittest discovery, and exits non-zero if any component fails.
+  - Given any one of the seven previously-orphaned scripts is made to fail deliberately, when `npm run
+    test:all` is run, then it exits non-zero and the failing script's path appears in the output.
+  - Given `grep -rn 'sealed-eval-test.sh\|check-skill-prompts.sh\|skill-ref-check.py\|artifact-memory-eval-manifest-check.py'
+    package.json data/scripts/run-all-gates.sh` is run, then every one of the seven scripts is reachable
+    from a committed entrypoint.
+  - Given README.md's Testing section, when it is read, then it documents `npm run test:all` and no command
+    it lists fails on a fresh clone.
+  depends_on:
+  - gates-green-t-test-glob
+  - gates-green-t-gate-runner
+  tags:
+  - F087
+  - F154
+  - npm-scripts
+  - gates
+  - ci
+- id: gates-green-t-skip-to-green
+  kind: task
+  title: Eliminate skip-to-green tests and put a budget on the remaining skips
+  status: planned
+  parent: gates-green-e2
+  summary: '`workspace-tooling/tests/test_f10_mirror.py:29-39` builds its paths from `Path.home() / ''Work''
+    / ''workspace'' / ''GitLab'' / ''SWAT DevOps - SDO'' / ...` and skips whenever that layout is absent
+    — i.e. on every machine but the original owner''s — so its two real assertions never execute for anyone
+    while its two guard-logic tests always pass, producing a green module with zero signal and leaking
+    a former employer''s directory name into a public MIT repo. `tests/hooks/block-plaintext-secret-write.test.sh:11`
+    does `command -v jq … || { echo SKIP; exit 0; }`, so a runner without jq reports success on an unrun
+    security-hook suite. Six substrate modules use prose skip reasons that no automation can budget against.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given `git rm workspace-tooling/tests/test_f10_mirror.py`, when `grep -rn 'SWAT DevOps' workspace-tooling/tests/`
+    is run, then it returns zero lines, and the substrate suite still runs with one fewer module and no
+    import error.
+  - Given jq is not on PATH, when `bash tests/hooks/block-plaintext-secret-write.test.sh` is run, then
+    it exits 1 with a message stating jq is required (today it prints SKIP and exits 0).
+  - Given every remaining `skipUnless`/`skipIf` in workspace-tooling/tests, when the suite runs, then
+    each skip reason matches the machine-readable form `PLATFORM:<name>` or `REQUIRES:<binary>`.
+  - Given a committed `workspace-tooling/tests/EXPECTED_SKIPS.txt` recording the allowed skip count per
+    platform, when a check step parses the unittest skip count and compares it, then adding a new unconditional
+    skip makes that step exit non-zero.
+  tags:
+  - F160
+  - skip-to-green
+  - test-hygiene
+  - ci
+- id: gates-green-t-data-scripts-tests
+  kind: task
+  title: Create a real unittest discovery root for data/scripts and seed it with external tests
+  status: planned
+  parent: gates-green-e2
+  summary: The 593-test Python suite is discovered exclusively from `workspace-tooling/tests` (README.md:104).
+    Grepping every file under `workspace-tooling/tests/` and `tests/` for 'data/scripts' returns exactly
+    one hit — a string inside `tests/fixtures/adapter-packs.golden.json`. So none of the 38 tracked Python
+    modules in data/scripts (the provider-pack compilers, the milestone and spike pipelines, model policy,
+    secret scanning, goal-F outcome capture) is exercised by any external suite; their only verification
+    is each module's own `--self-test`, where the same file defines and asserts the expected behaviour.
+    Create `data/scripts/tests/` (no `__init__.py`, matching the existing convention), relocate the two
+    orphaned harnesses into it, and seed external tests covering what a self-test structurally cannot.
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given `data/scripts/pipeline-outcome-log-test.py` and `data/scripts/agent-memory-consolidate-test.py`
+    are relocated to `data/scripts/tests/test_pipeline_outcome_log.py` and `test_agent_memory_consolidate.py`,
+    when `PYTHONPATH=$PWD/data/scripts python -m unittest discover -s data/scripts/tests -p 'test_*.py'
+    -t data/scripts/tests` is run, then it discovers both modules and exits 0.
+  - Given new external tests for the four gate generators, when the suite runs on Windows and Linux, then
+    it asserts (a) `catalog.json` renders byte-identically with `os.sep` monkeypatched to a backslash,
+    (b) each generator exits non-zero with a named diagnostic when `data/facts/` or `data/schemas/` is
+    absent rather than raising a bare KeyError or FileNotFoundError, and (c) a non-ASCII skill description
+    round-trips through catalog -> pack -> router unchanged.
+  - Given `agent-memory-consolidate-test.py` previously failed on Windows because it passed OS-native
+    paths to bash, when the relocated test runs on Windows, then it either passes or skips with reason
+    `PLATFORM:posix`.
+  - Given README.md's Testing section, when it is read, then it documents the second discovery root next
+    to the workspace-tooling discover line.
+  depends_on:
+  - gates-green-t-utf8-io
+  - gates-green-t-posix-provenance
+  tags:
+  - F165
+  - F115
+  - data-scripts
+  - unittest
+  - test-root
+  - ci
+- id: gates-green-t-artifacts-selftest-extract
+  kind: task
+  title: Extract milestone-pipeline-artifacts.py's 2,621-line self_test() into real unittest cases
+  status: planned
+  parent: gates-green-e2
+  summary: '`data/scripts/milestone-pipeline-artifacts.py` is a single 13,244-line / 702 KB module whose
+    entire test suite is one 2,621-line `self_test()` function, alongside a 782-line `validate_operations_evidence()`,
+    a 441-line `_validate_review_receipt()` and a 423-line `_project_probe_fact()`. Splitting the module
+    is XL and gated on gates-green-spike-1; extracting its self_test into `data/scripts/tests/test_milestone_pipeline_artifacts.py`
+    is independently valuable and is the prerequisite that makes any later split safe — it converts self-confirming
+    assertions into external ones with per-case names and failure attribution.'
+  priority: should
+  lane: next
+  size: L
+  acceptance:
+  - Given the extraction, when `PYTHONPATH=$PWD/data/scripts python -m unittest data.scripts.tests.test_milestone_pipeline_artifacts
+    -v` is run (or the discover invocation), then every assertion previously inside `self_test()` executes
+    as a separately named test case and the pass count is >= the number of `ok(...)` calls in the original
+    function.
+  - Given a deliberate regression in `validate_operations_evidence()`, when the extracted suite runs,
+    then it fails naming the specific case rather than aborting the whole self_test run.
+  - Given `python data/scripts/milestone-pipeline-artifacts.py --self-test` is still invoked by the committed
+    gate runner, when it runs, then it either delegates to the extracted suite or exits 0 having asserted
+    the same set — with no assertion existing in only one of the two places.
+  - Given the change, when `wc -l data/scripts/milestone-pipeline-artifacts.py` is run, then the module
+    is at least 2,000 lines smaller than at HEAD.
+  depends_on:
+  - gates-green-t-data-scripts-tests
+  tags:
+  - F115
+  - F165
+  - milestone-pipeline
+  - test-extraction
+  - ci
+- id: gates-green-spike-1
+  kind: spike
+  title: 'Time-boxed: determine the module seams for splitting milestone-pipeline-artifacts.py'
+  status: planned
+  parent: gates-green-e2
+  summary: A 13,244-line module cannot be split blind, and the recommended target (`milestone_pipeline/{artifacts,validators,gates,attempts,waivers}.py`)
+    is an assertion nobody has tested against the real import graph and shared state. Time-box an investigation
+    that produces a seam inventory — call graph, module-level mutable state, cross-function coupling,
+    and which of the four named giant functions can move first — plus a go/no-go with a concrete first
+    slice. This exists so the owner can decide whether the split is worth doing at all rather than discovering
+    mid-refactor that it is not decomposable.
+  priority: could
+  lane: next
+  size: S
+  acceptance:
+  - 'Given a 1-day time box, when the spike completes, then it produces `docs/spikes/milestone-pipeline-artifacts-split.md`
+    containing: the function-level call graph, every module-level mutable global and its writers, a proposed
+    module boundary with the line count landing in each, and the count of cross-boundary references each
+    boundary would create.'
+  - Given the document, when it is read, then it states an explicit GO or NO-GO with the first slice named
+    as a single reviewable change of under 1,500 moved lines, or states why no such slice exists.
+  - Given the spike, when it ends, then no production module has been modified (`git status --porcelain
+    data/scripts/milestone-pipeline-artifacts.py` is empty).
+  depends_on:
+  - gates-green-t-artifacts-selftest-extract
+  tags:
+  - F115
+  - spike
+  - refactor
+  - milestone-pipeline
+  - ci
+- id: gates-green-e3
+  kind: epic
+  title: Repair the broken data and eval gates
+  status: planned
+  summary: 'Three gates are broken in ways that have nothing to do with platform. (1) `sealed-eval.py
+    verify` on the committed corpus prints MISMATCH (sealed=3dac0bb… actual=310723cb…) and exits 1 — the
+    working tree is clean and the git blob at HEAD hashes to the same 310723cb…, so the repo''s single
+    commit ships a corpus that fails its own seal, and `sealed-eval-test.sh` fails case T3 out of the
+    box. A seal that is already broken at HEAD trains every reader to ignore MISMATCH, which is exactly
+    what the seal exists to prevent. (2) `data/schemas/` does not exist at all — `milestone-pipeline-schema-check.py
+    --self-test` dies with `KeyError: ''milestone-trust-policy-v2.schema.json''` and `milestone-pipeline-migrate.py
+    --self-test` with `MigrationError: cannot load bundled v2 state schema`. (3) 25 `--self-test` entrypoints
+    and 4 shell harnesses are invoked by nothing; 12 of them already fail. Outcome: the seal is honest,
+    the schema question is answered explicitly, and one committed runner tells the truth about every gate.'
+  priority: should
+  lane: now
+  size: M
+  acceptance:
+  - Given a clean clone on any OS, when `bash data/scripts/sealed-eval-test.sh` is run, then it exits
+    0 with case T3 `clean-match` passing.
+  - Given a clean clone, when the committed gate runner is executed, then it reports a verdict for all
+    25 `data/scripts/*.py --self-test` entrypoints plus `workspace-tooling/lock_check.py` and the 4 shell
+    harnesses, and exits 0 with zero unexplained failures.
+  - Given `python data/scripts/milestone-pipeline-schema-check.py --self-test` and `python data/scripts/milestone-pipeline-migrate.py
+    --self-test` are run, then each either exits 0 or the script no longer exists in the tree — neither
+    raises a bare KeyError or MigrationError.
+  tags:
+  - F075
+  - F152
+  - F164
+  - F089
+  - F154
+  - eval
+  - seals
+  - gate-runner
+  - evals
+- id: gates-green-t-reseal-corpus
+  kind: task
+  title: Re-seal sealed-eval-v0-corpus.jsonl, recording the invalidation in provenance rather than silently
+    overwriting
+  status: planned
+  parent: gates-green-e3
+  summary: '`data/scripts/sealed-eval-v0-manifest.json:6` declares `corpus_sha256: 3dac0bbfcba8…` while
+    the 4,313-byte corpus (zero CRLF, git blob identical) hashes to `310723cb0333…`. Corpus mtime 2026-07-23
+    postdates manifest mtime 2026-07-20: the corpus was edited during the genericization fork and never
+    re-sealed — the same pass left the mangled phrase ''any the dispatcher service ConflictBench store''
+    at sealed-eval.py:19-20. Re-seal, but do not silently overwrite the v0 seal: bump `seal_version` and
+    record in `provenance` that v0 was invalidated by the genericization fork, so the tamper-evidence
+    record stays honest.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - Given `python data/scripts/sealed-eval.py seal --corpus data/scripts/sealed-eval-v0-corpus.jsonl --manifest
+    data/scripts/sealed-eval-v0-manifest.json` has been run and committed, when `python data/scripts/sealed-eval.py
+    verify data/scripts/sealed-eval-v0-manifest.json --corpus data/scripts/sealed-eval-v0-corpus.jsonl`
+    is run, then it exits 0 and prints no MISMATCH.
+  - Given the updated manifest, when it is read, then `seal_version` is bumped, `seal_date` is updated,
+    and `provenance` contains an explicit statement that the v0 seal was invalidated by the genericization
+    fork (the prior digest 3dac0bb… is retained in the record, not deleted).
+  - Given `bash data/scripts/sealed-eval-test.sh` is run on Linux, macOS and Windows, then all 8 cases
+    pass including T3 `clean-match` and the script exits 0.
+  - Given `grep -n 'any the dispatcher service ConflictBench store' data/scripts/sealed-eval.py` is run,
+    then it returns zero lines and the surrounding docstring at :19-22 reads as coherent English.
+  depends_on:
+  - gates-green-t-gitattributes
+  tags:
+  - F075
+  - F152
+  - sealed-eval
+  - tamper-evidence
+  - evals
+- id: gates-green-t-sealed-eval-cwd
+  kind: task
+  title: Resolve sealed-eval's corpus path against the manifest, not the current working directory
+  status: planned
+  parent: gates-green-e3
+  summary: '`cmd_metric` resolves the default manifest via `_repo_root()` (sealed-eval.py:88-92, 271-273)
+    but then reads the manifest''s `corpus_path` field verbatim — `bp = Path(json.loads(bp.read_text())[''corpus_path''])`
+    at :207-209 — and that field holds the repo-relative string `data/scripts/sealed-eval-v0-corpus.jsonl`
+    (manifest:5). From any other working directory the baseline read fails with a raw traceback ending
+    in `FileNotFoundError: [Errno 2] ... ''data\\scripts\\sealed-eval-v0-corpus.jsonl''`, not the harness''s
+    own diagnostic. Every other path in the script is CWD-independent, so this is an inconsistency rather
+    than a design choice — and the harness is invoked from runbooks and (from M3) from CI, where CWD is
+    rarely the repo root.'
+  priority: should
+  lane: now
+  size: S
+  acceptance:
+  - Given `_compute_metric` resolves the manifest-derived corpus path as `(manifest_path.parent / manifest['corpus_path']).resolve()`
+    with a `_repo_root()` fallback, when `python <abs-path>/data/scripts/sealed-eval.py metric --corpus
+    ./corpus.jsonl` is run from a scratch directory that is not the repo root, then it completes without
+    a traceback.
+  - 'Given the baseline corpus is deliberately renamed, when `metric` is run, then it prints `metric:
+    BASELINE CORPUS NOT FOUND at <path>` and exits 1 (matching the existing missing-corpus branch at :262-265),
+    with no Python traceback in the output.'
+  - Given a new case is added to `data/scripts/sealed-eval-test.sh` that runs `metric` from a temp directory,
+    when `bash data/scripts/sealed-eval-test.sh` is run, then that case passes and the script exits 0.
+  depends_on:
+  - gates-green-t-reseal-corpus
+  tags:
+  - F089
+  - sealed-eval
+  - cwd-independence
+  - evals
+- id: gates-green-t-self-improvement-refs
+  kind: task
+  title: Remove or satisfy the seven references to a corpus and plan file that do not exist
+  status: planned
+  parent: gates-green-e3
+  summary: '`data/references/self-improvement-operations.md` instructs the operator to seed from `data/scripts/sealed-eval-v1-corpus.jsonl`
+    and to write results to `plans/self-improving-tooling-m3-baseline.md`; neither exists in the tree.
+    The references appear at lines 34, 58, 60, 68, 94, 126 and 134, and lines 115-129 describe the whole
+    measurement chain as depending on them. Default to stripping them (the artefacts are pre-fork residue
+    and the M6 milestone owns building a real corpus); commit them only if they can actually be produced
+    now.'
+  priority: should
+  lane: now
+  size: S
+  acceptance:
+  - Given the change, when `grep -n 'sealed-eval-v1-corpus\|self-improving-tooling-m3-baseline' data/references/self-improvement-operations.md`
+    is run, then it returns zero lines, or every path it returns exists in the tree.
+  - Given a link-check over `data/references/self-improvement-operations.md`, when every repo-relative
+    path it names is resolved, then all resolve.
+  - Given the runbook after the edit, when it is followed end to end on a clean clone, then every command
+    it prescribes exits 0.
+  depends_on:
+  - gates-green-t-reseal-corpus
+  tags:
+  - F152
+  - docs
+  - dead-references
+- id: gates-green-t-data-schemas
+  kind: task
+  title: '[OWNER DECISION] Commit data/schemas/ or delete the two gate scripts that require it'
+  status: planned
+  parent: gates-green-e3
+  summary: '`data/scripts/milestone-pipeline-schema-check.py:23` resolves `SCHEMA_DIR = Path(__file__).resolve().parents[1]
+    / ''schemas''`, globs `milestone-*.schema.json` at :138, and does named lookups at :26, :29, :127,
+    :213 and :336. `ls data/schemas/` returns ''No such file or directory''; `find . -name ''*.schema.json''
+    -not -path ''./node_modules/*''` returns exactly one file, `workspace-tooling/schemas/portfolio-index.schema.json`.
+    The schema set was not carried over by the genericization fork. This is a genuine scope decision the
+    owner must make: is the milestone pipeline part of the public kit? If yes, commit `milestone-pipeline-state-v2.schema.json`
+    and `milestone-trust-policy-v2.schema.json` (the expected shapes are described inline at :213 and
+    :336). If no, delete both scripts and their references. Either way, SCHEMA_DIR absence must raise
+    a clear diagnostic rather than a bare KeyError.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given the owner's decision is recorded in the issue, when either branch is implemented, then `python
+    data/scripts/milestone-pipeline-schema-check.py --self-test` and `python data/scripts/milestone-pipeline-migrate.py
+    --self-test` each exit 0, or neither script exists in the tree.
+  - Given branch (a), when `ls data/schemas/` is run, then it lists `milestone-pipeline-state-v2.schema.json`
+    and `milestone-trust-policy-v2.schema.json`, and both validate as JSON Schema Draft 2020-12.
+  - Given branch (b), when `grep -rn 'milestone-pipeline-schema-check\|milestone-pipeline-migrate' data/
+    README.md` is run, then it returns zero lines.
+  - Given `data/schemas/` is deliberately renamed away, when `milestone-pipeline-schema-check.py --self-test`
+    is run, then it exits non-zero printing 'data/schemas/ is missing — the schema set was not included
+    in this checkout' rather than `KeyError` or `MigrationError`.
+  tags:
+  - F164
+  - schemas
+  - milestone-pipeline
+  - scope-decision
+  - evals
+- id: gates-green-t-gate-runner
+  kind: task
+  title: Commit one runner that enumerates every --self-test entrypoint and shell harness and reports
+    a verdict for each
+  status: planned
+  parent: gates-green-e3
+  summary: '`grep -l -- ''--self-test'' data/scripts/*.py workspace-tooling/*.py` returns 26 entrypoints
+    (25 under data/scripts plus workspace-tooling/lock_check.py). Adding the four shell harnesses — `data/scripts/sealed-eval-test.sh`,
+    `data/scripts/milestone-pipeline-consolidate-memory-test.sh`, `tests/check-skill-prompts.sh`, `tests/hooks/block-plaintext-secret-write.test.sh`
+    — gives 30 executable gates that no script, document or automation invokes. Commit `data/scripts/run-all-gates.sh`
+    (plus a `.ps1` or Python equivalent so it is runnable without bash) that discovers the entrypoints
+    by grep rather than hardcoding them, so the list cannot drift, and drives them against a committed
+    expected-status file with a named owner for each quarantined entry.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given a clean clone, when the committed runner is executed, then it prints one line per entrypoint
+    of the form `<path> <PASS|SKIP|QUARANTINED|FAIL>` covering all 26 `--self-test` entrypoints and the
+    4 shell harnesses, and its discovered count matches `grep -l -- '--self-test' data/scripts/*.py workspace-tooling/*.py
+    | wc -l` plus 4.
+  - Given a new script with a `--self-test` flag is added to data/scripts, when the runner is executed,
+    then it appears in the output without any edit to the runner.
+  - 'Given a committed `data/scripts/gates-expected.json` mapping each entrypoint to `expected: pass|quarantined`
+    with an `owner` and `reason` for every quarantined entry, when the runner is executed, then it exits
+    0 only if every `expected: pass` entry passed and no `quarantined` entry unexpectedly passed.'
+  - Given an entrypoint marked `quarantined` with no `owner` field, when the runner is executed, then
+    it exits non-zero refusing the entry.
+  tags:
+  - F154
+  - gate-runner
+  - self-test
+  - enumeration
+  - ci
+- id: gates-green-t-fix-red-gates
+  kind: task
+  title: Fix or explicitly quarantine the twelve gate entrypoints that already fail
+  status: planned
+  parent: gates-green-e3
+  summary: 'Twelve of the enumerated entrypoints are already red and nothing knows. Fix them in the priority
+    order the evidence dictates: (1) `pipeline-outcome-log-test.py` — 2 concurrency failures losing 15-18%
+    of goal-F''s outcome records, fixed by gates-green-t-outcome-log-lock; (2) the eight `--self-test`
+    suites that crash on `import fcntl`, fixed by gates-green-t-fcntl-datascripts; (3) `milestone-pipeline-schema-check.py`
+    and `milestone-pipeline-migrate.py`, fixed by gates-green-t-data-schemas; (4) `agent-memory-consolidate-test.py`,
+    which needs POSIX-style paths passed to bash or an explicit `skipUnless(os.name == ''posix'')`. This
+    task is the closing verification that the runner reports zero unexplained failures.'
+  priority: must
+  lane: now
+  size: M
+  acceptance:
+  - Given a clean clone on Linux, macOS and Windows, when the committed gate runner is executed, then
+    it exits 0 on all three and its output contains zero `FAIL` lines.
+  - 'Given `data/scripts/gates-expected.json`, when it is read after this task, then the number of entries
+    with `expected: quarantined` is at most 2 and each carries an owner and a linked follow-up issue id.'
+  - 'Given `python data/scripts/pipeline-outcome-log-test.py` is run on Windows, then it reports 0 failures
+    out of 17 tests (today: 2 failures, `AssertionError: 817 != 1000` and `371 != 400`).'
+  - Given `python data/scripts/agent-memory-consolidate-test.py` is run on Windows, then it passes or
+    skips with reason `PLATFORM:posix` — it does not error.
+  depends_on:
+  - gates-green-t-gate-runner
+  - gates-green-t-data-schemas
+  - gates-green-t-outcome-log-lock
+  - gates-green-t-fcntl-datascripts
+  tags:
+  - F154
+  - F076
+  - gate-runner
+  - red-gates
+  - ci
+- id: gates-green-e4
+  kind: epic
+  title: Make the Python substrate importable off macOS, with a supported WSL path
+  status: planned
+  summary: '`python -m unittest discover -s workspace-tooling/tests -p ''test_*.py'' -t workspace-tooling/tests`
+    — the command README.md:104-105 calls THE substrate suite ''(~590 tests)'' — collects only 260 tests
+    on Windows and reports `FAILED (failures=9, errors=163, skipped=3)`. Static count of `def test_` is
+    593, so 333 tests (56%) never collect. Fourteen of 37 test modules fail at import. Two unconditional
+    POSIX dependencies cause nearly all of it: bare `import fcntl` at artifact_ingestion.py:22, artifact_memory_service.py:18
+    and artifact_quarantine.py:17 (plus seven more sites across the data/scripts milestone-pipeline and
+    roadmap toolchain — ten modules total), and `os.geteuid()` at 15 call sites across artifact_security.py,
+    artifact_runtime.py, artifact_event_consumer.py, artifact_memory_service.py and artifact_retrieval.py.
+    The same fcntl gap makes `pipeline-outcome-log.py` silently drop 15-18% of records on Windows — goal
+    F''s foundational capture layer, biased in an undetectable direction. Outcome: one shared `platform_compat`
+    shim, a suite that collects everywhere and declares what it skips, and a documented WSL2 path that
+    gives Windows users a working resident service months before the native transport port in M5.'
+  priority: must
+  lane: next
+  size: XL
+  acceptance:
+  - Given a clean clone on Windows 11, when `python -m unittest discover -s workspace-tooling/tests -p
+    'test_*.py' -t workspace-tooling/tests` is run, then it collects the full suite with 0 import errors
+    (today 260 collected, 14 modules fail at import) and every skip carries a machine-readable reason.
+  - Given `grep -rn '^import fcntl' data/scripts/*.py workspace-tooling/*.py` is run, then it returns
+    zero lines outside `workspace-tooling/platform_compat.py`.
+  - Given `grep -rn 'os.geteuid()' data/scripts/*.py workspace-tooling/*.py` is run, then it returns zero
+    lines outside `workspace-tooling/platform_compat.py`.
+  - Given a Windows host with WSL2 installed, when the documented setup script and its smoke script are
+    run, then the smoke script round-trips one memory query end to end and exits 0.
+  tags:
+  - F002
+  - F076
+  - F108
+  - F150
+  - X026
+  - portability
+  - fcntl
+  - geteuid
+  - wsl
+- id: gates-green-t-platform-compat
+  kind: task
+  title: Add workspace-tooling/platform_compat.py with current_uid, exclusive_file_lock and supports_posix_privacy
+  status: planned
+  parent: gates-green-e4
+  summary: One shim, importable from both the workspace-tooling and data/scripts trees, is the prerequisite
+    for every other task in this epic. It must expose `current_uid()` (os.geteuid on POSIX; a stable per-user
+    identity on Windows — the SID string or a documented sentinel), `exclusive_file_lock(fd)` / `unlock(fd)`
+    (fcntl.flock on POSIX, msvcrt.locking on Windows, with bounded retry), and `supports_posix_privacy()`
+    so callers can branch on whether mode-bit and uid ownership checks are meaningful. Build it with tests
+    before touching any call site — the shim is the thing every subsequent change depends on being correct.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given `workspace-tooling/platform_compat.py` exists, when `python -c "import platform_compat as p;
+    print(p.current_uid(), p.supports_posix_privacy())"` is run with the module on PYTHONPATH, then it
+    prints a value without raising on Windows, Linux and macOS.
+  - 'Given `workspace-tooling/tests/test_platform_compat.py`, when the substrate suite runs on each OS,
+    then it asserts: two processes contending on `exclusive_file_lock` over the same file serialise (no
+    interleaved writes over 500 iterations); the lock is released on context exit and on exception; `current_uid()`
+    is stable across calls within a process; and `supports_posix_privacy()` returns False on win32 and
+    True elsewhere.'
+  - Given the module, when `grep -n 'import fcntl\|import msvcrt' workspace-tooling/platform_compat.py`
+    is run, then both imports are guarded by a platform branch and neither is at unconditional module
+    scope in a way that raises on the other platform.
+  tags:
+  - F002
+  - F150
+  - platform-compat
+  - shim
+  - portability
+- id: gates-green-t-fcntl-substrate
+  kind: task
+  title: Route the three substrate fcntl imports and the resource import through the shim
+  status: planned
+  parent: gates-green-e4
+  summary: '`import fcntl` sits at module scope in `workspace-tooling/artifact_ingestion.py:22`, `artifact_memory_service.py:18`
+    and `artifact_quarantine.py:17`, so those three modules and everything importing them (`artifact_memory.py`,
+    `graphiti_pilot.py`) raise ModuleNotFoundError at import on Windows — that is 40 of the 163 errors
+    and the reason ten test modules never collect. `workspace-tooling/artifact_memory_service.py:23` additionally
+    does an unconditional `import resource`, which is also POSIX-only.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given the change, when `python -c "import artifact_ingestion, artifact_memory_service, artifact_quarantine,
+    artifact_memory, graphiti_pilot"` is run on Windows with workspace-tooling on PYTHONPATH, then it
+    exits 0 with no ModuleNotFoundError.
+  - Given `import resource` at artifact_memory_service.py:23, when the module is imported on Windows,
+    then the import is guarded (`sys.platform != 'win32'`) and any code path using it either has a Windows
+    equivalent or raises a named, documented error rather than NameError.
+  - Given the substrate suite on Windows, when `python -m unittest discover -s workspace-tooling/tests
+    -p 'test_*.py' -t workspace-tooling/tests` is run, then test_artifact_ingestion, test_artifact_memory_service,
+    test_artifact_quarantine, test_artifact_memory and test_graphiti_pilot all collect (today all five
+    fail at import).
+  - Given the locking semantics on POSIX are unchanged, when the suite is run on macOS and Linux, then
+    the pass count is not lower than at HEAD.
+  depends_on:
+  - gates-green-t-platform-compat
+  tags:
+  - F002
+  - F108
+  - F150
+  - fcntl
+  - substrate
+  - imports
+- id: gates-green-t-fcntl-datascripts
+  kind: task
+  title: Route the seven data/scripts fcntl sites through the shim so the pipeline toolchain imports on
+    Windows
+  status: planned
+  parent: gates-green-e4
+  summary: 'The finding that named three modules undercounted: `grep -rn ''import fcntl'' data/scripts/*.py`
+    returns `milestone-pipeline-artifacts.py:41`, `milestone-pipeline-checkpoint.py:22`, `milestone-pipeline-findings.py:82`,
+    `pipeline-outcome-log.py:315`, `roadmap-milestones-merge.py:38`, `roadmap-milestones-status.py:43`
+    and `spike-checkpoint.py:54` — i.e. the entire milestone-pipeline and roadmap toolchain, which is
+    goal F''s outcome-capture layer, is equally POSIX-locked. These are eight of the twelve already-red
+    gate entrypoints. data/scripts must import the same shim as workspace-tooling (one helper, not two
+    copies) — resolve the import path explicitly rather than by relative-path guessing.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given the change, when `grep -rn 'import fcntl' data/scripts/*.py` is run, then it returns zero lines.
+  - Given Windows, when each of `milestone-pipeline-artifacts.py`, `milestone-pipeline-checkpoint.py`,
+    `milestone-pipeline-findings.py`, `roadmap-milestones-merge.py`, `roadmap-milestones-status.py` and
+    `spike-checkpoint.py` is invoked with `--self-test`, then each exits 0 (today each crashes at import).
+  - Given both trees import the same shim, when `grep -rn 'def exclusive_file_lock' data/scripts/ workspace-tooling/`
+    is run, then exactly one definition exists.
+  - Given the locking behaviour on POSIX, when the six self-tests are run on Linux, then each exits 0
+    and the pass counts match HEAD.
+  depends_on:
+  - gates-green-t-platform-compat
+  tags:
+  - F150
+  - F002
+  - F154
+  - fcntl
+  - data-scripts
+  - pipeline
+  - portability
+- id: gates-green-t-geteuid
+  kind: task
+  title: Replace the fifteen os.geteuid() call sites with the shim's current_uid()
+  status: planned
+  parent: gates-green-e4
+  summary: '`os.geteuid` does not exist on Windows and is called at `artifact_security.py:45, :47, :73,
+    :157, :362, :364`, `artifact_runtime.py:128, :130`, `artifact_event_consumer.py:938, :968, :1048,
+    :2478`, `artifact_memory_service.py:1626, :1719` and `artifact_retrieval.py:233` — 44 of the 163 Windows
+    errors are `AttributeError: module ''os'' has no attribute ''geteuid''`. Each site is an ownership
+    check comparing `st_uid` against the current user; on Windows `st_uid` is not meaningful, so the sites
+    must branch on `supports_posix_privacy()` and either apply a Windows-appropriate check or record an
+    explicit, logged degradation — never silently pass. Note: the full Windows ACL privacy backend is
+    out of scope here (that is F003, a later milestone); this task only makes the modules importable and
+    the checks honest.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given the change, when `grep -rn 'os.geteuid()' workspace-tooling/*.py data/scripts/*.py` is run,
+    then it returns zero lines outside platform_compat.py.
+  - 'Given Windows, when the substrate suite is run, then zero errors of the form `AttributeError: module
+    ''os'' has no attribute ''geteuid''` appear (today 44).'
+  - Given a POSIX host, when the ownership checks in artifact_security.py and artifact_runtime.py are
+    exercised against a file owned by another uid, then they still fail closed exactly as at HEAD (a regression
+    test asserts the raised message).
+  - Given Windows, when an ownership check runs where no equivalent enforcement exists, then it emits
+    a single structured warning naming the check and the reason it is degraded, and the degradation is
+    asserted by a test rather than being silent.
+  depends_on:
+  - gates-green-t-platform-compat
+  tags:
+  - F002
+  - F108
+  - geteuid
+  - ownership
+  - substrate
+- id: gates-green-t-outcome-log-lock
+  kind: task
+  title: Stop pipeline-outcome-log.py silently dropping 15-18% of records on Windows
+  status: planned
+  parent: gates-green-e4
+  summary: '`data/scripts/pipeline-outcome-log.py:295-326` implements atomic append as `os.open(O_WRONLY|O_APPEND|O_CREAT)`
+    plus a single `os.write()` under a documented POSIX PIPE_BUF guarantee, with an `fcntl.flock` fallback
+    only for lines >= 4096 bytes. Windows gives no O_APPEND atomicity guarantee and has no fcntl, and
+    the emit path swallows every exception and returns 0 by design (:349-358), so loss is silent. Measured
+    on Windows 11: `AssertionError: 817 != 1000` (threads) and `371 != 400` (multiprocess). This is goal
+    F''s foundational capture layer — every downstream metric (sealed-eval''s n_baseline/n_post, trajectory
+    confidence tags) is computed from this file, and on Windows the corpus is biased toward runs that
+    happened not to collide.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given `_append_line` takes the shim's exclusive lock on Windows and keeps the O_APPEND fast path on
+    POSIX, when `python data/scripts/pipeline-outcome-log-test.py` is run on Windows 11, then the threaded
+    case asserts 1000 == 1000 and the multiprocess case asserts 400 == 400, with 0 failures across all
+    17 tests.
+  - Given `TestConcurrency` is parametrised by `sys.platform`, when the suite runs on Linux and on Windows,
+    then both the POSIX and the Windows branch of `_append_line` are exercised and asserted.
+  - Given a monotonic per-emit `seq` field is added to the record, when `python data/scripts/pipeline-outcome-log.py
+    verify --log <path>` is run against a log with a deliberately deleted line, then it exits non-zero
+    reporting the missing sequence number.
+  - Given `data/references/pipeline-outcome-log-schema.md:204-214`, when it is read, then the 'Proven
+    by TestConcurrency' claim states the POSIX precondition and names the Windows locking path.
+  depends_on:
+  - gates-green-t-platform-compat
+  - gates-green-t-fcntl-datascripts
+  tags:
+  - F076
+  - outcome-log
+  - concurrency
+  - goal-f
+  - evals
+- id: gates-green-t-suite-collects
+  kind: task
+  title: Make the substrate suite collect on every OS and close the sqlite handles that break teardown
+    on Windows
+  status: planned
+  parent: gates-green-e4
+  summary: 'Import errors are the largest cause of the 333 uncollected tests, but not the only one: `test_artifact_backup.py:31-40`
+    and several sibling modules leave sqlite handles open across tempdir teardown, producing `WinError
+    32` on Windows, and `test_artifact_consumer_launchd.py:49` asserts against checked-in launchd plists
+    that cannot exist off macOS. This task closes the residual gap after the fcntl and geteuid work so
+    the discover command reports the same collected count on all three OSes, with any genuinely platform-bound
+    module skipping loudly under the machine-readable reason convention from gates-green-t-skip-to-green.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given a clean clone, when `python -m unittest discover -s workspace-tooling/tests -p 'test_*.py' -t
+    workspace-tooling/tests` is run on Windows, Linux and macOS, then all three report the same 'Ran N
+    tests' collected count and N >= 593 (today Windows reports 260).
+  - Given the same command on Windows, when it completes, then it reports 0 errors and 0 failures; every
+    non-executed test appears as a skip with reason `PLATFORM:<name>` or `REQUIRES:<binary>`.
+  - Given `grep -rn 'WinError 32' `-style failures, when the suite is run twice consecutively on Windows
+    without cleaning temp directories, then both runs report identical results and no teardown error.
+  - Given the skip totals, when they are compared against `workspace-tooling/tests/EXPECTED_SKIPS.txt`,
+    then the check step exits 0.
+  depends_on:
+  - gates-green-t-fcntl-substrate
+  - gates-green-t-geteuid
+  - gates-green-t-skip-to-green
+  tags:
+  - F108
+  - F150
+  - test-collection
+  - substrate
+  - windows
+- id: gates-green-t-supported-platforms
+  kind: task
+  title: Publish an honest supported-platform matrix and make unsupported paths fail fast
+  status: planned
+  parent: gates-green-e4
+  summary: 'README.md:104-105 documents the substrate suite as ''(~590 tests)'' and the single commit
+    message claims ''593 passing'', while on Windows the same command collects 260 and reports 169 red.
+    Independent of the portability work, the repo must state what is supported where: which components
+    run natively on macOS, Linux and Windows; which require WSL2; and which are macOS-only today (the
+    five launchd plists, the AF_UNIX resident service). A Windows contributor who changes one line of
+    pure-Python logic must be able to tell their change from the pre-existing platform gap.'
+  priority: should
+  lane: next
+  size: S
+  acceptance:
+  - Given a `## Supported platforms` section in README.md and workspace-tooling/README.md, when read,
+    then each names the component (MCP server, generators, substrate suite, resident memory service, scheduling/supervision,
+    Obsidian projection) and its status per OS as one of native / WSL2 / unsupported, with no claim contradicted
+    by a command in this milestone's key results.
+  - Given a component marked unsupported is invoked on that OS, when it runs, then it exits non-zero within
+    2 seconds with a message naming the component, the OS and the documented alternative — rather than
+    emitting a cascade of import errors.
+  - Given `grep -n '593 passing\|~590 tests' README.md workspace-tooling/README.md` is run, then any surviving
+    number matches the count the suite actually reports on the platforms it claims.
+  depends_on:
+  - gates-green-t-suite-collects
+  tags:
+  - F108
+  - docs
+  - platform-support
+- id: gates-green-t-wsl-path
+  kind: task
+  title: Ship a documented, scriptable WSL2 path so Windows users get a working resident service now
+  status: planned
+  parent: gates-green-e4
+  summary: The resident memory service opens an AF_UNIX socket at `workspace-tooling/artifact_memory_service.py:1677`;
+    a native Windows transport is an L-effort three-backend port that belongs in M5 (`native-everywhere`),
+    and CPython gh-77589 will not rescue it (it targets 3.16 and omits asyncio). WSL2 is the M-effort
+    interim that delivers most of the value immediately, and it is the path this repo is already being
+    developed against. Ship a setup script, a smoke script that proves a query round-trips, and documentation
+    of the Windows-host/WSL-guest boundary (where the repo lives, how paths cross, where derived state
+    goes). The CI job that runs the smoke script lands in M3; this task ships the scripts and docs it
+    will call.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given a Windows host with WSL2 and a supported distro, when `docs/platforms/windows-wsl.md` is followed
+    verbatim from a bare clone, then the documented setup completes with no undocumented manual step.
+  - Given the setup has completed, when the committed smoke script is run, then it starts the resident
+    service inside WSL, issues one memory query, asserts a non-empty structured result, shuts the service
+    down and exits 0 — printing the socket path and the derived-state root it used.
+  - Given the smoke script is run where WSL2 is absent, then it exits non-zero within 2 seconds naming
+    WSL2 as the missing prerequisite.
+  - Given the document, when it is read, then it states explicitly where the repository must live (Windows
+    filesystem vs WSL filesystem), the performance and file-locking consequence of that choice, and that
+    this is an interim pending the M5 native transport.
+  depends_on:
+  - gates-green-t-supported-platforms
+  tags:
+  - X026
+  - wsl
+  - windows
+  - transport-interim
+  - portability

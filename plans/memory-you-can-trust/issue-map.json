@@ -1,0 +1,82 @@
+{
+  "memory-you-can-trust-e1": {
+    "number": 222,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/222"
+  },
+  "memory-you-can-trust-e2": {
+    "number": 223,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/223"
+  },
+  "memory-you-can-trust-spike-1": {
+    "number": 224,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/224"
+  },
+  "memory-you-can-trust-t-acorn-payload-indexes": {
+    "number": 240,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/240"
+  },
+  "memory-you-can-trust-t-bm25-ts": {
+    "number": 238,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/238"
+  },
+  "memory-you-can-trust-t-chunk-profiles": {
+    "number": 239,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/239"
+  },
+  "memory-you-can-trust-t-eval-canary": {
+    "number": 249,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/249"
+  },
+  "memory-you-can-trust-t-eval-hermetic-mode": {
+    "number": 245,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/245"
+  },
+  "memory-you-can-trust-t-forgetting-cases": {
+    "number": 248,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/248"
+  },
+  "memory-you-can-trust-t-fused-recall": {
+    "number": 242,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/242"
+  },
+  "memory-you-can-trust-t-gold-builder": {
+    "number": 244,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/244"
+  },
+  "memory-you-can-trust-t-model-registry": {
+    "number": 226,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/226"
+  },
+  "memory-you-can-trust-t-named-vector-migration": {
+    "number": 227,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/227"
+  },
+  "memory-you-can-trust-t-qdrant-integration-job": {
+    "number": 250,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/250"
+  },
+  "memory-you-can-trust-t-repo-gold-set": {
+    "number": 243,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/243"
+  },
+  "memory-you-can-trust-t-retrieval-ci-gate": {
+    "number": 247,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/247"
+  },
+  "memory-you-can-trust-t-retrieval-profile": {
+    "number": 225,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/225"
+  },
+  "memory-you-can-trust-t-search-relevance-suite": {
+    "number": 246,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/246"
+  },
+  "memory-you-can-trust-t-unicode-lexical": {
+    "number": 228,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/228"
+  },
+  "memory-you-can-trust-t-workspace-scoping": {
+    "number": 241,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/241"
+  }
+}

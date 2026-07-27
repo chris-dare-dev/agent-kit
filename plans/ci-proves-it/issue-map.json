@@ -1,0 +1,142 @@
+{
+  "ci-proves-it-e1": {
+    "number": 73,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/73"
+  },
+  "ci-proves-it-e2": {
+    "number": 74,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/74"
+  },
+  "ci-proves-it-e3": {
+    "number": 75,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/75"
+  },
+  "ci-proves-it-e4": {
+    "number": 76,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/76"
+  },
+  "ci-proves-it-t-agreement-tripwire-ci-aware": {
+    "number": 85,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/85"
+  },
+  "ci-proves-it-t-aidefence-rules-as-data": {
+    "number": 104,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/104"
+  },
+  "ci-proves-it-t-ci-node-matrix": {
+    "number": 77,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/77"
+  },
+  "ci-proves-it-t-ci-python-job": {
+    "number": 78,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/78"
+  },
+  "ci-proves-it-t-codeowners-goldens": {
+    "number": 88,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/88"
+  },
+  "ci-proves-it-t-community-health-files": {
+    "number": 89,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/89"
+  },
+  "ci-proves-it-t-coverage-ratchet": {
+    "number": 83,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/83"
+  },
+  "ci-proves-it-t-credential-rotation-policy": {
+    "number": 98,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/98"
+  },
+  "ci-proves-it-t-data-gates-workflow": {
+    "number": 84,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/84"
+  },
+  "ci-proves-it-t-eslint-typecheck-gate": {
+    "number": 79,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/79"
+  },
+  "ci-proves-it-t-graphiti-loopback-fence": {
+    "number": 107,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/107"
+  },
+  "ci-proves-it-t-guard-per-class-enforcement": {
+    "number": 105,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/105"
+  },
+  "ci-proves-it-t-hook-harness-fail-closed": {
+    "number": 103,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/103"
+  },
+  "ci-proves-it-t-hooks-node-port": {
+    "number": 101,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/101"
+  },
+  "ci-proves-it-t-hooks-provider-compile": {
+    "number": 102,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/102"
+  },
+  "ci-proves-it-t-main-branch-ruleset": {
+    "number": 91,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/91"
+  },
+  "ci-proves-it-t-model-snapshot-pins": {
+    "number": 96,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/96"
+  },
+  "ci-proves-it-t-mypy-baseline": {
+    "number": 81,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/81"
+  },
+  "ci-proves-it-t-output-side-gate": {
+    "number": 106,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/106"
+  },
+  "ci-proves-it-t-phantom-ci-regression-gate": {
+    "number": 87,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/87"
+  },
+  "ci-proves-it-t-portable-perf-probe": {
+    "number": 82,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/82"
+  },
+  "ci-proves-it-t-publish-adrs": {
+    "number": 92,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/92"
+  },
+  "ci-proves-it-t-purge-phantom-ci-claims": {
+    "number": 86,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/86"
+  },
+  "ci-proves-it-t-python-hash-locks": {
+    "number": 95,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/95"
+  },
+  "ci-proves-it-t-repoint-adr-citations": {
+    "number": 93,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/93"
+  },
+  "ci-proves-it-t-ruff-shellcheck-gate": {
+    "number": 80,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/80"
+  },
+  "ci-proves-it-t-security-policy": {
+    "number": 90,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/90"
+  },
+  "ci-proves-it-t-shared-profile-decision": {
+    "number": 100,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/100"
+  },
+  "ci-proves-it-t-supply-chain-workflows": {
+    "number": 94,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/94"
+  },
+  "ci-proves-it-t-threat-model": {
+    "number": 99,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/99"
+  },
+  "ci-proves-it-t-ts-state-file-hardening": {
+    "number": 97,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/97"
+  }
+}

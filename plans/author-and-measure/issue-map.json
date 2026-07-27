@@ -1,0 +1,146 @@
+{
+  "author-and-measure-e1": {
+    "number": 161,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/161"
+  },
+  "author-and-measure-e2": {
+    "number": 162,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/162"
+  },
+  "author-and-measure-e3": {
+    "number": 163,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/163"
+  },
+  "author-and-measure-e4": {
+    "number": 164,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/164"
+  },
+  "author-and-measure-e5": {
+    "number": 165,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/165"
+  },
+  "author-and-measure-spike-1": {
+    "number": 181,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/181"
+  },
+  "author-and-measure-t-authoring-docs": {
+    "number": 174,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/174"
+  },
+  "author-and-measure-t-authoring-templates": {
+    "number": 172,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/172"
+  },
+  "author-and-measure-t-catalog-body-digest": {
+    "number": 177,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/177"
+  },
+  "author-and-measure-t-churn-metrics-trailer": {
+    "number": 194,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/194"
+  },
+  "author-and-measure-t-churn-probe": {
+    "number": 188,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/188"
+  },
+  "author-and-measure-t-commands-to-skills": {
+    "number": 176,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/176"
+  },
+  "author-and-measure-t-content-pack-docs": {
+    "number": 180,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/180"
+  },
+  "author-and-measure-t-content-pack-roots": {
+    "number": 178,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/178"
+  },
+  "author-and-measure-t-cost-unit-honesty": {
+    "number": 192,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/192"
+  },
+  "author-and-measure-t-eval-budgets": {
+    "number": 186,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/186"
+  },
+  "author-and-measure-t-eval-case-schema": {
+    "number": 182,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/182"
+  },
+  "author-and-measure-t-eval-cases-seed": {
+    "number": 184,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/184"
+  },
+  "author-and-measure-t-eval-ci-gate": {
+    "number": 185,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/185"
+  },
+  "author-and-measure-t-eval-runner-offline": {
+    "number": 183,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/183"
+  },
+  "author-and-measure-t-frontmatter-lint-gate": {
+    "number": 168,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/168"
+  },
+  "author-and-measure-t-frontmatter-schemas": {
+    "number": 166,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/166"
+  },
+  "author-and-measure-t-hostile-frontmatter-corpus": {
+    "number": 169,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/169"
+  },
+  "author-and-measure-t-new-skill-scaffold": {
+    "number": 173,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/173"
+  },
+  "author-and-measure-t-outcome-export-merge": {
+    "number": 196,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/196"
+  },
+  "author-and-measure-t-outcome-schema-v2": {
+    "number": 187,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/187"
+  },
+  "author-and-measure-t-resource-id-attribution": {
+    "number": 190,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/190"
+  },
+  "author-and-measure-t-roi-statistics": {
+    "number": 195,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/195"
+  },
+  "author-and-measure-t-run-id-correlation": {
+    "number": 189,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/189"
+  },
+  "author-and-measure-t-shared-frontmatter-lib": {
+    "number": 167,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/167"
+  },
+  "author-and-measure-t-spec-clean-handoff": {
+    "number": 175,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/175"
+  },
+  "author-and-measure-t-strip-tools-roundtrip": {
+    "number": 170,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/170"
+  },
+  "author-and-measure-t-tier-provenance": {
+    "number": 179,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/179"
+  },
+  "author-and-measure-t-trajectory-rules": {
+    "number": 193,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/193"
+  },
+  "author-and-measure-t-ts-parser-contract": {
+    "number": 171,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/171"
+  },
+  "author-and-measure-t-wire-milestone-emit": {
+    "number": 191,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/191"
+  }
+}

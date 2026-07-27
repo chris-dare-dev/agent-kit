@@ -1,0 +1,1022 @@
+schema: roadmap/1
+slug: memory-grows-and-tiers
+project: agent-kit
+title: M9 Memory That Grows and Tiers — a gated write path and hot/warm/cold tiers driven by measured
+  access
+status: draft
+phase: sequenced
+brief: 'Give memory the two things it structurally lacks: a way to be written, and a way to age. A gated
+  write path (propose -> outbox -> policy gate -> canonical Markdown) with provenance and validity returned
+  at the tool boundary, and an explicit hot/warm/cold tier model whose demotion is driven by recorded
+  access signals rather than a single 14-day quarantine age gate.'
+goal:
+  hmw: How might we let memory grow safely and shed weight on evidence rather than on a fixed timer?
+  objective: Agents can write memory through an auditable gate that never rewrites canon directly, and
+    every artifact carries an access signal that drives an explicit, reversible tier transition.
+  key_results:
+  - From a bare clone on all three CI operating systems, `npm run eval:retrieval` completes and prints
+    nDCG@10 and recall@10 for all four modes in artifact_retrieval_eval.MODES against a tracked gold set;
+    today the eval has no corpus any adopter can supply (F045, F082).
+  - '`grep -nE ''^(EMBEDDING_MODEL|RERANKER_MODEL|EMBEDDING_DIMENSIONS|QDRANT_SERVER_VERSION) *='' workspace-tooling/artifact_retrieval.py`
+    returns zero matches, and a 768-dimension profile ingests, searches and passes the gold gate without
+    a source edit (F042, X021).'
+  - A pull request that changes the retrieval profile digest and drops nDCG@10 or recall@10 beyond the
+    declared tolerance fails CI; a profile change that does not run the gold suite also fails CI (X017).
+  - Every artifact-memory tool result carries canonical_path, content sha256, outbox unit id, catalog
+    generation, embedding model + dimension, memory_type, scope and validity window; a contract test asserts
+    each field is non-null on a live search (X018, X019, X032).
+  - '`grep -rn ''lessons.md'' data/agents/ | grep -c ''>>''` returns 0 and no code path outside the outbox
+    applier writes canonical Markdown; every write is reconstructible from the outbox alone (F039, X029,
+    X034).'
+  - The access ledger has recorded at least 30 days of real access events, with a reproducible `artifact_tier_plan.py
+    plan` output, before any demotion predicate is enabled in a shipped configuration (F056, X048).
+  - 'A lessons trim loses zero lines: regression test T6 in data/scripts/milestone-pipeline-consolidate-memory-test.sh
+    asserts every trimmed line is present in lessons-cold.md, and the marker line no longer accumulates
+    in the untrimmable tail (F058).'
+  - stale_hit_rate@10 and orphan_rate are reported beside nDCG in every eval run and are gated with committed
+    thresholds (X020).
+  wont:
+  - Multimodal ingestion — the modality half of F043 (PDF/image/notebook extractors, widening DOCUMENT_SUFFIXES
+    at artifact_catalog.py:43-46) is explicitly out of scope; only the language half ships. 'Multimodal'
+    stays an unmet claim and the README must stop asserting it.
+  - The content-addressed unit store (F060) and cold-representation compaction (F061). Rehydration in
+    this milestone resolves through the live file and the existing unit archive only; the CAS tier is
+    deferred until the access ledger justifies it.
+  - The two-collection hot/cold split with alias-fronted quantized cold storage, SIEVE-style demotion,
+    minimum dwell time and lazy promotion (the deferred half of F057 and all of X048's build phase). Storage-class
+    configurability and a gated eviction path ship; the second collection does not.
+  - Quantization tuning (X046) and AST-aware/tree-sitter chunking (X047) — both belong with the deferred
+    cold-plane engineering, not with the chunk-profile registry that ships here.
+  - A shared or team memory tier (F038). The store stays uid-scoped and private; multi-tenant trust boundaries
+    belong with the threat model in M3, not here.
+  - Asynchronous consolidation as a supervised event-consumer job (X035). The write path and the reconciliation
+    consumer ship; the importance/merge/decay/eviction consolidation pass does not.
+  - Any per-skill retrieval or prompt-optimisation machinery. data/skills/ contains exactly one skill
+    (handoff/); that work is n=1 until M6 builds a corpus.
+  - 'Everything on the KILLED list, restated so it cannot creep back in: PAM portable memory artifacts,
+    cryptographic erasure over the immutable outbox, W3C CG conformance packs, Qdrant miniCOIL sparse
+    vectors, a three-backend reranker plugin registry, LLM-generated contextual chunk prefixes, an LLM-arbitrated
+    write path, and promoting the Graphiti pilot into the canonical path.'
+generated_by:
+  agent: claude-opus-5
+  at: '2026-07-26'
+  brief: multi-workflow audit + landscape benchmark synthesis
+retired: []
+items:
+- id: memory-grows-and-tiers-e2
+  kind: epic
+  title: An explicit hot/warm/cold tier model driven by recorded access signals
+  status: planned
+  summary: 'Goal E is not partially implemented — it is unimplemented as a concept: a repo-wide grep for
+    tier, demote, rehydrate, evict or decay returns zero storage-lifecycle hits, and the only time rule
+    in the whole policy file is quarantine.minimum_age_days: 14. Every component correctly refuses to
+    be the one that deletes, so no component owns lifecycle. This epic builds the access ledger first
+    and lets it accumulate real data, then declares tiers with per-tier backends, latency targets, admission
+    rules and demotion predicates; replaces the single age gate with per-memory-type TTL and retrieval-time
+    decay; makes superseded vectors evictable and cold content readable back; turns the lessons.md FIFO
+    trim into an archiving demotion; and gives the never-invoked cold-path modules a schedule, a health
+    file, storage accounting and a perf gate.'
+  priority: should
+  lane: later
+  size: XL
+  acceptance:
+  - Given the access ledger has been running, when `artifact_access_ledger.py rollup --json` is run, then
+    it reports per-revision last_access_at, count_7d, count_30d and a decayed score — signals that today
+    exist nowhere in the repo.
+  - Given artifact-policy.json, when it is validated, then it contains a tiers block declaring HOT/WARM/COLD
+    with a storage backend, p95 read-latency target, admission rule and demotion predicate per tier, and
+    a lifecycle block keyed by artifact_type x authority_class.
+  - 'Given a superseded revision whose payload has been attested by artifact_unit_archive.py, when the
+    sweep runs with --apply, then its Qdrant points are deleted and memory_status reports the per-temperature
+    counts — today artifact_ingestion.py:1234 reports point_deletion: disabled and no code can remove
+    a point.'
+  - Given a lessons.md file at its 500-line cap, when the consolidator runs, then every trimmed line is
+    present verbatim in lessons-cold.md and the count is recorded in a sidecar log — today those lines
+    are destroyed.
+  depends_on:
+  - memory-you-can-trust-e1
+  tags:
+  - F046
+  - F055
+  - F056
+  - F057
+  - F058
+  - F059
+  - F062
+  - F063
+  - F065
+  - F067
+  - F070
+  - F071
+  - F072
+  - F073
+  - F158
+  - X033
+  - X048
+  - lifecycle
+  - tiering
+  - access-ledger
+- id: memory-grows-and-tiers-t-access-ledger
+  kind: task
+  title: Record durable per-artifact access recency, frequency and citation — build this first and let
+    it accumulate
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: 'Nothing in the repo ever records that an artifact, revision, chunk or point was read: grepping
+    last_access, access_count, accessed_at, hit_count and read_count across workspace-tooling/, src/ and
+    data/ returns zero matches, and the service keeps only restart-volatile aggregate counters (artifact_memory_service.py:1035-1047).
+    Without a recency/frequency signal no demotion policy is computable, so any tiering would have to
+    demote on age alone — exactly the policy artifact_unit_archive.py already proves is wrong here. Land
+    this ahead of the rest of the milestone so real data exists before any tier is declared.'
+  priority: must
+  lane: next
+  size: L
+  acceptance:
+  - Given a search that returns three results, when it completes, then artifact-access-ledger.sqlite3
+    contains three access_events rows carrying point_id, revision_id, artifact_id, route, rank and timestamp
+    — written from record_retrieval_result (artifact_memory_service.py:1035) and the /v1/get path, and
+    from nowhere else.
+  - Given the ledger file is read-only or its disk is full, when a search runs, then the search still
+    returns results and the ledger failure is logged — asserted by a test that makes the ledger unwritable
+    and expects a successful read.
+  - Given `artifact_access_ledger.py rollup`, when it runs, then access_summary rows carry last_access_at,
+    count_7d, count_30d, count_all and an exponential-decay score whose half-life comes from the lifecycle
+    policy block rather than a constant.
+  - Given the ledger file, when its mode is inspected on POSIX, then it is 0600 and created through the
+    same conventions as artifact_unit_archive.open_archive; on Windows the equivalent private-path check
+    from gates-green-e4 applies.
+  - Given memory_status and artifact_watermark, when they run, then the access summary is exposed read-only
+    through both, so the signal is visible before any policy consumes it.
+  depends_on:
+  - starts-everywhere-e3
+  - gates-green-e4
+  tags:
+  - F056
+  - X048
+  - access-ledger
+  - telemetry
+  - lifecycle
+- id: memory-grows-and-tiers-t-lifecycle-policy-block
+  kind: task
+  title: Replace the single 14-day age gate with per-memory-type TTL and decay policy
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: 'artifact-policy.json contains exactly one time-based rule for the entire substrate — quarantine.minimum_age_days:
+    14 — applied uniformly to decision, handoff, plan, research and roadmap, while a skill-event receipt
+    and a decision record have wildly different half-lives. Add a lifecycle block keyed by artifact_type
+    x authority_class declaring hot_ttl_days, warm_ttl_days, decay_half_life_days, cold_representation
+    and never_demote, validated with the same strict shape artifact_quarantine._load_rules uses. Move
+    RPO_HOURS and RETENTION_WARN_DAYS out of artifact_memory.py:38-43 and the four snapshot constants
+    out of artifact_backup_snapshot.py:32-36 into policy.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given artifact-policy.json, when it is validated against workspace-tooling/schemas/artifact-policy.schema.json,
+    then the lifecycle block is present, every declared artifact_type x authority_class pair has all five
+    fields, and an unknown key fails validation.
+  - Given `grep -nE 'RPO_HOURS|RETENTION_WARN_DAYS' workspace-tooling/artifact_memory.py`, when it is
+    run at HEAD, then the constants are gone and both values are read from the policy file.
+  - Given an artifact_type marked never_demote true, when classify() is asked for its tier, then it returns
+    HOT regardless of age or access score, asserted by a unit test.
+  - Given artifact_observations rows older than the policy window, when the new catalog compaction subcommand
+    runs, then they collapse into a per-revision first_run/last_run range row and the current_artifact_revisions
+    view still returns exactly the same rows as before compaction.
+  depends_on:
+  - memory-grows-and-tiers-t-access-ledger
+  tags:
+  - F063
+  - policy
+  - ttl
+  - decay
+  - lifecycle
+- id: memory-grows-and-tiers-t-tier-model
+  kind: task
+  title: Declare HOT/WARM/COLD tiers with owning code, and a dry-run demotion planner
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: 'Define three temperatures with owning code and wire them to what already exists: HOT (current
+    revisions in Qdrant, searchable), WARM (superseded revisions evicted from the live collection into
+    the existing unit archive, reachable via an as_of parameter rather than the currently-refused include_history),
+    COLD (the off-device bundle, restorable). Add a tiers block to artifact-policy.json, artifact_tier_policy.py
+    exposing a pure classify(revision, signals) -> tier, and artifact_tier_plan.py with plan/apply subcommands
+    that are dry-run by default and route every destructive step through artifact_outbox_retention.classify()''s
+    RETAIN kernel. No tier may be declared until the access ledger holds data.'
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given artifact-policy.json, when it is validated, then the tiers block declares, per tier, a storage
+    backend, a target p95 read latency, an admission rule and a demotion predicate, and artifact_tier_policy.py
+    fails closed on a tier with a missing predicate.
+  - Given a revision plus its access-summary signals, when classify() is called twice with identical inputs,
+    then it returns identical tiers — asserted by a determinism test, since classify must be pure and
+    stdlib-only like graphiti_policy.py.
+  - Given `artifact_tier_plan.py plan --json`, when it runs without --apply, then nothing is written or
+    deleted and the output enumerates every proposed demotion with the predicate that fired.
+  - Given a revision whose outbox unit artifact_outbox_retention.classify() marks RETAIN, when plan runs,
+    then that revision never appears in the demotion set, asserted by a test that constructs exactly that
+    case.
+  - Given memory_status, when it runs, then it reports per-temperature counts, replacing today's bare
+    historical_points number at artifact_memory.py:501.
+  depends_on:
+  - memory-grows-and-tiers-t-access-ledger
+  - memory-grows-and-tiers-t-lifecycle-policy-block
+  tags:
+  - F055
+  - F046
+  - tiering
+  - policy
+  - lifecycle
+- id: memory-grows-and-tiers-t-retrieval-decay
+  kind: task
+  title: Implement forgetting as retrieval-time decay plus salience, keeping RETAIN as the storage default
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: 'The only forgetting mechanism compatible with the substrate''s never-rewrite-canon rule is
+    read-time scoring, not deletion. Score at retrieval as semantic similarity modulated by recency decay
+    and an ingest-assigned salience weight, with recently-retrieved items boosted and untouched ones damped
+    toward a floor. Use type-specific curves from the lifecycle policy block: working memory expires hard
+    at run completion, procedural memory does not decay. Actual eviction stays reserved for the gated
+    paths in the sibling tasks.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given two candidates with identical similarity where one was retrieved yesterday and one has never
+    been retrieved, when the decay-aware ranker scores them, then the recently-retrieved one ranks higher,
+    asserted by a unit test over the access ledger fixture.
+  - Given an artifact_type declared non-decaying in the lifecycle policy, when it is scored, then its
+    decay multiplier is exactly 1.0 regardless of age.
+  - Given working-memory entries scoped to a run, when the run completes, then they are excluded from
+    subsequent retrievals without any storage deletion, asserted by a test that inspects the store afterwards
+    and finds the rows intact.
+  - Given the decay parameters, when ranking_contract() is computed, then decay half-lives and the salience
+    weighting are part of the profile digest, so a decay-curve change re-runs the gold gate.
+  - Given the forgetting cases from memory-that-earns-it-t-forgetting-cases, when the decay ranker is
+    enabled, then stale_hit_rate@10 improves against the recorded pre-decay baseline and the improvement
+    is recorded in the tolerances file.
+  depends_on:
+  - memory-grows-and-tiers-t-access-ledger
+  - memory-you-can-trust-t-forgetting-cases
+  tags:
+  - X033
+  - decay
+  - salience
+  - retrieval
+  - lifecycle
+- id: memory-grows-and-tiers-t-qdrant-storage-class
+  kind: task
+  title: Make Qdrant storage class configurable and add a gated, attestation-backed point-eviction path
+    (declared partial scope)
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: 'There is exactly one collection, created with VectorParams(size, distance=COSINE) and nothing
+    else (artifact_ingestion.py:1036-1043) — no on_disk, no quantization, no HNSW tuning, no indexing_threshold
+    — and qdrant_reconcile explicitly reports point_deletion: disabled (artifact_ingestion.py:1234), so
+    no code in the repo can remove a point. Extend collection creation to take a tier profile supplying
+    those knobs, defaulting to today''s behaviour, and add artifact_tier_move.py implementing move-then-delete
+    gated on a prior artifact_unit_archive.py attestation. DECLARED PARTIAL SCOPE: the second, quantized,
+    alias-fronted cold collection is deferred with X048''s build phase until the access ledger shows a
+    hot set that is a small fraction of a large corpus.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given a tier profile declaring on_disk true and an indexing_threshold, when a collection is created,
+    then get_collection reports exactly those settings; given no tier profile, then the created collection
+    is byte-identical in configuration to today's.
+  - Given a superseded revision whose payload artifact_unit_archive.py has attested, when `artifact_tier_move.py
+    --apply` runs, then its points are deleted from Qdrant and the run reports the attestation id it relied
+    on.
+  - Given a superseded revision with NO archive attestation, when the same command runs, then it refuses
+    to delete and exits non-zero naming the missing attestation — asserted by a test that constructs exactly
+    that state.
+  - Given the eviction path, when qdrant_reconcile's result payload is inspected, then point_deletion
+    no longer reads 'disabled' unconditionally but names the gate that governs it.
+  - Given this task's diff, when reviewed, then it introduces no second collection and no quantization_config
+    default — both are explicitly deferred and their absence is recorded in workspace-tooling/README-artifact-lifecycle.md
+    with the measurement that would justify them.
+  depends_on:
+  - memory-grows-and-tiers-t-tier-model
+  - memory-you-can-trust-t-qdrant-integration-job
+  tags:
+  - F057
+  - qdrant
+  - eviction
+  - storage-class
+  - lifecycle
+  - partial-scope
+- id: memory-grows-and-tiers-t-rehydration-read-path
+  kind: task
+  title: Build the verified rehydration route so a cold hit is not indistinguishable from loss (declared
+    partial scope)
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: 'artifact_memory.py:45-48 hard-disables historical retrieval with HISTORICAL_SNIPPETS_DISABLED
+    and get_artifact only returns the canonical current file by path, so a superseded revision has no
+    read route at all — which means demotion today is indistinguishable from deletion and no operator
+    will ever enable it. Add artifact_rehydrate.py with `get --revision-id <id>` resolving from the live
+    source file then the unit archive, verifying content_sha256 and unit_sha256 at every step and labelling
+    the response with its provenance tier and integrity status. DECLARED PARTIAL SCOPE: the content-addressed
+    store (F060) is deferred, so resolution stops at the unit archive; the resolver must return an explicit
+    not-in-any-tier error rather than pretending.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a revision present only in the unit archive, when `artifact_rehydrate.py get --revision-id <id>`
+    runs, then it returns the content, names the tier it came from, and reports integrity verified against
+    the stored unit_sha256.
+  - Given a revision whose archived bytes do not match their recorded hash, when the same command runs,
+    then it fails closed with an integrity error and returns no content.
+  - Given a revision present in no tier, when the command runs, then it exits non-zero with an explicit
+    'not resolvable in any configured tier' message naming the tiers searched — never an empty success.
+  - Given the MCP surface, when get_artifact_revision is called, then it succeeds — requiring /v1/get
+    with a revision_id to be added to ALLOWED_ROUTES at src/tools/artifact-memory.ts:72-77, without which
+    the adapter rejects the route.
+  - Given HISTORICAL_SNIPPETS_DISABLED, when the code is read at HEAD, then it is lifted only for objects
+    that resolve through the verified path, and README-artifact-ingestion.md:600-607 and its Current boundary
+    section at :788-796 are updated in the same commit.
+  depends_on:
+  - memory-grows-and-tiers-t-tier-model
+  tags:
+  - F065
+  - rehydration
+  - cold-read
+  - lifecycle
+  - partial-scope
+- id: memory-grows-and-tiers-t-lessons-demotion
+  kind: task
+  title: Turn the lessons.md FIFO trim into an archiving demotion, and bridge the two memory planes
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: 'data/scripts/milestone-pipeline-consolidate-memory.sh:104-108 enforces a 500-line cap with
+    `out = out[overflow:]`, permanently discarding the oldest dated lessons with no archive and no recovery
+    — the exact opposite of the substrate''s doctrine three directories away. Two bugs compound it: the
+    inserted marker line does not match LINE_RE so it lands in `unparsable`, is appended to the tail,
+    and can never be trimmed (the file stabilises at max_lines+1 and every run destroys one more lesson
+    forever); and the near-duplicate collapse at :95-98 discards the recurrence count, which is precisely
+    the frequency signal a lesson''s value should be scored on. Fix the bugs, demote overflow to lessons-cold.md,
+    and add the narrow artifact-policy.json allow rule that lets cold lessons be catalogued despite the
+    broad agent-memory prune.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a lessons.md at 520 lines with max_lines 500, when the consolidator runs, then lessons-cold.md
+    contains all 20 overflow lines verbatim and a sidecar consolidation-log.jsonl records {agent, dropped_count,
+    at, sha256} — asserted by new test T6 in data/scripts/milestone-pipeline-consolidate-memory-test.sh.
+  - Given the consolidator is run twice in succession with no new lessons, when the second run completes,
+    then lessons.md is byte-identical to after the first run and no additional line was demoted — asserted
+    by test T7, which fails against HEAD because the marker accumulates in the untrimmable tail.
+  - Given three near-duplicate lessons, when the collapse runs, then the surviving line carries an [n=3]
+    occurrence tally and survivors are ranked by recency times occurrences.
+  - Given artifact-policy.json, when the catalog walker runs, then `**/agent-memory/*/lessons-cold.md`
+    is catalogued with its own artifact_type while the broad `agent-memory` entry in catalog.prune_directory_names
+    still excludes the hot files — asserted by a catalog test over a fixture tree.
+  - Given the two-plane contract, when workspace-tooling/README-artifact-lifecycle.md is read, then it
+    documents hot lessons.md to lessons-cold.md to catalogued/embedded/searchable, and names which plane
+    owns cold lessons.
+  depends_on:
+  - memory-grows-and-tiers-t-lifecycle-policy-block
+  tags:
+  - F058
+  - F071
+  - lessons
+  - agent-memory
+  - demotion
+  - lifecycle
+- id: memory-grows-and-tiers-t-lifecycle-schedule-health
+  kind: task
+  title: Schedule the never-invoked cold path and surface its verdict in the health watermark
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: artifact_outbox_retention.py and artifact_unit_archive.py constitute the entire archive-then-prune
+    capability and are invoked by nothing — grepping for either name outside tests/ returns only a single
+    internal import. Meanwhile artifact_watermark.compute_watermark builds eleven components (:923-965)
+    and none of them is outbox size, retention pressure or archive coverage, so a new team member reading
+    the health surfaces sees green while derived state grows unattended. Add a scheduled weekly job through
+    the M5 cross-OS service contract, a twelfth `lifecycle` component, and a lifecycle block in both the
+    status payload and the service /v1/status route.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the weekly lifecycle job, when it runs, then it executes `artifact_unit_archive.py backfill
+    --apply` then `artifact_outbox_retention.py --json` and writes artifact-lifecycle-health.json into
+    the derived root.
+  - Given that file is older than its declared cadence, when compute_watermark runs, then the `lifecycle`
+    component reports STALE; given the file is absent, then MISSING — asserted by workspace-tooling/tests/test_artifact_watermark.py.
+  - Given the lifecycle component, when it is healthy, then it reports outbox bytes, RETAIN / RETAIN-BY-DEFAULT
+    / PRUNABLE directory counts, irreproducible revision count and archive coverage percent.
+  - Given the job definition, when it is rendered by the M5 service contract, then equivalent units exist
+    for launchd, systemd and Windows Task Scheduler — not a sixth macOS plist.
+  - Given workspace-tooling/README-artifact-lifecycle.md, when it is read, then both modules are documented
+    and README-artifact-ingestion.md §6 cross-links to it, closing the gap where quarantine is documented
+    and neither module is mentioned.
+  depends_on:
+  - native-everywhere-e2
+  - memory-grows-and-tiers-t-tier-model
+  tags:
+  - F059
+  - scheduling
+  - watermark
+  - cold-path
+  - lifecycle
+- id: memory-grows-and-tiers-t-storage-accounting
+  kind: task
+  title: Emit per-class storage accounting with growth forecasting and enforceable budgets
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: 'The system cannot answer how big memory is, where it is growing, or when it runs out. The
+    only budget in the tree is four module constants for snapshot count and bytes (artifact_backup_snapshot.py:32-36)
+    governing one artifact class, and the only disk check is a single shutil.disk_usage call in the backup
+    builder. A tiering system is a cost-management system: without cost measurement there is no signal
+    to tier against and no way to prove tiering worked. Add artifact_storage_accounting.py covering outbox
+    (by retention verdict), unit archive, catalog sqlite per table, the Qdrant collection, snapshots,
+    off-device bundles, quarantine sets, eval outputs and the graph store, plus rolling deltas and a projected
+    days-to-full.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given a populated derived root, when `artifact_storage_accounting.py --json` runs, then artifact-storage-accounting.json
+    contains bytes and object counts for every named class plus 7-day and 30-day deltas and a projected
+    days-to-full from shutil.disk_usage.
+  - Given the outbox breakdown, when it is inspected, then it is segmented by artifact_outbox_retention.classify()'s
+    verdicts rather than by a separate reimplementation.
+  - Given a `budgets` block in artifact-policy.json with soft and hard ceilings per class, when a class
+    exceeds its soft ceiling, then the lifecycle watermark component reports DEGRADED and the watchdog
+    raises; `grep -n 'WARN\|ALARM' workspace-tooling/artifact_backup_snapshot.py` shows the four constants
+    now read from that block.
+  - Given the report, when it is rendered, then each class is explicitly labelled bounded or unbounded,
+    so the reader can tell which classes have a rotation policy and which grow forever.
+  depends_on:
+  - memory-grows-and-tiers-t-lifecycle-schedule-health
+  tags:
+  - F062
+  - storage-accounting
+  - budgets
+  - capacity
+  - lifecycle
+- id: memory-grows-and-tiers-t-backup-watermark
+  kind: task
+  title: Give the coldest tier an alarm, an actor for its rollback deadline, and a health surface that
+    stops contradicting itself
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: 'Three small honesty defects in the same surface. (1) A frozen off-device RPO clock fires no
+    push alert: artifact_watermark has no backup component and artifact_watchdog.PIPELINE_DOWN_CODES has
+    no backup code, even though the code itself records that this exact failure already happened on 2026-07-22
+    (artifact_backup_offdevice.py:91-114). (2) The embedded-store rollback deadline is computed and displayed
+    but nothing ever acts on it, so expiry only changes a status string. (3) artifact_backup_snapshot.assess_retention
+    returns auto_delete: disabled in the same JSON document that lists the files the run just unlinked
+    under prune.pruned, on a nightly schedule that passes --prune-keep 7.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a backup health file whose last_run_at advances while completed_at does not — the documented
+    2026-07-22 scenario — when compute_watermark runs, then the new `backup` component reports STALE and
+    the test in workspace-tooling/tests/test_artifact_watermark.py reproducing that scenario passes.
+  - Given bundle_complete false or a non-empty incomplete_items, when the component runs, then it reports
+    DEGRADED; given the health file is absent, then MISSING.
+  - Given a frozen RPO clock, when the watchdog runs, then backup_stale is present in PIPELINE_DOWN_CODES
+    and a durable JSONL alert plus the platform notification fire.
+  - Given an expired rollback window, when the watchdog runs, then rollback_retention_expired fires, and
+    `artifact_memory.py rollback-decide --keep|--release --acknowledge <generation>` records the decision,
+    operator, timestamp and generation digest into an evidence JSON — with --release handing off to the
+    gated deletion path rather than deleting inline.
+  - 'Given a snapshot run that pruned at least one file, when its payload is inspected, then auto_delete
+    reads ''rotation-only'' with a rotation_keep field, and a test in workspace-tooling/tests/test_artifact_backup.py
+    asserts a pruning run can never emit auto_delete: disabled.'
+  depends_on:
+  - memory-grows-and-tiers-t-lifecycle-schedule-health
+  tags:
+  - F067
+  - F073
+  - F072
+  - watchdog
+  - watermark
+  - backup
+  - lifecycle
+- id: memory-grows-and-tiers-t-receipt-archival
+  kind: task
+  title: Give the skill-events receipt inbox an archival tier so the health probe stops rescanning all
+    of history
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: 'Receipts are the substrate''s hot input and nothing ever retires them: resolve_valid_receipt
+    only clears state rows, and each event also leaves a permanent per-event outbox directory nothing
+    collects. Two costs compound — artifact_watermark.receipts_component (:343-358) answers ''is the pipeline
+    healthy'' by rglob-ing and sorting the entire receipt history every 300 seconds, and skill-events
+    is a hard-required tier-1 backup item so the nightly bundle re-encrypts all of it forever. Add a `retire`
+    subcommand moving observed, aged receipts into a monthly archive, collect the matching outbox directories
+    through the RETAIN kernel, and split the backup inventory item.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given 1,000 receipts of which 900 are in the consumer's observed set and older than the policy window,
+    when `artifact_event_consumer.py retire --apply` runs, then the live receipt root holds 100 and skill-events-archive/<YYYY-MM>/
+    holds 900, with zero receipts lost (counted before and after).
+  - Given an unobserved receipt, when retire runs, then it is never moved, asserted by a test that constructs
+    exactly that case.
+  - Given a matching skill-event outbox directory that artifact_outbox_retention.classify() marks state-bound
+    or irreproducible-holding, when retire runs, then it is left untouched.
+  - 'Given the retired archive, when receipts_component runs, then its scan is O(unretired): a test asserts
+    the number of files stat-ed equals the live-root count, not the historical total.'
+  - Given artifact_backup_offdevice.py, when its inventory is read, then skill-events (hard=True) and
+    skill-events-archive (hard=False) are separate items, so an archive gap can no longer freeze the RPO
+    clock.
+  depends_on:
+  - memory-grows-and-tiers-t-lifecycle-policy-block
+  tags:
+  - F070
+  - receipts
+  - archival
+  - event-consumer
+  - lifecycle
+- id: memory-grows-and-tiers-t-perf-gate
+  kind: task
+  title: Wire the orphaned load and resilience harnesses to a nightly perf gate with committed budgets
+  status: planned
+  parent: memory-grows-and-tiers-e2
+  summary: workspace-tooling/artifact_memory_load_test.py and artifact_memory_resilience_test.py are referenced
+    by nothing — a grep across every tracked file matches only the git index. Neither asserts a budget;
+    they print numbers and exit, so there is no recorded baseline for p50/p95 query latency, RSS or recovery
+    time and 'regression' is undefined. Goal E is a performance claim with no measurement that can fail.
+    Give both a --budget-file, commit workspace-tooling/perf-budgets.json seeded from the first CI run,
+    and run them nightly against the compose Qdrant, off the pull-request path.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given workspace-tooling/perf-budgets.json with {p50_ms, p95_ms, max_rss_mb, recovery_s}, when either
+    harness runs with --budget-file, then it exits non-zero on a breach greater than 25 percent and prints
+    the measured value beside the budget.
+  - Given the nightly perf workflow on schedule and workflow_dispatch, when it runs, then it stands up
+    the compose Qdrant, executes both harnesses, writes the percentile table to $GITHUB_STEP_SUMMARY,
+    and opens an issue on breach — and it never runs on the pull-request path.
+  - Given a machine without docker, when the resilience harness runs, then it fails loudly with an explicit
+    message rather than the current ENOENT from the `or "/usr/local/bin/docker"` fallback at artifact_memory_resilience_test.py:25.
+  - Given the load harness on Windows and Linux, when it measures RSS and CPU, then it uses psutil or
+    resource.getrusage rather than shelling to /bin/ps at artifact_memory_load_test.py:56-63, and the
+    nightly job passes on all three operating systems.
+  depends_on:
+  - memory-you-can-trust-t-qdrant-integration-job
+  tags:
+  - F158
+  - perf
+  - budgets
+  - ci
+  - lifecycle
+- id: memory-grows-and-tiers-e1
+  kind: epic
+  title: A gated write path with provenance and validity at the tool boundary
+  status: planned
+  summary: 'All 17 MCP tools are read-only, and the actual write mechanism is raw shell embedded in agent
+    prompt bodies — 14 of the 20 files in data/agents/ carry the `mkdir -p ... && echo >> lessons.md`
+    pattern, with no schema, no validation, no dedupe, no attribution and no failure signal. This epic
+    makes writes never touch canonical files directly: a typed ADD|UPDATE|SUPERSEDE|NOOP record appends
+    to the immutable outbox, a policy gate generalised from the Graphiti pilot''s validator applies it,
+    and only then does canonical Markdown change. Alongside it land bi-temporal validity, explicit supersession,
+    provenance on every result, a memory_type dimension, indexing for the only two tiers that actually
+    learn, a secret/PII ingest gate with an erasure path, untrusted-input framing at the read boundary,
+    and scheduled reconciliation from the outbox.'
+  priority: must
+  lane: later
+  size: XL
+  acceptance:
+  - Given an agent calls the write surface, when the call completes, then a typed operation record exists
+    in the outbox, the policy gate's verdict is recorded, and canonical Markdown changed only if the gate
+    passed — asserted end to end by an integration test.
+  - Given `grep -rn 'lessons.md' data/agents/ | grep '>>'`, when it is run at HEAD, then it returns zero
+    matches and every agent writes through the tool surface.
+  - Given any artifact-memory tool result, when it is inspected, then it carries canonical path, sha256,
+    outbox unit id, catalog generation, embedding model and dimension, memory_type, scope and validity
+    window.
+  - Given derived state is deleted, when the reconciliation consumer runs with --repair, then the catalog
+    rows, the vector collection and the projections are rebuilt from the outbox alone and diff clean against
+    a pre-deletion snapshot.
+  tags:
+  - F039
+  - F040
+  - F068
+  - F044
+  - F138
+  - X018
+  - X019
+  - X029
+  - X030
+  - X031
+  - X032
+  - X034
+  - write-path
+  - bitemporal
+  - provenance
+  - memory
+- id: memory-grows-and-tiers-t-write-contract
+  kind: task
+  title: Generalise the Graphiti policy validator into a substrate-independent memory write contract
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: workspace-tooling/graphiti_policy.py already implements exactly the right thing — pre-persistence
+    validation of extracted objects, pure and stdlib-only so it stays testable without the optional dependency
+    — but it is buried inside a pilot where no external reader will find it and it gates only one destination.
+    Lift it into memory_write_contract.py gating every write regardless of destination (canonical Markdown,
+    vector payload, graph), add a protected-core-facts set a candidate write may not contradict (failing
+    closed rather than merging), publish the contract as a versioned JSON schema with a conformance suite,
+    and return rejection reasons in the tool response so an agent can correct and retry.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a candidate write to any of the three destinations, when it is submitted, then it passes through
+    memory_write_contract.validate() first — asserted by a test that monkeypatches the validator to always
+    reject and confirms zero writes reach any destination.
+  - Given a candidate that contradicts a protected core fact, when it is validated, then it is rejected
+    with a machine-readable reason code and no partial write occurs.
+  - Given the contract, when data/schemas/memory-write-contract.schema.json is validated, then it is Draft
+    2020-12 with additionalProperties:false and carries a contract version, and the conformance suite
+    in workspace-tooling/tests/ covers at least one accept and one reject case per rule.
+  - Given a rejected write through the MCP surface, when the tool result is read, then it contains the
+    rule id and a human-readable reason, so the agent can correct and retry without guessing.
+  - Given graphiti_policy.py, when it is read at HEAD, then it delegates its validation rules to the shared
+    module rather than duplicating them.
+  depends_on:
+  - starts-everywhere-e3
+  tags:
+  - X030
+  - write-contract
+  - validation
+  - fail-closed
+  - security
+  - memory
+- id: memory-grows-and-tiers-t-bitemporal-catalog
+  kind: task
+  title: Add bi-temporal validity and explicit supersession to the catalog and the outbox
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: This is the primitive that tiering, demotion, supersession and safe forgetting all need, and
+    it is the natural vocabulary for the never-rewrite-canon rule the substrate already enforces. Add
+    created_at, valid_from, invalid_at and superseded_by to catalog rows and outbox units; default conflict
+    resolution to recency-wins-with-explicit-invalidation rather than deletion or rewrite; and expose
+    an as_of parameter that defaults to currently-valid rows. Do this on ordinary catalog rows with no
+    graph dependency — it is the part of the Graphiti pilot worth keeping regardless of what the owner
+    decided about the pilot itself. Cheap now, expensive once the write path starts generating contradictions.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a catalog schema migration, when it completes, then artifact_revisions carries created_at, valid_from,
+    invalid_at and superseded_by, and existing rows are backfilled with valid_from from their observed_at
+    and a null invalid_at.
+  - Given revision B supersedes revision A, when the write path applies it, then A.invalid_at is set and
+    A.superseded_by names B — and A is not deleted or rewritten, asserted by a test comparing A's bytes
+    before and after.
+  - Given as_of set to a timestamp before B existed, when a search runs, then A is returned as valid and
+    B is not; given as_of omitted, then only B is returned.
+  - Given the outbox, when a unit is published, then it carries the same four fields, so bi-temporality
+    survives a full rebuild from the log alone.
+  - Given the catalog schema version, when it is read, then it was bumped in this change and the migration
+    is reversible or explicitly documented as one-way in workspace-tooling/README-artifact-catalog.md.
+  depends_on:
+  - memory-grows-and-tiers-t-write-contract
+  tags:
+  - X019
+  - bitemporal
+  - catalog
+  - supersession
+  - memory
+- id: memory-grows-and-tiers-t-memory-type-dimension
+  kind: task
+  title: Thread a required memory_type dimension through the catalog, the outbox and the search filters
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: Add a required memory_type field — episodic, semantic, procedural, working, identity — to catalog
+    rows and outbox units, threaded through search filters and retrieval ranking, with working memory
+    TTL-scoped to a run. Adopt the vocabulary as generic terminology from the standard cognitive-science
+    and LangMem/MemGPT usage, explicitly NOT as an interop commitment to any recent preprint. This is
+    mostly a schema and migration task, and it is the prerequisite for the type-specific decay curves
+    and type-specific conflict rules the lifecycle epic depends on.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the catalog migration, when it completes, then every row carries a non-null memory_type drawn
+    from the five-value enum, and a row with any other value fails the schema check.
+  - Given a search filtered to memory_type=procedural, when it runs, then only procedural rows are returned,
+    and the filter is one of the fields carrying the keyword payload index created in memory-that-earns-it-t-acorn-payload-indexes.
+  - Given working-memory entries written during a run, when the run's TTL expires, then they are excluded
+    from retrieval, asserted by a test that advances a clock fixture.
+  - Given the classifier that assigns memory_type at ingest, when it cannot determine a type, then it
+    fails the unit into the dead-letter path with an explicit reason rather than defaulting silently.
+  - Given the lifecycle policy block, when it is validated, then its keys resolve against the memory_type
+    enum so type-specific decay curves are expressible.
+  depends_on:
+  - memory-grows-and-tiers-t-bitemporal-catalog
+  tags:
+  - X032
+  - memory-type
+  - catalog
+  - schema
+  - memory
+- id: memory-grows-and-tiers-t-gated-write-path
+  kind: task
+  title: 'Build the gated write path: propose to the outbox, apply a policy gate, then write canonical
+    Markdown'
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: 'There is no programmatic way for an agent to create a memory: README.md:81 states all 17 tools
+    are read-only, and the real mechanism is prompt-embedded bash appending to lessons.md, which is unportable
+    (no bash on Windows), unvalidatable and unobservable — a failed append is invisible. Add a write surface,
+    gated by MEMORY_WRITE=enabled with read-only remaining the default, whose calls append a typed ADD|UPDATE|SUPERSEDE|NOOP
+    operation record to the immutable outbox; the event consumer applies memory_write_contract and only
+    on pass writes canonical Markdown and reindexes. Present the surface as the Anthropic memory-tool
+    verbs so the safety machinery is adoptable without a new API, ship readOnly/destructive/idempotent
+    annotations on all tools old and new, and respect the tool budget from adr-012. No LLM decides the
+    operation type — the caller declares it and the gate validates it.'
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given MEMORY_WRITE is unset, when the server starts, then the write tools are not registered and the
+    server remains read-only — asserted by src/mcp-contract.test.ts against the default profile.
+  - Given MEMORY_WRITE=enabled and a valid ADD call, when it completes, then an operation record exists
+    in the outbox, the consumer's gate verdict is recorded, canonical Markdown contains the new entry,
+    and the index returns it — proven end to end by the integration job.
+  - Given a call whose declared operation contradicts the contract (for example SUPERSEDE naming a nonexistent
+    target), when it is submitted, then no canonical file changes, the outbox holds the rejected proposal
+    with its reason, and the tool returns the rule id.
+  - Given the process is killed between the outbox append and the canonical write, when the consumer restarts,
+    then it applies the pending record exactly once — asserted by a crash-injection test.
+  - Given every registered tool, when tools/list is called, then each carries readOnly/destructive/idempotent
+    annotations, and the tool-budget test from adr-012 still passes with the write tools registered.
+  - Given data/agents/, when `grep -rn 'lessons.md' data/agents/ | grep -c '>>'` runs, then it returns
+    0 and the agents call the write surface instead.
+  depends_on:
+  - memory-you-can-trust-spike-1
+  - memory-grows-and-tiers-t-write-contract
+  - memory-grows-and-tiers-t-bitemporal-catalog
+  tags:
+  - X029
+  - F039
+  - write-path
+  - outbox
+  - mcp-server
+  - tool-annotations
+- id: memory-grows-and-tiers-t-result-provenance
+  kind: task
+  title: Return the provenance and validity the substrate already computes and discards at the tool boundary
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: 'The substrate computes canonical path, content hash, outbox unit id, catalog generation and
+    embedding identity on every path and then throws all of it away when the result crosses into the MCP
+    tool response. Carrying it is the cheapest way to make the actual differentiator visible in every
+    call: competitors return text and a score, this can return text, a score and a verifiable chain to
+    a hash-checked file. It also turns the README''s ''the index is a hint, retrieve the real file'' rule
+    from prose into something the calling agent can mechanically check.'
+  priority: must
+  lane: later
+  size: S
+  acceptance:
+  - Given any search_artifacts or recall result, when it is inspected, then every entry carries canonical_path,
+    content_sha256, outbox_unit_id, catalog_generation, embedding_model, embedding_dimensions, memory_type,
+    scope, valid_from and invalid_at — asserted field by field in src/mcp-contract.test.ts.
+  - Given a result's content_sha256, when the named canonical file is hashed, then the two match — asserted
+    by an integration test that verifies the chain end to end rather than merely checking the field is
+    present.
+  - Given a result whose source file has changed since indexing, when it is returned, then the mismatch
+    is reported as an explicit integrity flag on that entry rather than omitted.
+  - Given the golden tools/list fixture, when it is regenerated, then the documented result shape includes
+    the provenance block so adopters can rely on it.
+  depends_on:
+  - memory-grows-and-tiers-t-bitemporal-catalog
+  - memory-grows-and-tiers-t-memory-type-dimension
+  tags:
+  - X018
+  - provenance
+  - tool-boundary
+  - mcp-server
+- id: memory-grows-and-tiers-t-index-memory-tiers
+  kind: task
+  title: Index the agent-memory and personal-memory tiers — the only tiers that learn are excluded three
+    ways
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: 'The exclusion runs exactly the wrong way: artifact-policy.json lists agent-memory in catalog.prune_directory_names
+    and .claude in catalog.exclude_roots, and _should_prune_dir fires on directory name during the os.walk
+    prune step (artifact_catalog.py:180-183) before _is_included ever runs — so the `.claude/agent-memory/**`
+    include glob can never win. The walk also uses followlinks=False and counts symlinked files into skipped_symlinks,
+    which is precisely what the sanctioned consolidation design produces. The learning loop goal F needs
+    — an agent writes a lesson, a later agent retrieves it semantically — is broken at the indexing step,
+    and the failure is silent.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given `artifact_catalog.py --include-memory-roots <unified-agent-memory-root> <MEMORY_ROOT>`, when
+    it runs, then those roots are catalogued with artifact_type='agent-memory' and authority_class='local',
+    even though they lie outside the workspace.
+  - Given a symlinked agent-memory root of the shape the consolidation design produces, when the catalog
+    walks it, then one level of symlink is resolved for those roots only and the files are catalogued
+    rather than counted into skipped_symlinks.
+  - Given a lesson written through the gated write path, when search_artifacts is called with artifact_type='agent-memory',
+    then the lesson is returned — the end-to-end learning loop, asserted in the integration job.
+  - Given a catalog run where files land in skipped_symlinks or outside_artifact_scope, when the run summary
+    is printed, then those counts are surfaced as a warning naming example paths, not as a silent stat.
+  - Given artifact-policy.json at HEAD, when it is read, then the broad agent-memory prune no longer blocks
+    the memory scope, while the hot lessons.md files remain governed by the two-plane contract from memory-that-earns-it-t-lessons-demotion.
+  depends_on:
+  - memory-grows-and-tiers-t-lessons-demotion
+  - memory-grows-and-tiers-t-memory-type-dimension
+  tags:
+  - F040
+  - catalog
+  - agent-memory
+  - indexing
+  - memory
+- id: memory-grows-and-tiers-t-ingest-secret-pii-gate
+  kind: task
+  title: Gate ingest for secrets and PII, and give the immutable outbox an erasure path
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: Canonical Markdown is chunked, embedded and stored with zero content inspection — a grep for
+    redact, scrub, pii or secret across artifact_ingestion.py and artifact_catalog.py returns nothing
+    — while chunk bodies land in the catalog, the outbox and Qdrant payloads. The outbox is immutable
+    by construction (atomic_write_bytes publishes via os.link no-replace at artifact_security.py:272)
+    and there is deliberately no deletion authority anywhere, so one engineer pasting a token into a handoff
+    note permanently contaminates the replay set with no answer to a deletion request. Add a pre-ingest
+    gate over each chunk body before the unit payload is written, and an authorised expunge path that
+    tombstones the affected unit while preserving the manifest hash chain.
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given a chunk body containing a value matching data/scripts/secret-scan.py's TOKEN_SHAPES, when ingest
+    runs, then the unit is refused, a dead-letter record names file:line with the value masked through
+    that module's mask(), and nothing is written to the catalog, the outbox or Qdrant.
+  - Given a clean corpus, when ingest runs, then the gate adds no false positives — asserted by running
+    it over the repo's own tracked Markdown and expecting zero refusals.
+  - 'Given an approved human authorization record, when `artifact_outbox_expunge.py --apply` runs, then
+    the affected outbox unit becomes a tombstone with an explicit expunged: true entry, the manifest hash
+    chain still verifies, the matching Qdrant points are deleted, and a receipt is written in the content-addressed
+    style of artifact_supervisor_receipt.py.'
+  - Given no authorization record, when the same command runs, then it refuses and exits non-zero — expunge
+    is never available as an ordinary operation.
+  - Given docs/DATA-RETENTION.md, when it is read, then it states what is retained, for how long, and
+    how to remove it — a question the repo today cannot answer at all.
+  depends_on:
+  - memory-grows-and-tiers-t-write-contract
+  - ci-proves-it-e4
+  tags:
+  - F138
+  - security
+  - pii
+  - secrets
+  - erasure
+  - ingestion
+- id: memory-grows-and-tiers-t-untrusted-memory-boundary
+  kind: task
+  title: Treat retrieved memory as untrusted input at the read boundary
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: Once the write path lands, anything one agent wrote is readable by another and memory becomes
+    a persistent injection channel. Wrap recalled content in explicit non-instruction structural delimiters,
+    escape boundary markers, role patterns and known injection signatures, validate each entry against
+    its declared memory_type schema, and route non-conformers into the existing reversible quarantine.
+    This is mostly wiring components that already exist — the AIDefence rules in src/security/ and the
+    quarantine machinery — and it must ship in the same release as the write path, not after it.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a stored memory whose body contains a fabricated tool-result delimiter or a role marker, when
+    it is returned through any memory tool, then the marker is escaped and the content is wrapped in a
+    delimiter block declared as non-instruction data — asserted by a test using a corpus of known injection
+    strings.
+  - Given a retrieved entry that does not validate against its declared memory_type schema, when it is
+    read, then it is routed into the reversible quarantine and excluded from the result, with the quarantine
+    reason recorded.
+  - Given the AIDefence guard, when a memory result is produced, then guardToolOutput runs over it before
+    the response is cached — closing the gap where the guard faces only the caller and never the output.
+  - Given the delimiter scheme, when it is documented in docs/THREAT-MODEL.md, then the memory-as-injection-channel
+    path is named as an in-scope threat with this control as its mitigation.
+  depends_on:
+  - memory-grows-and-tiers-t-gated-write-path
+  - ci-proves-it-e4
+  tags:
+  - X031
+  - security
+  - prompt-injection
+  - read-boundary
+- id: memory-grows-and-tiers-t-outbox-reconciliation
+  kind: task
+  title: 'Close the loop: scheduled replay reconciliation from the outbox against derived state'
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: Standard event-sourcing hygiene, and almost no new code — the immutable ledger, the event consumer,
+    the checkpointing and the watchdog all exist. Add a reconciliation consumer mode that periodically
+    rebuilds derived state (catalog rows, vector collection, projections) from the outbox alone, diffs
+    it against live derived state, fails closed with a report on divergence, surfaces the result in the
+    health watermark, and offers a --repair mode that rebuilds from the ledger. Justify it as rebuild-from-log,
+    not as implementing any preprint's asserted complexity bound.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given consistent derived state, when the reconciliation mode runs, then it reports zero divergences
+    and writes its verdict into the lifecycle health file.
+  - Given a deliberately corrupted catalog row, when reconciliation runs, then it fails closed, names
+    the divergent row, and does not silently repair — repair requires --repair.
+  - Given derived state deleted entirely, when reconciliation runs with --repair, then catalog rows, the
+    vector collection and the projections are rebuilt from the outbox and diff clean against a pre-deletion
+    snapshot — asserted end to end in the nightly integration job.
+  - Given reconciliation has not run within its declared cadence, when compute_watermark runs, then the
+    lifecycle component reports STALE.
+  - Given a unit the reconciler cannot replay, when it is encountered, then it lands in the existing dead-letter
+    path with its reason rather than aborting the whole run.
+  depends_on:
+  - memory-grows-and-tiers-t-gated-write-path
+  - memory-grows-and-tiers-t-lifecycle-schedule-health
+  tags:
+  - X034
+  - reconciliation
+  - event-sourcing
+  - outbox
+  - memory
+- id: memory-grows-and-tiers-t-graphiti-validity-filter
+  kind: task
+  title: Filter or expose Graphiti fact invalidation — stale facts currently return labelled approved
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: 'CONDITIONAL: if the owner retired Graphiti at starts-everywhere-e3, this closes as won''t-do
+    and the bi-temporal work in memory-that-earns-it-t-bitemporal-catalog carries the capability instead.
+    Otherwise: Graphiti''s bi-temporal model is the one place in the stack with a built-in hot/cold mechanism,
+    and the read path ignores it. artifact_memory.py:355-378 selects r.invalid_at and uses it only in
+    ORDER BY, so a fact Graphiti has explicitly marked superseded is returned in the same list, stamped
+    quality_status ''approved'' at :369, as a live one. Nothing ever writes invalid_at either, even though
+    Supersedes is already in graphiti_policy.py''s DEFAULT_EDGE_TYPES.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given a graph containing an invalidated edge, when query_temporal_facts is called with no as_of, then
+    the invalidated fact is not returned — the Cypher now filters r.invalid_at IS NULL.
+  - Given as_of set to a time when the fact was valid, when the query runs, then the fact IS returned
+    and its quality_status reads 'approved-superseded' rather than 'approved', so the label can never
+    lie.
+  - Given the as_of parameter, when it is supplied to the MCP tool, the service /v1/facts route and the
+    Python layer, then all three honour it — asserted by a test exercising each layer.
+  - Given a Supersedes edge persisted through the policy layer, when the write completes, then invalid_at
+    is set on the superseded edge by the new invalidate stage, so the field the reader now honours is
+    actually populated.
+  - Given the owner retired Graphiti in M1, when this item is reviewed, then it is closed as won't-do
+    with that decision cited, and no partial implementation is left behind.
+  depends_on:
+  - starts-everywhere-e3
+  tags:
+  - F068
+  - graphiti
+  - bitemporal
+  - correctness
+  - memory
+- id: memory-grows-and-tiers-t-graphiti-tokenized-retrieval
+  kind: task
+  title: Replace the whole-query CONTAINS lookup in temporal_facts with tokenized, time-filtered graph
+    retrieval
+  status: planned
+  parent: memory-grows-and-tiers-e1
+  summary: CONDITIONAL on the same M1 Graphiti decision as its sibling. artifact_memory.py:355-365 passes
+    the entire query string as one needle to four toLower(...) CONTAINS clauses, so a natural-language
+    question only matches if that exact substring appears verbatim in a name or fact — strictly weaker
+    than the FTS5 lexical index already in place, which means the graph adds FalkorDB, an LLM extractor
+    and an embedder and buys nothing. Route lookup through graphiti_core's own hybrid search, or at minimum
+    tokenize with the existing artifact_retrieval._query_terms and OR the terms, and move the hardcoded
+    host/port/password into the runtime config alongside the qdrant block.
+  priority: could
+  lane: later
+  size: M
+  acceptance:
+  - Given a stored fact and a natural-language query sharing three content words but no verbatim substring,
+    when query_temporal_facts runs, then the fact is returned — asserted by a test that fails against
+    HEAD.
+  - Given the query path, when it is read at HEAD, then it either calls graphiti_core's hybrid search
+    or tokenizes through artifact_retrieval._query_terms; the whole-query needle is gone.
+  - Given the tool input schema at src/index.ts, when it is inspected, then as_of, valid_from and valid_to
+    are declared and translate to the documented bi-temporal WHERE clause.
+  - Given the FalkorDB connection, when `grep -rn '6379\|falkor' workspace-tooling/artifact_memory.py`
+    runs, then host, port and password come from the runtime config rather than the two hardcoded call
+    sites.
+  - Given the owner retired Graphiti in M1, when this item is reviewed, then it is closed as won't-do
+    with that decision cited.
+  depends_on:
+  - memory-grows-and-tiers-t-graphiti-validity-filter
+  tags:
+  - F044
+  - graphiti
+  - retrieval
+  - tokenization
+  - memory

@@ -1,0 +1,1012 @@
+schema: roadmap/1
+slug: native-everywhere
+project: agent-kit
+title: M5 Native Everywhere — native transport, cross-OS supervision, and a projection without symlinks
+status: draft
+phase: sequenced
+brief: 'M5 makes the substrate a first-class citizen on all three operating systems. Three planes move
+  at once: the IPC transport between the MCP adapter and the resident memory service (AF_UNIX only — `hasattr(socket,
+  ''AF_UNIX'')` is False in Windows CPython, and `src/tools/artifact-memory.ts:169` makes win32 the first
+  clause of a rejection test); the supervision plane (five `com.personal.*.plist` files that hardcode
+  `$HOME/Work/workspace/scripts/` — a directory this repo does not contain — and so cannot install even
+  on macOS); and the Obsidian projection (a symlink farm built through `dir_fd=` calls, and `os.supports_dir_fd`
+  is empty on Windows). Each becomes one declarative contract with per-OS backends, and the POSIX trust
+  model becomes a pluggable privacy backend that fails CLOSED where it cannot be enforced — today on Windows
+  `chmod(0o700)` reads back `0o777` and `st_uid` is `0`, so the owner-only guarantee silently degrades
+  while CI reports green. It lands after M4 because the AF_UNIX-to-named-pipe port and the three-way supervisor
+  are the two largest items on the board and both are worthless if the kit is not installable; it precedes
+  M8 because goal E''s lifecycle jobs cannot run cross-OS until the cadence plane does.'
+goal:
+  hmw: How might we make the transport, the supervision plane and the vault projection first-class on
+    Windows and Linux — without weakening the POSIX trust boundary that is the only thing making the memory
+    service safe today?
+  objective: Run the full substrate — resident memory service, scheduled lifecycle jobs and the Obsidian
+    projection — natively on Windows, Linux and macOS, driven by one declarative service contract rendered
+    to launchd, systemd and Task Scheduler, and one transport contract with a per-OS privacy backend that
+    fails closed.
+  key_results:
+  - 'All four artifact-memory MCP tools return live service results on windows-latest, macos-latest and
+    ubuntu-latest: `build/transport-conformance.json` records at least one passing backend per OS, and
+    the CI matrix FAILS (not skips) if any OS reports zero backends.'
+  - '`git ls-files ''workspace-tooling/*.plist''` is empty. All five services render from `workspace-tooling/services/<name>/service.toml`,
+    and `python workspace-tooling/service_manager.py check` exits 0 on all three OSes.'
+  - '`service_manager.py install --all` completes with no UAC/elevation prompt on Windows and no sudo
+    on Linux/macOS, and `status --json` reports every service installed and running from the OS supervisor''s
+    own view (not from the health file alone).'
+  - '`python -m unittest discover -s workspace-tooling/tests` is green on ubuntu-latest and windows-latest
+    with zero whole-module darwin skips in test_artifact_watchdog.py, test_artifact_backup.py and test_artifact_consumer_launchd.py.'
+  - The vault projection builds on all three OSes with zero symlinks, and `artifact_catalog.py --json`
+    reports `skipped_symlinks == 0` with projected-stub count equal to catalogued document count.
+  - '`grep -rn ''GitLab/\|Work/workspace\|/bin/launchctl\|osascript\|Library/Logs'' workspace-tooling/`
+    returns hits only inside the darwin renderer/backend modules.'
+  wont:
+  - No memory-capability work. Retrieval configuration, the gold set, the hot/warm/cold tier model and
+    the gated write path are M8; this milestone only makes the plane they run on portable.
+  - No skills corpus, authoring path or ROI ledger work (M6). data/skills/ holds exactly one skill (handoff/),
+    so anything premised on a skill population stays sequenced after a corpus exists.
+  - No port of the four bash/jq PreToolUse hooks (F006/F111/F132) — those belong to M3's guard epic, even
+    though they are also POSIX-only.
+  - WSL is not removed or deprecated. The documented, CI-tested WSL2 path from M2 remains the supported
+    Windows story until the native transport ships, and stays supported afterwards as the low-friction
+    option.
+  - No system-wide (root/Administrator) service installation, no Windows Service Control Manager backend,
+    and no remote or cross-machine supervision. User-level only, per X027.
+  - No Docker work, no Qdrant packaging and no no-Qdrant degraded mode (M4). No Graphiti or graph work
+    at all.
+  - The naming decision is not re-opened. M5 renders service labels from whatever M1's owner decision
+    settled; it does not choose the name.
+generated_by:
+  agent: claude-opus-5
+  at: '2026-07-26'
+  brief: multi-workflow audit + landscape benchmark synthesis
+retired: []
+items:
+- id: native-everywhere-e1
+  kind: epic
+  title: 'Pluggable IPC transport: UDS on POSIX, named pipe on Windows'
+  status: planned
+  summary: Introduce a transport abstraction with AF_UNIX as the POSIX default (the stronger boundary)
+    and a DACL-restricted named-pipe backend on Windows, implemented on both the TypeScript adapter and
+    the Python service, plus a loopback+token backend so a container can exercise the service at all.
+    In the same move, split artifact_security.py into a policy layer and a pluggable privacy backend so
+    POSIX mode bits and Windows ACLs become two implementations of one contract rather than one hardcoded
+    assumption that silently degrades. The outcome is that the four artifact-memory tools work on Windows
+    instead of failing at a literal platform check, and the owner-only custody guarantee either holds
+    or raises — never passes vacuously.
+  priority: must
+  lane: next
+  size: XL
+  acceptance:
+  - Given a Windows host with the memory service running, when `node dist/index.js` starts under the default
+    (personal) profile and `artifact_memory_status` is called, then it returns a live service payload
+    rather than the 'artifact memory unavailable on this platform' degradation M1 introduced, and `src/mcp-contract.test.ts`
+    passes on windows-latest.
+  - Given any of the three OSes, when `python -m unittest workspace-tooling.tests.test_transport_conformance`
+    runs, then an identical assertion set passes against every backend `artifact_transport.available_backends()`
+    reports, and the suite fails (not skips) if the platform reports zero backends.
+  - Given a path whose privacy the active backend cannot enforce, when any `artifact_security.require_private_*`
+    is called, then `PrivateStateError` is raised — never an AttributeError and never a silent pass; verified
+    by `python -m unittest workspace-tooling.tests.test_artifact_security -k fail_closed` on windows-latest.
+  - Given `grep -n 'win32' src/tools/artifact-memory.ts`, then no hit is part of a rejection condition;
+    the only platform branch is transport/trust-backend selection.
+  depends_on:
+  - gates-green-e4
+  - named-and-installable-e2
+  tags:
+  - F005
+  - F126
+  - F003
+  - transport
+  - windows
+  - ipc
+  - security-model
+  - portability
+- id: native-everywhere-spike-1
+  kind: spike
+  title: '[SPIKE] Choose the Windows endpoint: DACL-restricted named pipe vs loopback TCP + token'
+  status: planned
+  parent: native-everywhere-e1
+  summary: 'F005 and F126 both propose `\\.\pipe\agent-kit-artifact-memory-<sid>` restricted to the current
+    SID, but Python''s stdlib has no named-pipe server — `socketserver.UnixStreamServer` is defined only
+    when `socket.AF_UNIX` exists and there is no NT-pipe equivalent — so a named-pipe server needs pywin32/win32pipe,
+    a Windows-only native dependency. The Node side is free: `http.request({ socketPath })` already accepts
+    pipe paths, so the call site at src/tools/artifact-memory.ts:108 would not change. Time-box three
+    days, prototype both endpoints end to end, measure them, and put the dependency question to the owner
+    as a recorded decision.'
+  priority: must
+  lane: now
+  size: S
+  acceptance:
+  - 'Given a three-day time box, when the spike ends, then `docs/spikes/windows-ipc-endpoint.md` exists
+    recording: (a) a runnable prototype under `spikes/win-ipc/` in which a Python `win32pipe.CreateNamedPipe`
+    server with a DACL restricted to the current SID serves one HTTP/1.1 JSON round trip to a Node `http.request({
+    socketPath })` client; (b) the same round trip over 127.0.0.1 with a 0600 token file and an Authorization
+    header; (c) measured p50/p95 round-trip latency for both over 1000 requests; (d) the pywin32 wheel
+    availability matrix for CPython 3.12 on win-x86_64 and win-arm64.'
+  - Given the named-pipe prototype, when a second local user account attempts to connect to the pipe,
+    then the connection is refused, and the exact DACL string used is recorded in the report.
+  - Given the spike report, when the owner reviews it, then a decision is recorded as an ADR under `docs/adr/`
+    stating which endpoint is the Windows default and whether pywin32 becomes a `[windows]` extra in the
+    substrate pyproject (from M4) or is rejected in favour of loopback+token. No implementation story
+    starts before that ADR is merged.
+  tags:
+  - F005
+  - F126
+  - spike
+  - windows
+  - named-pipe
+  - pywin32
+  - dependency-decision
+  - portability
+- id: native-everywhere-t-transport-contract
+  kind: task
+  title: Make the runtime config carry a discriminated {transport, endpoint} service block
+  status: planned
+  parent: native-everywhere-e1
+  summary: '`workspace-tooling/artifact_runtime.py:249` hardcodes `expected_service_fields = {"socket_path"}`
+    and `:24` pins `SCHEMA_VERSION = 2`, so the runtime config can only ever describe a Unix socket; `:432-433`
+    feeds `service.get("socket_path")` into `_future_private_socket`. Replace the block with `{transport,
+    endpoint}` where transport is one of `uds` | `npipe` | `loopback`, bump SCHEMA_VERSION to 3, and gate
+    the `require_private_socket` S_ISSOCK/0600/uid ladder at `:106-137` to the `uds` branch while the
+    other transports dispatch to the privacy backend. Ship a one-shot migration so an existing schema-2
+    config on a live machine is not orphaned.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - 'Given an existing schema_version 2 runtime config containing `service.socket_path`, when `python
+    workspace-tooling/artifact_memory_provision.py migrate-runtime --apply` runs, then the file becomes
+    schema_version 3 with `service: {"transport": "uds", "endpoint": "<the old socket_path>"}` and the
+    original is preserved alongside as `<name>.v2.bak`.'
+  - 'Given a schema-3 config with `transport: "npipe"` and an `endpoint` of `\\.\pipe\agent-kit-artifact-memory-<sid>`,
+    when `artifact_runtime.load_runtime()` runs on win32, then it returns without raising and `require_private_socket`
+    is never called (asserted with a mock).'
+  - 'Given a schema-3 config with `transport: "uds"`, when it is loaded on any POSIX host, then the existing
+    S_ISSOCK + mode-0600 + uid-equality checks still run — proven by every existing assertion in `workspace-tooling/tests/test_artifact_runtime.py`
+    passing unchanged.'
+  - Given a config whose `transport` value is not one of the three accepted values, when it is loaded,
+    then `RuntimeConfigError` is raised naming both the field and the accepted set, and the process exits
+    non-zero.
+  depends_on:
+  - native-everywhere-spike-1
+  tags:
+  - F005
+  - F126
+  - runtime-config
+  - schema-version
+  - transport
+  - substrate
+- id: native-everywhere-t-py-transport-backends
+  kind: task
+  title: Replace UnixStreamServer and the AF_UNIX client with a transport backend factory
+  status: planned
+  parent: native-everywhere-e1
+  summary: 'On the Python side three sites hardcode AF_UNIX: `artifact_memory_service.py:1564` declares
+    `class ArtifactUnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer)` — a class
+    body that raises AttributeError at import on Windows because `UnixStreamServer` only exists when `socket.AF_UNIX`
+    does; `artifact_memory_service.py:1677` probes stale endpoints with `socket.socket(socket.AF_UNIX,
+    socket.SOCK_STREAM)`; and `artifact_service_client.py:42` builds the client connection the same way.
+    Add `workspace-tooling/artifact_transport.py` exposing `available_backends()`, `server_factory(transport,
+    endpoint, handler)`, `client_connection(transport, endpoint, timeout)` and `probe_stale(transport,
+    endpoint)`, and reduce those three sites to backend calls. The lifecycle lock at `_socket_lifecycle_lock_path`
+    (`:1555-1561`) and the refuse-if-active semantics must survive the port unchanged.'
+  priority: must
+  lane: next
+  size: L
+  acceptance:
+  - Given a Windows CPython where `python -c "import socket; print(hasattr(socket,'AF_UNIX'))"` prints
+    False, when `python -c "import artifact_memory_service"` runs with PYTHONPATH set to workspace-tooling,
+    then it exits 0 — today it raises AttributeError at the class definition on line 1564.
+  - Given a schema-3 npipe (or loopback) config, when `python workspace-tooling/artifact_memory_service.py
+    --config <cfg> --health-file <path>` starts on Windows, then the process stays up and writes a health
+    file within 60 seconds.
+  - Given a running service on any transport, when `artifact_service_client.post_json(route='/status',
+    ...)` is called, then the same JSON response shape is returned — asserted by one parametrized test
+    that iterates `artifact_transport.available_backends()`.
+  - Given a STALE endpoint left behind by a killed service, when the service restarts, then it binds successfully
+    using the backend's own probe (AF_UNIX connect on posix, CreateFile on the pipe, TCP connect on loopback);
+    given a LIVE endpoint, then it refuses with the existing 'Artifact Memory Service socket is already
+    active' ServiceError. Both cases asserted per backend in workspace-tooling/tests/test_artifact_memory_service.py.
+  depends_on:
+  - native-everywhere-t-transport-contract
+  tags:
+  - F005
+  - F126
+  - transport
+  - af-unix
+  - memory-service
+  - substrate
+- id: native-everywhere-t-ts-transport-backends
+  kind: task
+  title: Replace absoluteSocketPath and validateSecureSocket with a platform-dispatched endpoint-trust
+    interface
+  status: planned
+  parent: native-everywhere-e1
+  summary: '`src/tools/artifact-memory.ts:165-182` makes `process.platform === "win32"` the FIRST clause
+    of `absoluteSocketPath`''s rejection test, so every Windows call throws before a connection is attempted;
+    `currentUid()` at `:183-188` throws whenever `process.getuid` is undefined (always, on Windows); `validateSecureSocket()`
+    at `:206-260` walks every path component asserting POSIX `stat.uid` and mode bits; and `MAX_SOCKET_PATH_BYTES
+    = 103` at `:53` is the POSIX `sun_path` limit applied unconditionally. Replace these with `resolveEndpoint()`
+    and a `validateEndpointTrust()` interface dispatched on transport, keeping the POSIX implementation
+    byte-for-byte and adding a Windows owner-SID check for the pipe. Also read the endpoint from the provisioner''s
+    runtime config rather than the hardcoded default at `:38-47`.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given `process.platform === 'win32'` and a runtime config declaring an npipe endpoint, when `resolveEndpoint()`
+    is called, then it returns the endpoint instead of throwing — and `node dist/index.js` under the default
+    personal profile on Windows registers all 17 tools with `artifact_memory_status` reaching the service.
+  - Given a POSIX host, when the uds branch runs, then the 103-byte length cap, home-prefix requirement,
+    normalization check, NUL rejection, trailing-separator rejection and the full per-component lstat/uid/mode
+    ladder are all still enforced — proven by `src/tools/artifact-memory.test.ts` passing UNMODIFIED on
+    macos-latest and ubuntu-latest.
+  - Given a named pipe whose owner SID is not the current user's, when `validateEndpointTrust()` runs
+    on Windows, then it throws the existing SOCKET_ERROR and no HTTP request is issued.
+  - Given `npx tsc --noEmit && grep -rn 'process.getuid' src/`, then the only hits are inside the POSIX
+    trust backend module, and the build exits 0.
+  depends_on:
+  - native-everywhere-t-transport-contract
+  - native-everywhere-spike-1
+  tags:
+  - F126
+  - F005
+  - mcp-adapter
+  - typescript
+  - endpoint-trust
+  - mcp-server
+- id: native-everywhere-t-security-backend-split
+  kind: task
+  title: Split artifact_security into a policy layer and a pluggable OS privacy backend
+  status: planned
+  parent: native-everywhere-e1
+  summary: '`workspace-tooling/artifact_security.py` is the gate every derived-state path passes through
+    and its whole trust model is POSIX-only: `require_private_directory` (:81-95) demands mode exactly
+    0o700, `require_private_file` (:108-122) demands exactly 0o600, `_owned` (:44-48) demands `st_uid
+    == os.geteuid()`, and `fsync_directory` (:219-228) opens a directory with `os.open`. On Windows every
+    one of these is meaningless in the DANGEROUS direction — `chmod(0o700)` on a directory reads back
+    0o777, `chmod(0o600)` on a file reads back 0o666, `st_uid` is always 0 — so the checks PASS while
+    the guarantee is absent, and `os.open(<dir>)` raises PermissionError WinError 13. Split into a policy
+    layer plus `PosixPrivacyBackend` (today''s logic verbatim) and `WindowsPrivacyBackend` (DACL grants
+    only the current SID; create with inheritance removed), selected explicitly at import and failing
+    CLOSED when no backend can enforce.'
+  priority: must
+  lane: next
+  size: L
+  acceptance:
+  - Given a Windows host, when `artifact_security.ensure_private_directory(p)` runs, then `icacls <p>`
+    shows a grant to the current SID only and inheritance removed, and `require_private_directory(p)`
+    returns p; when the DACL is then widened to include Everyone, then `require_private_directory(p)`
+    raises `PrivateStateError`.
+  - 'Given a platform for which no privacy backend can enforce the policy, when any `require_private_*`
+    is called, then `PrivateStateError` is raised naming the platform. Reproduction: `python -c "import
+    artifact_security as s; s._select_backend(''unsupported'')"` exits non-zero with PrivateStateError,
+    never AttributeError and never 0.'
+  - Given `fsync_directory` on Windows, when it is called on a private directory, then it returns None
+    as a documented no-op instead of raising `PermissionError [WinError 13]` — `python -m unittest workspace-tooling.tests.test_artifact_security
+    -k fsync` passes on windows-latest.
+  - Given macos-latest and ubuntu-latest, when `python -m unittest workspace-tooling.tests.test_artifact_security`
+    runs, then every pre-existing assertion passes unchanged, confirming PosixPrivacyBackend preserved
+    the mode-bit and uid logic verbatim.
+  depends_on:
+  - gates-green-e4
+  tags:
+  - F003
+  - F126
+  - security-model
+  - acl
+  - fail-closed
+  - windows
+  - security
+- id: native-everywhere-t-security-fixtures
+  kind: task
+  title: Rewrite the permission-based test fixtures to acquire unreadability through the privacy backend
+  status: planned
+  parent: native-everywhere-e1
+  summary: The fail-closed guarantees are tested by raw `os.chmod`, which is a no-op on Windows, so the
+    tests report green while the guarantee is absent — the exact failure direction F003 flags as worse
+    than an unsupported platform. `workspace-tooling/tests/test_artifact_watermark.py:535` (`test_unreadable_subdirectory_fails_the_fingerprint_closed`)
+    chmods a nested dir to 0o000 and asserts `quarantine_fingerprint` returns None; on Windows it returned
+    a real SHA-256. Its siblings at `:526` and `:551` chmod to 0o400/0o000 and assert STATE_UNKNOWN; on
+    Windows they report 'degraded' != 'unknown'. Route all of these through a backend method (`make_unreadable`/`restore`)
+    that is a real DACL denial on Windows and chmod on POSIX, and skip loudly where the backend cannot
+    deliver it.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given windows-latest, when `python -m unittest workspace-tooling.tests.test_artifact_watermark` runs,
+    then `test_unreadable_subdirectory_fails_the_fingerprint_closed` PASSES with `assertIsNone(fingerprint)`
+    because the fixture removed read access through `privacy_backend.make_unreadable(path)` rather than
+    `os.chmod(nested, 0o000)`.
+  - Given windows-latest, when the same module runs, then `test_unstattable_child_reports_unknown_rather_than_raising`
+    and `test_unreadable_root_reports_unknown_rather_than_all_clear` both assert `STATE_UNKNOWN` and pass.
+  - Given a platform whose backend cannot make a path unreadable, when the fixture runs, then the test
+    SKIPS with an explicit reason naming the backend — it never passes vacuously, and a test asserts that
+    the skip reason is non-empty.
+  - Given `grep -rn 'os.chmod' workspace-tooling/tests/`, then no remaining hit is used to establish a
+    privacy precondition (hits inside the POSIX backend's own unit test are permitted and enumerated in
+    an allowlist test).
+  depends_on:
+  - native-everywhere-t-security-backend-split
+  tags:
+  - F003
+  - tests
+  - fail-closed
+  - fixtures
+  - security
+- id: native-everywhere-t-loopback-fallback
+  kind: task
+  title: Add a loopback TCP + token transport so a container can exercise the service
+  status: planned
+  parent: native-everywhere-e1
+  summary: 'F005 asks explicitly for a `127.0.0.1:<port>` fallback with a 0600 token file and a required
+    Authorization header, because neither UDS nor a named pipe is reliably available inside a CI container,
+    and today there is no way to run the service in CI at all. Implement it as the third `artifact_transport`
+    backend: bind loopback only, mint a per-boot token into the derived root at 0600 (or owner-only DACL
+    via the privacy backend), and require `Authorization: Bearer <token>` on every route. This is the
+    backend that makes the M3 integration job and the conformance suite possible on every OS.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - 'Given a Linux container with `AGENT_MEMORY_TRANSPORT=loopback`, when the service starts, then it
+    binds 127.0.0.1 on an ephemeral port, writes `<derived_root>/artifact-memory-token` at mode 0600,
+    and records `{"transport": "loopback", "endpoint": "127.0.0.1:<port>"}` in the runtime config.'
+  - 'Given a request without a valid `Authorization: Bearer <token>` header, when it reaches the loopback
+    listener, then the service returns HTTP 401 and writes no part of the request body to any log — asserted
+    in workspace-tooling/tests/test_artifact_memory_service.py.'
+  - Given a configured bind address that is not 127.0.0.1 or ::1, when the service starts, then it refuses
+    with a ServiceError naming the rejected address and exits non-zero.
+  - Given the token file, when its mode or owner is not owner-only, when the client starts, then it refuses
+    to read the token and raises rather than sending it.
+  depends_on:
+  - native-everywhere-t-py-transport-backends
+  - native-everywhere-t-security-backend-split
+  tags:
+  - F005
+  - loopback
+  - token-auth
+  - ci-enablement
+  - substrate
+- id: native-everywhere-t-transport-conformance
+  kind: task
+  title: One conformance suite that runs the whole memory API over every available transport
+  status: planned
+  parent: native-everywhere-e1
+  summary: With three backends there are now three ways to be silently wrong, and today's only transport
+    test — `src/tools/artifact-memory.test.ts`, whose socketFixture at `:42` binds an AF_UNIX socket —
+    is orphaned from `npm test` and 12/12 red on Windows. Add `workspace-tooling/tests/test_transport_conformance.py`
+    that drives the identical assertion set over every backend the platform reports, wire the TypeScript
+    suite so it runs against the platform's backend rather than being excluded, and emit a machine-readable
+    result the M3 gate runner asserts on.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given `python -m unittest workspace-tooling.tests.test_transport_conformance` on ubuntu-latest, macos-latest
+    and windows-latest, then every backend from `artifact_transport.available_backends()` passes the same
+    assertions (status, search, get, error envelope shape, oversize-body rejection above MAX_JSON_BYTES,
+    wire-protocol-version mismatch handling), and the suite FAILS rather than skips if the platform reports
+    zero backends.
+  - Given the M3 CI matrix, when the windows-latest leg runs `npm test`, then `src/tools/artifact-memory.test.ts`
+    is included and un-skipped, exercising the npipe or loopback backend instead of being excluded for
+    EACCES on its AF_UNIX bind at src/tools/artifact-memory.test.ts:42.
+  - Given a conformance run, then `build/transport-conformance.json` records `{os, backend, passed, failed}`
+    per backend, and the committed gate runner exits non-zero if the file is missing, empty, or reports
+    any failure.
+  depends_on:
+  - native-everywhere-t-py-transport-backends
+  - native-everywhere-t-ts-transport-backends
+  - native-everywhere-t-loopback-fallback
+  - ci-proves-it-e1
+  tags:
+  - F005
+  - F126
+  - conformance
+  - tests
+  - ci
+- id: native-everywhere-e2
+  kind: epic
+  title: One declarative service contract rendered to launchd, systemd and Task Scheduler
+  status: planned
+  summary: A single schedule/service declaration per service renders launchd plists, systemd user units
+    and timers, and per-user Windows Scheduled Tasks needing no admin rights, driven by an install/uninstall/start/stop/status/logs
+    verb set modelled on service-manager-rs. The five broken `com.personal.*` plists — which hardcode
+    `$HOME/Work/workspace/scripts/`, embed a literal `$HOME` launchd never expands, and pin `/opt/homebrew/bin`
+    — become generated templates and are deleted from the tree. The three hardcoded `/bin/launchctl` probes
+    and the plist-derived cadence constants move behind one OS dispatch, the alert channel dispatches
+    per OS instead of shelling `/usr/bin/osascript`, and the three plist-asserting test modules assert
+    against the OS-neutral contract plus a per-OS rendered artifact.
+  priority: should
+  lane: next
+  size: XL
+  acceptance:
+  - Given `git ls-files 'workspace-tooling/*.plist'`, then the output is empty — all five com.personal.*
+    plists are removed and every unit is rendered from a contract.
+  - Given each of the three OSes, when `python workspace-tooling/service_manager.py render --all --dry-run`
+    runs, then it prints the rendered artifact for that OS (launchd plist / systemd .service+.timer /
+    Scheduled Task XML), and `service_manager.py check` exits non-zero listing every argv path, interpreter
+    or log directory that does not exist.
+  - Given a non-elevated Windows user, when `service_manager.py install artifact-memory-service` runs,
+    then `Get-ScheduledTask -TaskName 'agent-kit-artifact-memory-service'` returns a registered per-user
+    task, `service_manager.py status --json` reports it running, and no UAC prompt was raised.
+  - Given `python -m unittest discover -s workspace-tooling/tests` on ubuntu-latest and windows-latest,
+    then test_artifact_watchdog.py, test_artifact_backup.py and test_artifact_consumer_launchd.py are
+    all green with zero whole-module darwin skips.
+  depends_on:
+  - gates-green-e4
+  - named-and-installable-e2
+  tags:
+  - F004
+  - F051
+  - F066
+  - F103
+  - F174
+  - F011
+  - F016
+  - F147
+  - X027
+  - supervision
+  - scheduling
+  - cross-os
+  - lifecycle
+- id: native-everywhere-t-service-contract-schema
+  kind: task
+  title: Declare the five services as OS-neutral service.toml contracts with a schema and a validate gate
+  status: planned
+  parent: native-everywhere-e2
+  summary: 'Create `workspace-tooling/services/<name>/service.toml` for artifact-memory-service, artifact-event-consumer,
+    artifact-qdrant-bootstrap, artifact-watchdog and artifact-backup-daily, plus `workspace-tooling/schemas/service-contract.schema.json`
+    (Draft 2020-12, alongside the existing portfolio-index.schema.json). The five plists are the source
+    of truth for the VALUES but every path defect must be fixed in the port: `$HOME/Work/workspace/scripts/<module>.py`
+    becomes `<repo>/workspace-tooling/<module>.py`; the literal `$HOME` strings launchd never expands
+    become render-time substitutions; the `/opt/homebrew/bin` PATH is derived from the resolved interpreter.
+    Interpreter choice becomes a declared property, not a path literal: the watchdog runs on `system`
+    (it must not depend on the venv whose absence it reports) while backup-daily runs on `venv` (system
+    python has no qdrant_client). Labels come from whatever name M1 settled, replacing `com.personal.*`.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given the five service.toml files, when `python workspace-tooling/service_manager.py validate` runs
+    on all three OSes, then all five validate against workspace-tooling/schemas/service-contract.schema.json
+    and the command exits 0.
+  - Given `grep -rn 'Work/workspace' workspace-tooling/services/` then there are zero hits, and given
+    `grep -rn '\$HOME\|/opt/homebrew' workspace-tooling/services/` then there are zero hits.
+  - Given the watchdog contract, then `interpreter = "system"`; given the backup-daily contract, then
+    `interpreter = "venv"`. Both are asserted by a test reading the contract property, replacing the `/usr/bin/python3`
+    and `personal-artifacts/venv/bin/python` path literals the current tests assert on.
+  - Given the memory-service contract, then it declares `schedule = { kind = "keepalive", throttle_seconds
+    = 10 }`, `run_at_load = true`, `umask = 0o077`, and distinct stdout/stderr destinations — matching
+    the values the retired plist carried; given the backup-daily contract, then `schedule = { kind = "calendar",
+    ... }` with `run_at_load = false` (RunAtLoad would fire a ~536 MB write at bootstrap).
+  - Given the consumer contract, then argv includes --health-file, --desktop-notify, --reconcile-retry-seconds
+    and --runtime-config, and includes NEITHER --qdrant-path nor --collection nor any literal collection
+    name — asserted by a test so the pre-cutover sink regression cannot return.
+  depends_on:
+  - starts-everywhere-e1
+  tags:
+  - F004
+  - F147
+  - F103
+  - F051
+  - service-contract
+  - toml
+  - schema
+  - lifecycle
+- id: native-everywhere-t-service-manager-cli
+  kind: task
+  title: 'Build service_manager.py: install / uninstall / start / stop / status / logs / render / validate
+    / check'
+  status: planned
+  parent: native-everywhere-e2
+  summary: 'Add `workspace-tooling/service_manager.py` as the single supervision entry point, modelled
+    on the service-manager-rs interface X027 names: user level by default, a restart policy each backend
+    approximates, and a status verb reading BOTH the OS supervisor''s view and the existing health-file
+    JSON so the known false-healthy probe has exactly one place to be fixed. It owns backend selection
+    (launchd / systemd-user / schtasks) and exposes `is_running(label)` as the function the three retired
+    launchctl probes will call. Every verb accepts a service name or `--all`, and no verb may require
+    elevation.'
+  priority: must
+  lane: next
+  size: L
+  acceptance:
+  - Given `python workspace-tooling/service_manager.py --help`, then the verbs install, uninstall, start,
+    stop, status, logs, render, validate and check are all listed, and each accepts a service name or
+    --all.
+  - Given any OS, when `service_manager.py install <name>` runs as an unprivileged user, then the unit
+    is written to that OS's per-user location (~/Library/LaunchAgents, $XDG_CONFIG_HOME/systemd/user,
+    or a per-user Scheduled Task) with no sudo and no elevation prompt; when `uninstall <name>` then runs,
+    then the unit is removed and `status <name>` reports installed=false.
+  - Given `service_manager.py status --json`, then it emits one row per declared service with {name, installed,
+    running, health_file, health_age_seconds, backend}, where `running` comes from the OS supervisor and
+    `health_age_seconds` from the health file, so a running-but-stale service is distinguishable from
+    a stopped one — asserted by a test that stops the service and leaves the health file in place.
+  - Given `service_manager.py check`, when any argv path, interpreter or log directory referenced by a
+    rendered unit does not exist, then it exits non-zero and prints every missing path; when all exist,
+    it exits 0.
+  - Given `service_manager.py logs <name> --tail 50`, then it prints the last 50 lines of that service's
+    stdout and stderr destinations on all three OSes, and exits non-zero with an actionable message if
+    the destinations do not exist.
+  depends_on:
+  - native-everywhere-t-service-contract-schema
+  tags:
+  - F004
+  - X027
+  - F174
+  - service-manager
+  - cli
+  - supervision
+  - lifecycle
+- id: native-everywhere-t-render-launchd
+  kind: task
+  title: Render launchd plists from the contract and delete the five checked-in plists
+  status: planned
+  parent: native-everywhere-e2
+  summary: 'Implement the darwin backend so the five plists are generated with real absolute paths substituted
+    at render time, then `git rm` the checked-in `workspace-tooling/com.personal.artifact-*.plist` files.
+    This is the fix for the defect that makes them non-functional even on macOS: launchd performs no expansion
+    in ProgramArguments, WorkingDirectory or StandardOutPath, yet the memory-service plist passes the
+    literal strings `$HOME/.local/share/personal-artifacts/venv/bin/python` and `$HOME/Work/workspace/scripts/artifact_memory_service.py`
+    at lines 10-11, uses `$HOME` again at :18 and :40, and points at a directory this repository does
+    not contain. The rendered output must preserve every behavioural property the plists encoded.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given macOS, when `python workspace-tooling/service_manager.py render --all --out build/units/darwin`
+    runs, then five plists are produced whose ProgramArguments contain only absolute resolved paths (zero
+    occurrences of the literal `$HOME`, zero occurrences of `Work/workspace/scripts`), and `plutil -lint`
+    exits 0 for each of the five files.
+  - Given the rendered memory-service plist compared against the retired com.personal.artifact-memory-service.plist,
+    then Label, Umask (0o77), KeepAlive, RunAtLoad, ThrottleInterval (10) and the distinct StandardOutPath/StandardErrorPath
+    are all preserved — asserted by a test over the rendered output, not by a diff against a checked-in
+    file.
+  - Given `git ls-files 'workspace-tooling/*.plist'`, then the output is empty, and `git log --diff-filter=D
+    --name-only` shows all five plists deleted in this change.
+  - Given `service_manager.py install --all` on macOS followed by `launchctl list | grep artifact`, then
+    all five labels appear, and `service_manager.py uninstall --all` removes them.
+  depends_on:
+  - native-everywhere-t-service-manager-cli
+  tags:
+  - F004
+  - F147
+  - F103
+  - launchd
+  - macos
+  - renderer
+  - lifecycle
+- id: native-everywhere-t-render-systemd
+  kind: task
+  title: Render systemd user units and timers from the same contract
+  status: planned
+  parent: native-everywhere-e2
+  summary: 'Implement the Linux backend emitting one `.service` per service plus a `.timer` for each scheduled
+    job, all at user level so no root is needed: keepalive services become `Type=simple` with `Restart=on-failure`
+    and `RestartSec` from the contract''s throttle, and interval schedules become `OnUnitActiveSec` timers.
+    This closes the gap F051 measures — a grep for systemd, .timer, schtasks or ''Task Scheduler'' across
+    workspace-tooling/ and data/ currently returns zero hits, so the entire memory lifecycle is unschedulable
+    on Linux.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given Linux, when `python workspace-tooling/service_manager.py render --all --out build/units/linux`
+    runs, then artifact-memory-service.service (Type=simple, Restart=on-failure, RestartSec=10) plus .service/.timer
+    pairs for the four scheduled jobs are produced, and `systemd-analyze verify build/units/linux/*.service`
+    exits 0.
+  - Given `service_manager.py install --all` on Linux, when it completes, then `systemctl --user is-enabled
+    agent-kit-artifact-event-consumer.timer` prints `enabled` and `systemctl --user list-timers` shows
+    a next elapse within the contract's declared interval.
+  - Given the consumer contract's 900-second interval, then the rendered timer's OnUnitActiveSec is `900s`
+    — asserted by a test that changes the contract value and observes the rendered value change, not by
+    a literal.
+  - Given each rendered unit, then StandardOutput and StandardError resolve to DISTINCT destinations under
+    the OS-aware derived root, asserted by a test.
+  depends_on:
+  - native-everywhere-t-service-manager-cli
+  tags:
+  - F051
+  - F066
+  - F174
+  - systemd
+  - linux
+  - renderer
+  - lifecycle
+- id: native-everywhere-t-render-schtasks
+  kind: task
+  title: Render per-user Windows Scheduled Tasks that need no admin rights
+  status: planned
+  parent: native-everywhere-e2
+  summary: 'Implement the Windows backend emitting per-user Scheduled Tasks (Register-ScheduledTask /
+    schtasks XML) so the cadence plane exists on Windows at all. Task Scheduler has no direct KeepAlive
+    equivalent, so the keepalive memory service is approximated with a logon/boot trigger plus RestartCount/RestartInterval
+    settings, and that approximation must be written down rather than left implicit. Per F103''s ordering
+    note this is sequenced AFTER the transport work: generating Windows units is wasted effort until the
+    Python modules themselves import and run there.'
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given Windows and a NON-elevated PowerShell session, when `python workspace-tooling/service_manager.py
+    install --all` runs, then five tasks named `agent-kit-<service>` exist under `Get-ScheduledTask`,
+    each registered with `-User $env:USERNAME` and without `-RunLevel Highest`, and no UAC prompt was
+    raised during the run.
+  - Given the memory-service keepalive contract, when it is rendered for Task Scheduler, then the task
+    carries a logon (or boot) trigger plus RestartCount and RestartInterval settings, and `workspace-tooling/README.md`
+    contains a supervision section stating explicitly which KeepAlive semantics Task Scheduler cannot
+    reproduce.
+  - Given `service_manager.py uninstall --all` on Windows, then `Get-ScheduledTask -TaskName 'agent-kit-*'`
+    returns nothing and the command exits 0.
+  - Given each rendered task, then stdout and stderr are redirected to DISTINCT files under the OS-aware
+    derived root (`%LOCALAPPDATA%`-based), and `grep -rn 'Library/Logs' workspace-tooling/services/` returns
+    zero hits.
+  depends_on:
+  - native-everywhere-t-service-manager-cli
+  - native-everywhere-e1
+  tags:
+  - F174
+  - F066
+  - F051
+  - X027
+  - windows
+  - task-scheduler
+  - renderer
+  - portability
+- id: native-everywhere-t-supervision-probe
+  kind: task
+  title: Replace the three hardcoded launchctl probes and the plist-derived cadence constants with the
+    service contract
+  status: planned
+  parent: native-everywhere-e2
+  summary: 'Three modules shell `/bin/launchctl` and therefore report false on every non-macOS host: `artifact_watermark.py:138-150`
+    `_launchctl_loaded` (already injected as the `loaded_probe` parameter at :403 and :898, so the seam
+    exists); `artifact_memory.py:856-867` `_launch_agent_loaded`, consumed at :789 as `snapshot.cadence_scheduled`;
+    and `artifact_supervisor_receipt.py:144-162` `probe_launchctl`, which builds a `gui/{os.getuid()}/{label}`
+    target. Route all three through `service_manager.is_running(label)`. Separately, `artifact_watermark.py:56-64`
+    derives its max-age constants from ''the installed LaunchAgents'' as literals with a comment, and
+    `:442-450` reads argv back out of a plist with plistlib — both must read the contract instead. Finally
+    the label regex at `artifact_supervisor_receipt.py:49` (`^com\.personal\.artifact-[a-z0-9-]{1,64}$`)
+    must accept the renamed labels.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given Linux with the consumer timer enabled, when `python workspace-tooling/artifact_memory.py status
+    --json` runs, then `snapshot.cadence_scheduled` is true — today it is false on every non-macOS host
+    because artifact_memory.py:856 shells /bin/launchctl and returns False on OSError.
+  - 'Given any of the three OSes, when `artifact_watermark.compute_watermark()` runs against installed
+    services, then the consumer, service, bootstrap and watchdog components report ok/stale from `service_manager.is_running(label)`
+    and never `unknown: launchctl could not be consulted`.'
+  - Given the max-age constants at artifact_watermark.py:56-64, then each is derived at import from the
+    corresponding service.toml schedule (three intervals) — asserted by a test that changes a contract
+    interval and observes CONSUMER_MAX_AGE_SECONDS change, rather than a literal with an explanatory comment.
+  - Given `grep -rn '/bin/launchctl\|import plistlib' workspace-tooling/*.py`, then the only hits are
+    inside the launchd renderer/backend module.
+  - Given the renamed `agent-kit-artifact-*` labels, when a supervisor receipt is minted on each of the
+    three OSes, then LABEL_PATTERN accepts them and a receipt is written — asserted in workspace-tooling/tests/test_artifact_supervisor_receipt.py.
+  depends_on:
+  - native-everywhere-t-service-manager-cli
+  tags:
+  - F004
+  - F051
+  - F066
+  - launchctl
+  - health-plane
+  - cadence
+  - lifecycle
+- id: native-everywhere-t-alert-dispatch
+  kind: task
+  title: Dispatch alerts per OS and add an OS-independent channel that degrades to a file drop
+  status: planned
+  parent: native-everywhere-e2
+  summary: 'The whole alerting plane is macOS-only and degrades to a silent no-op elsewhere: `artifact_watchdog.py:69-84`
+    `_desktop_notify` shells `/usr/bin/osascript`, catches OSError and returns False that nothing acts
+    on; `artifact_event_consumer.py:1490-1508` carries a second copy of the same call; the default log
+    at `artifact_watchdog.py:48` is `~/Library/Logs/personal-artifact-watchdog.jsonl`; and the consumer
+    contract passes `--desktop-notify` assuming the channel works. Add `notify(title, message)` to the
+    platform-compat module M2 creates, dispatching to osascript / notify-send / a Windows toast, each
+    guarded by `shutil.which`. Because desktop notification is inherently best-effort, add an OS-independent
+    channel beside it — a 0600 file drop under the derived root that an oncall or CI job can poll — and
+    make `--desktop-notify` degrade to that rather than to nothing.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given Linux WITH notify-send present, when the watchdog raises, then a desktop notification is delivered;
+    given Linux WITHOUT notify-send, then `notify()` returns False and the alert is still written to the
+    file-drop channel — both asserted by `python -m unittest workspace-tooling.tests.test_artifact_watchdog
+    -k alert_channel` on ubuntu-latest.
+  - Given Windows, when the watchdog raises, then a toast is attempted through platform-compat `notify()`
+    and, regardless of whether it succeeds, `<derived_root>/alerts/<iso8601>-<code>.json` is written with
+    owner-only permissions via the privacy backend.
+  - 'Given `--desktop-notify` on a host with no notifier binary, then the run''s JSON record carries `alert_channel:
+    "file"` and the run exits 0 — never a silently swallowed OSError with no record.'
+  - Given `grep -rn 'osascript' workspace-tooling/*.py`, then the only hit is inside the darwin branch
+    of the platform-compat notify implementation (the duplicate at artifact_event_consumer.py:1502 is
+    gone).
+  - Given any OS, then `artifact_watchdog.DEFAULT_LOG` resolves under the OS-aware derived root, and `grep
+    -rn 'Library/Logs' workspace-tooling/*.py` returns zero hits outside the launchd renderer.
+  depends_on:
+  - native-everywhere-t-service-contract-schema
+  - gates-green-e4
+  tags:
+  - F011
+  - F066
+  - alerting
+  - notifications
+  - cross-os
+  - portability
+- id: native-everywhere-t-rewrite-supervision-tests
+  kind: task
+  title: Rewrite the three plist-asserting test modules against the contract plus a rendered artifact
+  status: planned
+  parent: native-everywhere-e2
+  summary: Portability fixes cannot land green because the suite asserts macOS-specific facts as invariants,
+    with no seam at which a systemd unit or a Scheduled Task could satisfy the same tests. `tests/test_artifact_watchdog.py:256-269`
+    opens the watchdog plist with plistlib and asserts `arguments[0] == "/usr/bin/python3"` plus Umask
+    0o77, StartInterval <= 600, RunAtLoad and distinct out/err paths. `tests/test_artifact_backup.py:30-46`
+    asserts RunAtLoad false, StartCalendarInterval present, Umask 0o77 and that ProgramArguments[0] contains
+    the literal `personal-artifacts/venv/bin/python`. `tests/test_artifact_consumer_launchd.py:12-55`
+    parses the consumer plist for Umask, --health-file, --desktop-notify, --reconcile-retry-seconds, absence
+    of --qdrant-path/--collection, presence of --runtime-config, absence of KeepAlive, and compares an
+    installed copy byte-for-byte against the checked-in file. Every one of these properties must survive
+    — expressed against the contract and the rendered artifact instead of against a plist.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given ubuntu-latest and windows-latest, when `python -m unittest workspace-tooling.tests.test_artifact_watchdog
+    workspace-tooling.tests.test_artifact_backup workspace-tooling.tests.test_artifact_consumer_launchd`
+    runs, then all three modules are GREEN with zero module-level `skipUnless(darwin)` guards.
+  - Given the watchdog module, then the interpreter assertion reads `contract.interpreter == "system"`
+    — replacing the `/usr/bin/python3` path literal at test_artifact_watchdog.py:268 — and the backup
+    module asserts `contract.interpreter == "venv"`, replacing the `personal-artifacts/venv/bin/python`
+    substring check at test_artifact_backup.py:45.
+  - Given the current platform, when each test renders its contract, then it asserts the RENDERED artifact
+    sets a private umask (or its ACL equivalent), restarts on failure, separates stdout from stderr, and
+    carries the expected argv flags — including that the consumer unit contains --health-file, --desktop-notify,
+    --reconcile-retry-seconds and --runtime-config and contains NEITHER --qdrant-path, --collection, `personal_artifact_chunks_v1`
+    nor `personal-artifacts/qdrant`.
+  - Given macOS, then the plistlib-specific assertions survive inside a `@unittest.skipUnless(sys.platform
+    == 'darwin')` block that exercises the launchd renderer only, and the installed-copy drift test at
+    test_artifact_consumer_launchd.py:46-55 compares the installed unit against the RENDERED unit rather
+    than against a checked-in plist.
+  depends_on:
+  - native-everywhere-t-render-launchd
+  - native-everywhere-t-render-systemd
+  - native-everywhere-t-render-schtasks
+  tags:
+  - F016
+  - F004
+  - tests
+  - supervision
+  - cross-os-ci
+  - ci
+- id: native-everywhere-e3
+  kind: epic
+  title: Portable Obsidian projection without symlinks
+  status: planned
+  summary: The symlink-and-dir_fd vault projection is rebuilt on generated Markdown stubs with frontmatter
+    back-references — portable on all three OSes and, crucially, readable by the catalog, which skips
+    every symlinked file today so the projected vault is invisible to the very index it exists to feed.
+    Its three shell entry points, which currently invoke modules at a `scripts/` path that does not exist
+    in this repository and are therefore silent no-ops, are pointed at the real location. Its only config
+    — a 7.7 KB manifest of employer projects and absolute GitLab paths, duplicated as a hardcoded pattern
+    list inside obsidian-stamp.py — becomes one de-personalised example with a schema and a guard test.
+  priority: could
+  lane: later
+  size: L
+  acceptance:
+  - Given any of the three OSes, when `python workspace-tooling/build_agent_vault.py --apply` runs, then
+    the projection is created with zero symlinks (`find <vault> -type l` on POSIX / `Get-ChildItem -Recurse
+    | Where-Object LinkType` on Windows both return nothing) and every projected entry is a Markdown stub
+    carrying a frontmatter back-reference.
+  - Given the built projection, when `python workspace-tooling/artifact_catalog.py --workspace <vault>
+    --json` runs, then `skipped_symlinks == 0` and the catalogued document count equals the projected
+    stub count.
+  - Given a bare clone, when `bash workspace-tooling/vault-reconcile.sh` runs, then its log contains zero
+    `can't open file` errors and every invoked module resolved under workspace-tooling/.
+  - Given `grep -rn 'GitLab/' workspace-tooling/`, then there are zero hits.
+  depends_on:
+  - gates-green-e4
+  tags:
+  - F010
+  - F048
+  - F179
+  - obsidian
+  - projection
+  - symlinks
+  - de-personalise
+  - memory
+- id: native-everywhere-t-vault-entrypoints
+  kind: task
+  title: Point the three vault shell entry points at the real module location
+  status: planned
+  parent: native-everywhere-e3
+  summary: '`vault-reconcile.sh`, `roadmap-board-refresh.sh` and `project-linker-hook.sh` each resolve
+    `DIR` to the repo root and then invoke `python3 "$DIR/scripts/<module>.py"` — but there is no `scripts/`
+    directory at the repo root; the modules live in `workspace-tooling/`. All three are therefore no-ops:
+    vault-reconcile.sh:10-14 calls frontmatter-stamp.py and project-linker.py twice, roadmap-board-refresh.sh:11
+    and :18 call roadmap_status_excalidraw.py, and project-linker-hook.sh:39 swallows the failure entirely
+    via `nohup ... >/dev/null 2>&1 &` followed by `exit 0`. `SCRIPT_DIR` is already computed in all three
+    (line 5, line 5, line 34), so the fix is to invoke `"$SCRIPT_DIR/<module>.py"` and keep `$DIR` as
+    the content root only. The same wrong `scripts/...` prefix is repeated in four README files.'
+  priority: must
+  lane: next
+  size: S
+  acceptance:
+  - Given a bare clone and a temp content root, when `bash workspace-tooling/vault-reconcile.sh` runs,
+    then its log contains zero `can't open file` lines and each invoked module resolved to `workspace-tooling/<module>.py`
+    — asserted by a new test that runs the script and greps the log.
+  - Given project-linker-hook.sh, when the detached command fails, then the failure text lands in the
+    same reconcile log the other two scripts write to instead of `/dev/null`, and the hook still exits
+    0 so a linker error can never fail an agent write.
+  - Given `grep -rn 'scripts/frontmatter-stamp.py\|scripts/project-linker.py\|scripts/roadmap_status_excalidraw.py\|scripts/artifact_'
+    workspace-tooling/`, then there are zero hits in either the three shell scripts or in README-project-linker.md,
+    README-portfolio-projection.md, README-roadmap-status.md and README-artifact-ingestion.md.
+  tags:
+  - F179
+  - entrypoints
+  - shell
+  - obsidian
+  - substrate
+- id: native-everywhere-t-project-map-example
+  kind: task
+  title: 'De-personalise the projection config: one project map, an example, a schema and a guard test'
+  status: planned
+  parent: native-everywhere-e3
+  summary: The manifest driving the whole projection ships the author's employer taxonomy. `workspace-tooling/project-map.json`
+    is 7.7 KB containing `regions` such as `GitLab/workspace/platform/plans`, `GitLab/workspace/platform/tools/claude-mcp-server/plans`
+    and `GitLab/workspace/platform/infra/platform-infra/{plans,docs}`, plus 14 project entries (dispatcher,
+    service-registry, platform-infra and others). The same taxonomy is duplicated as a hardcoded 13-row
+    `PROJECT_PATTERNS` list at `obsidian-stamp.py:28-42` (airgap-zerotrust, dispatcher, zero-trust, crossplane,
+    kargo, service-registry, cost-optimization, admin-web-app, ruflo), so two tools disagree about one
+    config. Collapse to one config read through path_contract.py, ship a two-project generic example plus
+    a JSON Schema under workspace-tooling/schemas/, and add a test that fails if the tracked example is
+    ever re-personalised.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given `git ls-files workspace-tooling/`, then `project-map.json` is no longer tracked and `project-map.example.json`
+    is tracked, containing exactly two generic sample projects and zero `GitLab/` segments.
+  - Given `python -m unittest workspace-tooling.tests.test_path_contract -k example_is_generic`, then
+    it FAILS if the tracked example contains any of `GitLab/`, `dispatcher`, `service-registry`, `platform-infra`,
+    `airgap`, `kargo`, `crossplane` or `ruflo` — verified during review by temporarily reintroducing one
+    entry and observing the red run.
+  - 'Given obsidian-stamp.py, then PROJECT_PATTERNS is loaded from the project map rather than declared
+    in the module: `grep -n ''airgap-zerotrust\|crossplane\|ruflo'' workspace-tooling/obsidian-stamp.py`
+    returns nothing, and both obsidian-stamp.py and project-linker.py resolve the same config through
+    path_contract.py.'
+  - Given a user file at `<derived_root>/project-map.json`, when path_contract resolves the map, then
+    the user file wins over the tracked example; given neither file exists, then the tool exits non-zero
+    with a message naming both paths it searched.
+  - Given the example map plus a two-project fixture, when `python workspace-tooling/project-linker.py
+    --reconcile` runs, then it exits 0 — the example is executable documentation, not decoration.
+  - Given `workspace-tooling/schemas/project-map.schema.json`, then the example validates against it and
+    a malformed map is rejected with a field-naming error.
+  tags:
+  - F048
+  - F179
+  - de-personalise
+  - config
+  - schema
+  - substrate
+- id: native-everywhere-t-vault-build-python
+  kind: task
+  title: Port build-agent-vault.sh to one cross-platform Python program
+  status: planned
+  parent: native-everywhere-e3
+  summary: '`workspace-tooling/build-agent-vault.sh` is bash with `set -euo pipefail`, so the whole projection
+    is unavailable on Windows before any symlink question arises; it also shells `shasum -a 256` at line
+    150 for its lock id, which is the BSD/macOS spelling absent from GNU coreutils, making it fragile
+    on a minimal Linux image too. Port it to `workspace-tooling/build_agent_vault.py` so the projection
+    is one cross-platform program: manifest/policy resolution (currently :23-27), the sync and --audit-policy
+    modes, the no-delete transition semantics, and the lock id (via hashlib). The existing no-delete invariant
+    test must keep passing against the port.'
+  priority: should
+  lane: later
+  size: L
+  acceptance:
+  - 'Given a minimal Linux image with no `shasum` binary on PATH, when the builder computes its lock id,
+    then it succeeds using `hashlib.sha256` — the reproduction `bash workspace-tooling/build-agent-vault.sh
+    --audit-policy` failing with `shasum: command not found` no longer applies.'
+  - Given `python workspace-tooling/build_agent_vault.py --audit-policy --output build/vault-audit.json`
+    on all three OSes, then it exits 0 and emits the same JSON schema the shell version emitted, plus
+    a new `link_strategy` field.
+  - 'Given the no-delete invariant, when `python -m unittest workspace-tooling.tests.test_build_agent_vault_no_delete`
+    runs against the ported builder, then it passes: the default scheduled mode performs no unlink, no
+    replacement, no stale pruning and no empty-directory deletion.'
+  - Given `git ls-files workspace-tooling/build-agent-vault.sh`, then either the file is absent or it
+    is a shim of at most three lines exec'ing the Python module, asserted by a test on its line count.
+  tags:
+  - F010
+  - obsidian
+  - portability
+  - shasum
+- id: native-everywhere-t-stub-projection
+  kind: task
+  title: Project Markdown stubs with frontmatter back-references instead of a symlink farm
+  status: planned
+  parent: native-everywhere-e3
+  summary: '`safe_vault_link.py:69-110` builds every projected entry through a `dir_fd=` ladder — `os.open`,
+    `os.mkdir`, `os.stat`, `os.readlink`, `os.symlink`, all with `dir_fd=current` — and `os.supports_dir_fd`
+    is the empty set on Windows, so `os.symlink in os.supports_dir_fd` is False and the very first `os.open(vault,
+    O_RDONLY)` raises `PermissionError [WinError 13]` regardless. Even a dir_fd-free rewrite would not
+    help: `os.symlink` on Windows needs Developer Mode or elevation. Make generated Markdown stubs the
+    default strategy (frontmatter back-reference to the canonical file), keep the dir_fd symlink path
+    as an opt-in `--link-mode symlink` gated on a runtime capability probe rather than an assumption,
+    add junction and `--copy` fallbacks mirroring the precedent already in setup-local.sh:9-11, and record
+    the strategy actually used in the --audit-policy JSON.'
+  priority: should
+  lane: later
+  size: L
+  acceptance:
+  - Given Windows without Developer Mode and without elevation, when `python workspace-tooling/build_agent_vault.py
+    --apply` runs, then it completes and creates stub files — the reproduction of calling `safe_vault_link.create_missing_link(...)`
+    directly and failing at `os.open(vault, O_RDONLY)` with `PermissionError [WinError 13]` no longer
+    occurs on the default path.
+  - Given the default `--link-mode stub`, then each projected entry is a Markdown file whose frontmatter
+    carries `source_path`, `source_sha256` and `projected_at` and whose body links back to the canonical
+    file — asserted by a test parsing a projected stub.
+  - Given `--link-mode symlink` on a host where the runtime capability probe confirms symlink support,
+    then today's dir_fd symlink behaviour runs unchanged and the existing safe_vault_link tests pass;
+    given `--link-mode symlink` where the probe FAILS, then the command exits non-zero naming the probe
+    result rather than silently falling back to another strategy.
+  - Given `--audit-policy`, then the emitted JSON records the strategy actually used per entry as one
+    of `stub` | `symlink` | `junction` | `copy`.
+  - Given a stub whose canonical source content has changed, when the builder re-runs, then that stub's
+    `source_sha256` is refreshed while every unrelated existing entry is preserved byte-for-byte — the
+    no-delete invariant test still passes.
+  depends_on:
+  - native-everywhere-t-vault-build-python
+  tags:
+  - F010
+  - F048
+  - obsidian
+  - stubs
+  - dir-fd
+  - windows
+  - memory
+- id: native-everywhere-t-catalog-reads-projection
+  kind: task
+  title: Make the catalog index the projection, and settle the dead vault_projection policy block
+  status: planned
+  parent: native-everywhere-e3
+  summary: 'The projection is invisible to the index it exists to feed: `artifact_catalog.py:373-375`
+    does `if path.is_symlink(): stats["skipped_symlinks"] += 1; continue`, so a symlink farm contributes
+    nothing. Stub-mode projection fixes that by construction, and this story proves it and closes the
+    surrounding dead config. `workspace-tooling/artifact-policy.json:4-25` sets `vault_projection.default_action:
+    "exclude"` with a single `**/*` exclude rule and a description that defers ownership to `add_properties.py`
+    — a file that does not exist in this repository — while `vault_projection_policy.py` carries 489 lines
+    behind it. Either restore a working default the shipped example actually exercises, or delete the
+    block, the module and README-vault-projection-policy.md together. Whichever is chosen, the tree must
+    agree.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given a stub-mode projection, when `python workspace-tooling/artifact_catalog.py --workspace <vault>
+    --json` runs, then `skipped_symlinks == 0` and the number of catalogued documents equals the number
+    of projected stubs — asserted by a new case in workspace-tooling/tests/test_artifact_catalog.py.
+  - Given artifact-policy.example.json, then its `vault_projection` block either (a) declares a working
+    default with non-empty candidate_roots and allow_rules that a test exercises end to end against the
+    example project map, or (b) is deleted together with vault_projection_policy.py and README-vault-projection-policy.md
+    — and `grep -rn 'vault_projection' workspace-tooling/` agrees with whichever branch was taken, with
+    no orphan references.
+  - Given `grep -rn 'add_properties' workspace-tooling/`, then there are zero hits — the policy description
+    no longer cites a file absent from this repository.
+  - Given the chosen branch, when `python -m unittest workspace-tooling.tests.test_vault_projection_policy`
+    runs, then it either passes against the restored default or the module is deleted along with its test,
+    and `python -m unittest discover -s workspace-tooling/tests` stays green on all three OSes.
+  depends_on:
+  - native-everywhere-t-stub-projection
+  tags:
+  - F048
+  - F010
+  - catalog
+  - policy
+  - dead-code
+  - memory

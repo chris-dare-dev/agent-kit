@@ -1,0 +1,102 @@
+{
+  "memory-grows-and-tiers-e1": {
+    "number": 230,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/230"
+  },
+  "memory-grows-and-tiers-e2": {
+    "number": 229,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/229"
+  },
+  "memory-grows-and-tiers-t-access-ledger": {
+    "number": 231,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/231"
+  },
+  "memory-grows-and-tiers-t-backup-watermark": {
+    "number": 253,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/253"
+  },
+  "memory-grows-and-tiers-t-bitemporal-catalog": {
+    "number": 257,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/257"
+  },
+  "memory-grows-and-tiers-t-gated-write-path": {
+    "number": 259,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/259"
+  },
+  "memory-grows-and-tiers-t-graphiti-tokenized-retrieval": {
+    "number": 266,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/266"
+  },
+  "memory-grows-and-tiers-t-graphiti-validity-filter": {
+    "number": 265,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/265"
+  },
+  "memory-grows-and-tiers-t-index-memory-tiers": {
+    "number": 261,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/261"
+  },
+  "memory-grows-and-tiers-t-ingest-secret-pii-gate": {
+    "number": 262,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/262"
+  },
+  "memory-grows-and-tiers-t-lessons-demotion": {
+    "number": 237,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/237"
+  },
+  "memory-grows-and-tiers-t-lifecycle-policy-block": {
+    "number": 232,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/232"
+  },
+  "memory-grows-and-tiers-t-lifecycle-schedule-health": {
+    "number": 251,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/251"
+  },
+  "memory-grows-and-tiers-t-memory-type-dimension": {
+    "number": 258,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/258"
+  },
+  "memory-grows-and-tiers-t-outbox-reconciliation": {
+    "number": 264,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/264"
+  },
+  "memory-grows-and-tiers-t-perf-gate": {
+    "number": 255,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/255"
+  },
+  "memory-grows-and-tiers-t-qdrant-storage-class": {
+    "number": 235,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/235"
+  },
+  "memory-grows-and-tiers-t-receipt-archival": {
+    "number": 254,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/254"
+  },
+  "memory-grows-and-tiers-t-rehydration-read-path": {
+    "number": 236,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/236"
+  },
+  "memory-grows-and-tiers-t-result-provenance": {
+    "number": 260,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/260"
+  },
+  "memory-grows-and-tiers-t-retrieval-decay": {
+    "number": 234,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/234"
+  },
+  "memory-grows-and-tiers-t-storage-accounting": {
+    "number": 252,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/252"
+  },
+  "memory-grows-and-tiers-t-tier-model": {
+    "number": 233,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/233"
+  },
+  "memory-grows-and-tiers-t-untrusted-memory-boundary": {
+    "number": 263,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/263"
+  },
+  "memory-grows-and-tiers-t-write-contract": {
+    "number": 256,
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues/256"
+  }
+}

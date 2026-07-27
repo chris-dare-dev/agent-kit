@@ -1,0 +1,1081 @@
+schema: roadmap/1
+slug: providers-as-data
+project: agent-kit
+title: M7 Providers as Data — adding a provider is a data contribution, proven by a conformance suite
+status: draft
+phase: sequenced
+brief: 'Goal C is the headline differentiator and today it is a claim, not a mechanism: a fourth provider
+  means editing five Python modules, `provider == "codex"` string tests are scattered through shared helpers,
+  `PLATFORM_ROOT = ROOT.parents[1]` scatters 26 files two directories above the clone, the golden manifest
+  validates the renderer against itself, Codex silently drops 4 of 5 entrypoints while CONTEXT.md promises
+  nothing is silently dropped, and every OpenCode agent is hard-bound to Bedrock inference profiles in
+  an AWS account no adopter has.
+
+  This milestone turns provider support into versioned data: `data/providers/<id>/provider.json` under
+  a Draft 2020-12 schema declares capabilities, per-kind layout, ref-rewrite mode, root-contract shape
+  and the output anchor; the generator, the model-policy checker and the catalog all derive their provider
+  set from those manifests.
+
+  A hostile-case conformance corpus then proves each pack renders losslessly or reports the loss fail-closed,
+  with an independent expectation tree so a reviewer sees a line diff instead of a hash diff.
+
+  Finally every pack becomes a versioned, signed artifact with the provider-neutral `.agents/skills/`
+  tree as tier 0, the Claude target ships as a versioned plugin, and each rendered skill carries its catalog
+  id so file-delivered Codex and OpenCode packs stop being invisible to the ledger.
+
+  This is safe only after M3 (CI to run a suite in), M4 (a format to ship into) and M6 (one frontmatter
+  contract to conform to); F026''s anchor work lands here with the manifest that defines anchors, because
+  doing it earlier means writing the same generator twice.'
+goal:
+  hmw: How might we make adding a provider a reviewed data contribution — with the capability loss it
+    causes stated out loud and proven by a suite — instead of a five-module Python edit that only its
+    author can review?
+  objective: Provider support is declared in versioned capability manifests, every pack is proven correct
+    against an independent oracle or reports its loss fail-closed, and every pack ships as a signed, versioned
+    artifact that reports its own usage.
+  key_results:
+  - A fourth provider is added by a commit that changes zero lines under data/scripts/*.py — proven by
+    the worked gemini-cli example's own `git show --stat`, which touches only data/providers/, data/provider-adapters/,
+    tests/fixtures/ and data/facts/catalog.json.
+  - '`python3 -m unittest discover -s tests/provider_conformance -p ''test_*.py''` is green and covers
+    every declared manifest x every catalog kind; the two known renderer defects (block-sequence allowed-tools
+    tool leak, Codex entrypoint drop) each have a test that fails against HEAD''s renderer and passes
+    after the fix.'
+  - '`python3 data/scripts/generate-adapter-packs.py --apply` writes zero bytes outside the repository
+    root, and `grep -rn ''parents\[1\]\|Work/workspace\|provider == "'' data/scripts/*.py` returns no
+    hits.'
+  - Zero rendered pack bytes contain `amazon-bedrock/`, `PENDING LIVE-VERIFICATION`, or (in a non-Claude
+    pack) a `.claude/` path literal — each asserted by a conformance test, not by inspection.
+  - Every built pack carries pack.json with semver and per-file sha256 plus a detached signature that
+    `pack-verify.py` rejects on a single flipped byte; every rendered skill and agent carries its catalog
+    id and revision.
+  - 'All three providers emit an edit event that joins to the M6 outcome ledger on run_id: a fixture run
+    produces non-zero per-catalog-id counts for codex and opencode, not just claude.'
+  wont:
+  - Extracting the compiler as a standalone interop package (X053) — explicitly last, not first; the profile
+    interpreter, lossiness reporter and conformance suite stay in-repo this milestone.
+  - Implementing the MCP Skills Extension SEP-2640 (X013) or migrating to MCP SDK v2 / the 2026-07-28
+    protocol revision (X012) — that is server-surface work, not pack work, and the tool-count degradation
+    research flagged in the corrections has not been done.
+  - Publishing packs to the MCP Registry or skills.sh (X014) — belongs to M4 and is blocked behind the
+    owner's name decision (X001, OpenAI AgentKit collision).
+  - Converting the 5 commands into skills (X010) — the shape of the corpus is M6's decision; M7 renders
+    whatever the catalog holds.
+  - 'Shipping Gemini CLI as a supported provider — it lands as a documentation-grade worked example with
+    conformance fixtures and status: experimental, nothing more.'
+  - Any per-skill A/B, interleaving or optimisation machinery — the corpus is still small (see the n=1
+    research correction); M7 measures delivery, not skill quality.
+  - Emulating provider-side runtime features the provider lacks (background Workflow, subagent dispatch,
+    runtime tool sandboxing) — the manifest records their absence honestly; it does not paper over it.
+generated_by:
+  agent: claude-opus-5
+  at: '2026-07-26'
+  brief: multi-workflow audit + landscape benchmark synthesis
+retired: []
+items:
+- id: providers-as-data-e1
+  kind: epic
+  title: Versioned provider capability manifests replacing hardcoded provider logic
+  status: planned
+  summary: 'Replace every hardcoded provider fact in data/scripts/ with `data/providers/<id>/provider.json`
+    validated by a Draft 2020-12 schema, declaring id, status, capabilities, per-kind layout, ref-rewrite
+    mode, root-contract shape, owned namespaces and an anchor enum (repo|workspace|home) resolved by one
+    function. The generator, the model-policy checker and the catalog all derive their provider set from
+    the manifests instead of frozen constants, the model policy gains an override chain so shipped defaults
+    stop hard-binding every OpenCode agent to Bedrock, and `--apply` stops writing outside the clone.
+    Outcome: a provider is a reviewable data diff, not a five-module Python edit.'
+  priority: must
+  lane: later
+  size: XL
+  acceptance:
+  - Given a clean clone, when `python3 data/scripts/provider-manifest-check.py --check` runs, then it
+    validates every data/providers/*/provider.json against data/schemas/provider-manifest.schema.json
+    and exits 0.
+  - Given the refactor is complete, when `grep -rnE 'provider == "|REQUIRED_PROVIDERS|PLATFORM_ROOT|WRONGCASE_RE|MCP_TIER_TOOL'
+    data/scripts/*.py` runs, then it returns no hits.
+  - Given a new data/providers/gemini-cli/provider.json and its fixtures, when they are committed, then
+    `git show --stat HEAD` lists no file under data/scripts/ and `python3 data/scripts/generate-adapter-packs.py
+    --check` exits 0 with the new pack rendered.
+  - Given `python3 data/scripts/generate-adapter-packs.py --apply` with no flags in a clone at `<parent>/Source
+    Code/agent-kit`, then every written file is under `<repo>/dist/packs/` and `<parent>/Source Code/.opencode`
+    does not exist afterwards.
+  - Given a fresh clone with no AWS account, when the packs are built, then `grep -rn 'amazon-bedrock'
+    dist/packs/` returns nothing.
+  depends_on:
+  - gates-green-e1
+  - ci-proves-it-e1
+  - author-and-measure-e1
+  tags:
+  - F018
+  - F024
+  - F025
+  - F026
+  - F027
+  - F028
+  - F030
+  - F123
+  - X011
+  - provider-manifest
+  - generator
+  - goal-C
+  - packs
+- id: providers-as-data-t-provider-manifest-schema
+  kind: task
+  title: Author the provider-manifest schema and the three shipped manifests
+  status: planned
+  parent: providers-as-data-e1
+  summary: 'Create data/schemas/provider-manifest.schema.json (Draft 2020-12, additionalProperties:false,
+    in the same stdlib validation style as data/scripts/milestone-pipeline-schema-check.py:25-34) and
+    the three manifests data/providers/{claude,codex,opencode}/provider.json. The manifests must encode,
+    as data, every provider fact currently hardcoded in data/scripts/generate-adapter-packs.py: MCP support
+    and tier->tool map (:78), owned path namespaces (:81), ref-rewrite mode (:145-157), per-kind layout
+    and anchor (:305, :530-535), tool-restriction enforcement (:289-295 vs :341-344), per-agent model
+    support and effort field (:241-252). This story only lands the data and its validator — no renderer
+    change yet, so the manifests can be reviewed against today''s behaviour.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the three manifests, when `python3 data/scripts/provider-manifest-check.py --check` runs, then
+    it exits 0 and prints one `OK <id> (status=<status>)` line per manifest.
+  - Given data/providers/codex/provider.json with a required key deleted, when `--check` runs, then it
+    exits 1 and the message names both the JSON pointer and the missing key.
+  - 'Given `python3 data/scripts/provider-manifest-check.py --self-test`, then it asserts the manifests
+    reproduce HEAD behaviour: codex.capabilities.mcp.supported is true with tierTools equal to {references:get_reference,
+    agents:get_agent, skills:get_skill}, opencode.capabilities.mcp.supported is false, codex.capabilities.perAgentModel
+    is false, and claude.layout.anchor is "repo".'
+  - Given the schema, when a manifest declares an anchor outside the enum (repo|workspace|home), then
+    `--check` exits 1 naming the illegal value and the allowed set.
+  tags:
+  - F018
+  - F123
+  - X011
+  - provider-manifest
+  - schema
+  - goal-C
+  - packs
+- id: providers-as-data-t-anchor-resolver
+  kind: task
+  title: Delete PLATFORM_ROOT and resolve every output path through a manifest anchor
+  status: planned
+  parent: providers-as-data-e1
+  summary: data/scripts/generate-adapter-packs.py:59 sets `PLATFORM_ROOT = ROOT.parents[1]`, which in
+    this standalone clone resolves two directories above the checkout; `_anchor` (:530-535) maps every
+    PLATFORM/-prefixed pack path there and `apply()` (:538-564) writes unconditionally and unlinks stale
+    `.toml` files in that foreign directory. Delete the constant, resolve every anchor through one `resolve_anchor(manifest,
+    args)` reading the manifest's `layout.anchor` plus path template, default `--apply` to `<repo>/dist/packs/<provider>/`,
+    require an explicit `--install-to PATH` to write anywhere else, refuse paths above the repo root without
+    `--allow-outside-repo`, gate the unlink loop behind `--prune`, and print the resolved destination
+    before writing.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the documented reproduction (clone at `<parent>/Source Code/agent-kit`, run `python3 data/scripts/generate-adapter-packs.py
+    --apply`), then every written path is under `<repo>/dist/packs/` and `<parent>/Source Code/.opencode`
+    does not exist; tests/provider_conformance/test_anchor.py asserts no written path resolves outside
+    ROOT.
+  - Given `--install-to <dir-above-repo>` without `--allow-outside-repo`, then the process exits 2 printing
+    `refusing to write outside the repo root (pass --allow-outside-repo)` and creates no files.
+  - Given a stale `.codex/agents/orphan.toml` in the target and `--apply` without `--prune`, then orphan.toml
+    still exists afterwards; with `--prune` it is deleted and its full path was printed to stdout before
+    deletion.
+  - Given the change is complete, when `grep -nE 'parents\[1\]|Work/workspace' data/scripts/generate-adapter-packs.py`
+    runs, then it returns no hits.
+  - Given `--apply` on any platform, then the first stdout line names the resolved destination directory
+    for each provider.
+  depends_on:
+  - providers-as-data-t-provider-manifest-schema
+  tags:
+  - F026
+  - F177
+  - anchor
+  - safety
+  - goal-B
+  - goal-C
+  - portability
+- id: providers-as-data-t-manifest-driven-renderer
+  kind: task
+  title: Turn the pack generator into a manifest interpreter and delete the per-provider renderers
+  status: planned
+  parent: providers-as-data-e1
+  summary: 'Rewrite data/scripts/generate-adapter-packs.py so `build_packs` (:409-415) loops `data/providers/*/provider.json`
+    instead of naming two renderers. Delete `render_codex` (:281) and `render_opencode` (:329) in favour
+    of one `render(manifest, catalog, policy)` dispatching to format emitters (emit_toml / emit_markdown_frontmatter)
+    chosen by `layout.<kind>.format`. Derive `MCP_TIER_TOOL` (:78), `WRONGCASE_RE` (:81), the ref-rewrite
+    branches (:145-157), the coverage rows (:484-490) and the model accessors `codex_effort`/`opencode_model`
+    (:241-252) from manifest fields. This is a pure refactor: the emitted bytes must not change.'
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given the refactor, when `grep -c 'provider == ' data/scripts/generate-adapter-packs.py` runs, then
+    it prints 0, and `grep -n 'def render_codex\|def render_opencode' data/scripts/generate-adapter-packs.py`
+    returns nothing.
+  - Given the refactor and no other change, when `python3 data/scripts/generate-adapter-packs.py --update-golden`
+    runs, then `git diff --exit-code tests/fixtures/adapter-packs.golden.json` exits 0 — the packs are
+    byte-identical to HEAD.
+  - Given `python3 data/scripts/generate-adapter-packs.py --provider codex --check`, then only the codex
+    pack is built and checked and it exits 0.
+  - Given a fourth manifest added under data/providers/, when `--check` runs, then coverage_problems emits
+    rows for that provider derived from its manifest with no edit to data/scripts/*.py; a test in tests/provider_conformance
+    adds a synthetic manifest and asserts the new rows appear.
+  - Given `python3 data/scripts/generate-adapter-packs.py --self-test`, then every existing assertion
+    in self_test() still passes with its provider argument sourced from a manifest id rather than a literal.
+  depends_on:
+  - providers-as-data-t-provider-manifest-schema
+  - providers-as-data-t-anchor-resolver
+  tags:
+  - F018
+  - F123
+  - generator
+  - refactor
+  - goal-C
+  - packs
+- id: providers-as-data-t-capabilities-block
+  kind: task
+  title: Model provider capabilities as data and generate the capability matrix from them
+  status: planned
+  parent: providers-as-data-e1
+  summary: Today tool-restriction enforcement is a hardcoded English paragraph injected into Codex agent
+    bodies (generate-adapter-packs.py:289-295) while OpenCode gets a real `permission:` block (:341-344),
+    and `providerPartial` (catalog-generate.py:243) is `any(v == 'degraded')`, so the 9 codex:adapted
+    agents — including the write-capable milestone-implementer, rectifier and researcher — never appear
+    in the degradation manifest despite losing runtime tool enforcement. Generate the note from `capabilities.toolRestrictionEnforcement`,
+    make providerPartial a per-capability computation, and generate data/references/provider-capability-matrix.md
+    (rows = catalog entries, columns = declared providers, cells = the specific capability lost) from
+    the manifests.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the change, when `grep -n 'not a Codex runtime sandbox' data/scripts/generate-adapter-packs.py`
+    runs, then it returns nothing, and the equivalent note is emitted only when the manifest declares
+    toolRestrictionEnforcement != "runtime" AND the entry's tools list is restricted.
+  - Given HEAD's catalog (10 codex:adapted entries), when `python3 data/scripts/generate-root-contract.py`
+    runs, then data/claude-md/CONTEXT.md lists the 9 tool-restricted adapted agents as losing runtime
+    tool enforcement under codex — the file grows from 5 provider-partial items to at least 14 — and `--check`
+    exits 0 against the regenerated file.
+  - Given `python3 data/scripts/generate-adapter-packs.py --check`, then data/references/provider-capability-matrix.md
+    is regenerated and a stale committed copy makes the check exit 3 naming the file.
+  - 'Given a manifest that declares `capabilities.subagents: false`, when the packs render, then every
+    agent entry for that provider carries a generated note saying subagents are unavailable, and a conformance
+    test asserts the note text is derived from the manifest field name, not a literal.'
+  depends_on:
+  - providers-as-data-t-manifest-driven-renderer
+  tags:
+  - F024
+  - X011
+  - capabilities
+  - degradation
+  - goal-C
+  - packs
+- id: providers-as-data-t-derive-provider-set
+  kind: task
+  title: Derive the provider set from manifests and un-freeze the catalog's provider-named schema
+  status: planned
+  parent: providers-as-data-e1
+  summary: 'Provider names are baked into generated data, not just code: `REQUIRED_PROVIDERS = ("claude","codex","opencode")`
+    at data/scripts/model-policy-providers-check.py:23, a three-key dict literal at catalog-generate.py:210-214,
+    and a provider-named `ioSchema.codexAdapter` field (catalog-generate.py:228) inside a schema its own
+    docstring calls FROZEN at v1.1. Make both scripts enumerate data/providers/*/provider.json, rename
+    `codexAdapter` to a provider-keyed `adapters` map in both the frontmatter key and the catalog, bump
+    `_schemaVersion` to 2.0 with a written migration, and rewrite the sentinel assertions at catalog-generate.py:352-357
+    and :427-436 to assert only providers present in the manifests.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the change, when `grep -n REQUIRED_PROVIDERS data/scripts/model-policy-providers-check.py` runs,
+    then it returns nothing; and given a new data/providers/gemini-cli/provider.json with capabilities.perAgentModel
+    true, the check exits 1 listing every class missing a providers.gemini-cli block.
+  - Given the regenerated catalog, when `grep -c codexAdapter data/facts/catalog.json` runs, then it prints
+    0; every entrypoint entry carries `ioSchema.adapters` as an object, and `_schemaVersion` is "2.0".
+  - Given data/references/catalog-schema-migration.md documenting 1.1 -> 2.0, when `python3 data/scripts/catalog-generate.py
+    --check` runs, then it exits 0, and `python3 data/scripts/skill-ref-check.py --check` resolves the
+    migration doc's links.
+  - Given a synthetic fourth manifest, when `python3 data/scripts/catalog-generate.py --self-test` runs,
+    then no sentinel assertion fails because of the added provider — a conformance test adds the manifest
+    and asserts exit 0.
+  - Given the adapter-source lookup, when a provider declares hand-authored adapters, then they are read
+    from data/provider-adapters/<provider>/entrypoints/<name>/ generically (generalising generate-adapter-packs.py:316-325)
+    — asserted by adding a fixture adapter for the synthetic provider.
+  depends_on:
+  - providers-as-data-t-provider-manifest-schema
+  - providers-as-data-t-manifest-driven-renderer
+  tags:
+  - F030
+  - catalog
+  - schema-migration
+  - goal-C
+  - packs
+- id: providers-as-data-t-model-policy-override-chain
+  kind: task
+  title: Un-bind the shipped model policy from Bedrock and add an override chain
+  status: planned
+  parent: providers-as-data-e1
+  summary: 'Every one of the six classes in data/model-policy.json resolves providers.opencode.model to
+    an AWS Bedrock inference profile (:32, :60, :88, :112, :134, :162), and that string is the only model
+    literal any pack stamps — so any external adopter running the OpenCode pack gets 20 agent files pinned
+    to ARNs in an account they do not have, with no override path (generate-adapter-packs.load_policy()
+    at :237-238 reads one file). Change the shipped values to a provider-neutral default, move the Bedrock
+    IDs into a documented example overlay, and give load_policy() the chain: data/model-policy.json, then
+    $AGENT_KIT_MODEL_POLICY_OVERRIDE, then <workspace>/.claude/model-policy.local.json (the file model-policy-apply.py:76-102
+    already defines, so one override serves both paths). Let a manifest declare perAgentModel:false so
+    Codex is not forced to carry dead model strings.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the change, when `grep -rn 'amazon-bedrock' data/model-policy.json` runs, then it returns nothing;
+    the Bedrock inference-profile IDs live in data/references/model-policy-overlay.example.json with a
+    comment recording they were verified against `aws bedrock list-inference-profiles` on 2026-07-11.
+  - Given `AGENT_KIT_MODEL_POLICY_OVERRIDE=data/references/model-policy-overlay.example.json`, when the
+    packs are rendered, then every dist/packs/opencode/**/agents/*.md carries the original Bedrock model
+    string — a round-trip test asserts byte-equality with the pre-change golden for those files.
+  - Given the default (no override), when the packs are rendered, then `grep -rn 'amazon-bedrock' dist/packs/`
+    returns nothing and every OpenCode agent carries the neutral default.
+  - Given data/providers/codex/provider.json declaring capabilities.perAgentModel false, when `python3
+    data/scripts/model-policy-providers-check.py --check` runs, then it exits 0 without requiring a providers.codex.model
+    for any class.
+  - Given all three sources present, when load_policy() runs, then a `--print-resolved` mode prints, per
+    class, the winning value and which source it came from; a test asserts local overrides env overrides
+    shipped.
+  depends_on:
+  - providers-as-data-t-provider-manifest-schema
+  tags:
+  - F025
+  - model-policy
+  - opencode
+  - goal-C
+  - goal-A
+  - packs
+- id: providers-as-data-t-root-contract-per-provider
+  kind: task
+  title: Make the root-contract generator manifest-driven instead of AGENTS.md-only
+  status: planned
+  parent: providers-as-data-e1
+  summary: 'data/scripts/generate-root-contract.py renders exactly two files to two constant paths (:40-41)
+    with a constant 5120-byte budget (:49), a constant Obsidian frontmatter block (:47), and a Python
+    frozenset REQUIRED_ROUTER_IDS (:58-68). A provider with a different root-context convention (GEMINI.md,
+    .cursor/rules/*.mdc, .windsurfrules, CONVENTIONS.md) has no rendering path at all. Add `layout.rootContract
+    {path, format, frontmatter, byteBudget}` to the manifest, loop the generator over the manifests keeping
+    the existing anchor-based coverage proof per output, move the required-router set into a `required:
+    true` flag on each statement in data/references/agents-md-coverage-map.md''s json block, and drive
+    the CLAUDE.md -> AGENTS.md substitution in generate-adapter-packs.py transform_skill/transform_body
+    (:183, :188) from layout.rootContract.path.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a manifest declaring layout.rootContract.path "GEMINI.md" with byteBudget 4096, when `python3
+    data/scripts/generate-root-contract.py` runs, then data/claude-md/GEMINI.md is emitted and a body
+    exceeding 4096 bytes makes `--check` exit non-zero naming GEMINI.md and both byte counts.
+  - 'Given the change, when `grep -n REQUIRED_ROUTER_IDS data/scripts/generate-root-contract.py` runs,
+    then it returns nothing; and given a `required: true` statement deleted from data/references/agents-md-coverage-map.md,
+    `--check` exits non-zero naming the removed router id.'
+  - Given the change, when `grep -n '"CLAUDE.md", "AGENTS.md"' data/scripts/generate-adapter-packs.py`
+    runs, then it returns nothing; a conformance test with a manifest whose rootContract.path is GEMINI.md
+    asserts the rendered body says GEMINI.md, not AGENTS.md.
+  - Given no manifest change, when the generator runs against HEAD's three providers, then `git diff --exit-code
+    data/claude-md/` exits 0 — the refactor changes no committed output.
+  depends_on:
+  - providers-as-data-t-provider-manifest-schema
+  - providers-as-data-t-capabilities-block
+  tags:
+  - F027
+  - root-contract
+  - generator
+  - goal-C
+  - packs
+- id: providers-as-data-t-library-root-refs
+  kind: task
+  title: Stop emitting .claude/ paths into non-Claude packs and enforce namespace ownership
+  status: planned
+  parent: providers-as-data-e1
+  summary: '`rewrite_refs` returns `scripts`, `commands` and `hooks` refs unchanged as `.claude/{tier}/{rest}`
+    for Codex (generate-adapter-packs.py:151-154), so every Codex pack file can point into a directory
+    that only exists if the Claude symlink farm ran first (bootstrap.sh:346-351 verifies twelve such symlinks)
+    — an undocumented ordering constraint for a team standardising on Codex. Introduce a manifest-declared
+    `libraryRootVar` (default `${AGENT_KIT_ROOT}`), rewrite those tiers to `${AGENT_KIT_ROOT}/data/{tier}/{rest}`,
+    plant the variable in each provider''s config template, and generalise `linkcase_problems` (:497-513)
+    into a manifest-driven ownedNamespaces assertion replacing the hardcoded WRONGCASE_RE (:81).'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a built codex pack, when `grep -rn '\.claude/' dist/packs/codex/` runs, then it returns nothing,
+    and every former `.claude/{scripts,commands,hooks}/...` ref now reads `${AGENT_KIT_ROOT}/data/{tier}/...`.
+  - Given data/scripts/template-codex-config.toml and data/scripts/template-opencode.json, when a test
+    inspects them, then each defines AGENT_KIT_ROOT in its environment block ([shell_environment_policy]/env
+    for Codex) and the test fails if either omits it.
+  - Given a conformance fixture that injects an `.opencode/` literal into a codex-owned pack file, when
+    `--check` runs, then it exits 3 with `pack file for codex contains a path literal owned by opencode`,
+    derived from the manifests' ownedNamespaces.
+  - Given the change, when `grep -n 'WRONGCASE_RE' data/scripts/generate-adapter-packs.py` runs, then
+    it returns nothing, and the wrong-case regression (`.Codex`/`.OpenCode`/`.Claude`) is still caught
+    — a fixture asserts each of the three literals still fails --check.
+  depends_on:
+  - providers-as-data-t-manifest-driven-renderer
+  tags:
+  - F028
+  - refs
+  - namespaces
+  - goal-C
+  - packs
+- id: providers-as-data-e2
+  kind: epic
+  title: Provider conformance suite with a fail-closed lossiness report
+  status: planned
+  summary: 'The only automated check on pack output is a sha256 drift comparison against tests/fixtures/adapter-packs.golden.json
+    — a file produced by `--update-golden` from the very renderer it polices, so it detects change but
+    proves nothing about correctness and shows a reviewer a hash, never a line. Build a hostile-case corpus
+    and a suite that asserts rendered output against an independent expectation, make every kind either
+    render for every provider or produce a declared, reported loss (with its own non-zero exit code),
+    wire or honestly downgrade the OpenCode config plant and the Codex/OpenCode secret-guard legs, and
+    pin upstream spec revisions with a scheduled drift watchdog. Outcome: a fourth-provider PR arrives
+    with an oracle a reviewer who is not the author can trust.'
+  priority: should
+  lane: later
+  size: XL
+  acceptance:
+  - Given the suite, when `python3 -m unittest discover -s tests/provider_conformance -p 'test_*.py'`
+    runs, then it exits 0 and its report names every declared manifest x every catalog kind it covered.
+  - Given the YAML block-sequence allowed-tools fixture, when the packs render, then no pack file contains
+    `Agent` or `AskUserQuestion` in an allowed-tools value; this assertion fails against HEAD's line-based
+    strip_skill_tools (data/scripts/generate-adapter-packs.py:162-173) and passes after it is replaced.
+  - 'Given a renderer that drops a field the manifest does not declare as lossy, when `python3 data/scripts/generate-adapter-packs.py
+    --check` runs, then it exits 4 with `undeclared loss: <entry>.<field> for <provider>` and dist/packs/compile-report.json
+    marks the entry undeclared:true.'
+  - Given HEAD's data, when the entrypoint coverage contract runs, then either all 5 entrypoints render
+    for Codex or data/claude-md/CONTEXT.md names memory-sync, roadmap, skill-to-command and spike in a
+    generated `omitted for codex` section — and CONTEXT.md no longer claims nothing is silently dropped
+    while an omission exists.
+  - Given `python3 data/scripts/spec-pins-check.py --check`, then it exits 0 offline; given a pin that
+    has moved upstream, `--fetch` exits 1 printing pinned vs observed for each drifted revision.
+  depends_on:
+  - providers-as-data-e1
+  - ci-proves-it-e1
+  - author-and-measure-e1
+  tags:
+  - F020
+  - F021
+  - F034
+  - X052
+  - conformance
+  - lossiness
+  - goal-C
+  - packs
+- id: providers-as-data-spike-1
+  kind: spike
+  title: Measure the OpenCode and Codex hook payloads against pinned CLI versions
+  status: planned
+  parent: providers-as-data-e2
+  summary: 'data/scripts/template-opencode.json:2 is a key literally named `_TODO_S1_2_PENDING_LIVE_VERIFICATION`
+    and template-opencode-plugin.mjs:19-42 carries a 24-line PENDING LIVE-VERIFICATION banner stating
+    that the firing condition, the bash payload shape and the fallback args shape are all unmeasured and
+    that the guard fails open. data/hooks/block-plaintext-secret-write.sh:11 asserts a Codex `.tool_input.*`
+    payload contract with no file implementing it. Time-boxed investigation: install pinned opencode and
+    Codex CLI versions, execute the verification recipe already written at template-opencode-plugin.mjs:40-45,
+    and record what actually fires and with what payload — or record NOT-MEASURABLE. The output is measurements
+    and a supported/experimental verdict per provider, not code.'
+  priority: must
+  lane: later
+  size: S
+  acceptance:
+  - Given a pinned opencode version recorded as the literal output of `opencode --version` in data/providers/opencode/provider.json
+    specRevisions.cli, when a live session attempts (a) a Write of a fake `glpat-AAAA...` token to .mcp.json
+    and (b) the same via `echo ... > .mcp.json` in the bash tool, then data/references/provider-verification-log.md
+    records which hook fired and the raw JSON payload for each attempt.
+  - Given the log, when it is reviewed, then each of the three open questions at template-opencode-plugin.mjs:20-42
+    (permission.ask firing condition for edit/bash; bash payload field name; tool.execute.before output.args
+    per-tool field names) carries an explicit MEASURED or NOT-MEASURABLE verdict with the evidence inline.
+  - Given a pinned Codex CLI version, then the log records whether a `.codex/hooks.json` mechanism exists,
+    its exact payload shape, and whether it satisfies the `.tool_input.{file_path,content,command}` contract
+    asserted at data/hooks/block-plaintext-secret-write.sh:11.
+  - 'Given the 2-working-day time box expires, then the spike closes regardless: every unmeasured leg
+    is written up as NOT-MEASURABLE and the corresponding provider.json keeps `status: experimental`,
+    which providers-as-data-t-provider-status-and-guard-legs then surfaces in README.'
+  depends_on:
+  - providers-as-data-t-provider-manifest-schema
+  tags:
+  - F020
+  - spike
+  - opencode
+  - codex
+  - verification
+  - goal-C
+  - packs
+- id: providers-as-data-t-conformance-corpus
+  kind: task
+  title: Build the hostile-case conformance corpus
+  status: planned
+  parent: providers-as-data-e2
+  summary: 'Create tests/fixtures/conformance-corpus/ holding source artifacts designed to break the transforms,
+    per F021 plus the unicode and oversized cases the milestone adds: a skill whose allowed-tools is a
+    YAML block sequence including Agent; a skill whose allowed-tools is the comma form; an agent with
+    a restricted `tools:` list; an agent with no `tools:` key; a body containing '''''' , """ and backslashes
+    (both TOML multiline escapes); a description containing `: `, single and double quotes; CJK, emoji
+    and RTL text in name, description and body; a body over 100 KB; a `.claude/<tier>/` ref for each of
+    the six tiers matched by REF_RE (generate-adapter-packs.py:74); a ref with swallowed trailing punctuation;
+    and a placeholder ref (`argoops-<name>.sh`). Register them in a corpus manifest so an unregistered
+    fixture fails the suite.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - 'Given tests/fixtures/conformance-corpus/, when tests/provider_conformance/test_corpus_registry.py
+    runs, then it exits 0 and fails with `unregistered fixture: <path>` if a file is added under the corpus
+    without a corresponding entry in tests/fixtures/conformance-corpus/corpus.json.'
+  - Given corpus.json, when the registry test runs, then it asserts at least one fixture exists for each
+    of the 12 named hostile cases and fails naming any case with zero fixtures.
+  - 'Given the corpus is committed, when `python3 data/scripts/catalog-generate.py --check` runs, then
+    it exits 0 and the catalog entry count is unchanged (26 at HEAD) — the corpus lives outside the catalog
+    roots or is excluded by `catalog-exclude: true`.'
+  - Given the corpus, when `python3 data/scripts/generate-adapter-packs.py --check` runs, then `git diff
+    --exit-code tests/fixtures/adapter-packs.golden.json` exits 0 — corpus fixtures never enter the shipped
+    packs.
+  tags:
+  - F021
+  - conformance
+  - fixtures
+  - goal-C
+  - packs
+- id: providers-as-data-t-conformance-suite
+  kind: task
+  title: Assert pack output against an independent oracle, not the renderer's own golden
+  status: planned
+  parent: providers-as-data-e2
+  summary: 'Add tests/provider_conformance/ (unittest, matching the repo''s no-__init__.py convention)
+    that renders the corpus through every declared manifest and asserts: (a) parse validity — `tomllib.loads`
+    every emitted .toml and `yaml.safe_load` every emitted frontmatter block, naming the file on failure;
+    (b) manifest-driven invariants — no STRIP_TOOLS member survives in any pack, every declared kind reaches
+    its declared coverage, a restricted `tools:` list either yields an enforced restriction or an entry
+    in CONTEXT.md; (c) a literal expectation tree at tests/fixtures/expected/<provider>/** so a reviewer
+    sees a line diff, with `--update-expected` to regenerate. Keep the sha256 golden as a fast pre-check
+    only. Replacing the line-based `strip_skill_tools` (generate-adapter-packs.py:162-173) with a structured
+    round-trip through the M6 shared frontmatter parser is part of this story.'
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - 'Given the suite, when `python3 -m unittest discover -s tests/provider_conformance -p ''test_*.py''`
+    runs, then it exits 0; given a deliberately malformed TOML emitter, it exits 1 with `invalid TOML
+    in <pack path>: <tomllib message>`.'
+  - Given the block-sequence allowed-tools fixture, when the tool-strip test runs against HEAD's strip_skill_tools,
+    then it FAILS with `Agent leaked into codex pack for <fixture>`; after the structured round-trip replaces
+    it, the same test passes and `python3 data/scripts/generate-adapter-packs.py --self-test` still passes
+    every existing assertion.
+  - Given tests/fixtures/expected/, when a one-character renderer change is made, then `python3 -m unittest
+    discover -s tests/provider_conformance` fails printing a unified line diff of the affected file (not
+    a hash), and `--update-expected` followed by `git diff` shows exactly that line.
+  - Given tests/fixtures/adapter-packs.golden.json is deleted, when the conformance suite runs, then it
+    still exits 0 — the golden is no longer the only oracle.
+  - Given the suite, when it runs on ubuntu-latest, macos-latest and windows-latest in CI, then all three
+    legs are green (no POSIX-only assumptions in fixture paths or line endings).
+  depends_on:
+  - providers-as-data-t-conformance-corpus
+  - providers-as-data-t-manifest-driven-renderer
+  - author-and-measure-e1
+  - ci-proves-it-e1
+  tags:
+  - F021
+  - F023
+  - conformance
+  - testing
+  - goal-C
+  - goal-A
+  - packs
+- id: providers-as-data-t-lossiness-report
+  kind: task
+  title: Emit a per-compile lossiness report and make an undeclared loss a build error
+  status: planned
+  parent: providers-as-data-e2
+  summary: 'Make the generator report what it destroys. On every compile, write dist/packs/compile-report.json
+    recording, per (catalog entry, provider, field), an action in {kept, rewritten, downgraded, dropped}
+    with the reason and the manifest field that authorised it. A loss the manifest does not declare is
+    a build error with its own exit code (4), distinct from golden drift (2) and contract failure (3).
+    This is the differentiator X011 names: rulesync converts and stays silent about what did not survive.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given `python3 data/scripts/generate-adapter-packs.py --check`, then dist/packs/compile-report.json
+    exists and contains one record per (entry, provider, field) with keys {entryId, provider, field, action,
+    reason, authorisedBy, undeclared}.
+  - 'Given a test that makes the renderer drop `argument-hint` for a provider whose manifest does not
+    declare that loss, when `--check` runs, then it exits 4 with `undeclared loss: entrypoint/roadmap.argument-hint
+    for codex` and the matching record has undeclared:true.'
+  - Given two consecutive `--check` runs with no source change, then `dist/packs/compile-report.json`
+    is byte-identical between runs (keys sorted, no timestamps inside the record set).
+  - Given HEAD's data, when the report is generated, then it records the 20 subagent entries as the least-portable
+    primitive with an explicit per-provider action — a test asserts every catalog agent has a record for
+    every declared provider, so no entry is silently absent from the report.
+  - Given the report, when `python3 data/scripts/generate-adapter-packs.py --report-summary` runs, then
+    it prints a per-provider count of dropped/downgraded fields suitable for a PR comment.
+  depends_on:
+  - providers-as-data-t-capabilities-block
+  - providers-as-data-t-conformance-suite
+  tags:
+  - X011
+  - F034
+  - lossiness
+  - fail-closed
+  - goal-C
+  - packs
+- id: providers-as-data-t-entrypoint-coverage-contract
+  kind: task
+  title: Close the Codex entrypoint drop and stop CONTEXT.md promising what the renderer violates
+  status: planned
+  parent: providers-as-data-e2
+  summary: 'render_codex handles `kind == "entrypoint"` only when providerSupport.codex == ''adapted''
+    (generate-adapter-packs.py:316); the other four fall off the end of the loop with no output and no
+    note, so /memory-sync, /roadmap, /skill-to-command and /spike do not exist for Codex. coverage_problems
+    (:475-478, :486) computes the expected Codex entrypoint count as the number of adapted ones, so 1-of-5
+    is green, while data/claude-md/CONTEXT.md:5 asserts these capabilities render "rather than being silently
+    dropped". Decide the contract per kind in the manifest and enforce it: render every entrypoint using
+    the hand-authored adapter when present and a degradation-noted mechanical render otherwise, or keep
+    the opt-in model and generate an `omitted capabilities` section in CONTEXT.md from the same computation
+    — and fix the preamble at generate-root-contract.py:160-163 either way.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given HEAD's catalog (5 entrypoints, 2 Codex skill files rendered), when the new contract runs, then
+    either dist/packs/codex contains a SKILL.md for all 5 entrypoints, or data/claude-md/CONTEXT.md contains
+    an `## Omitted for codex` section naming memory-sync, roadmap, skill-to-command and spike.
+  - Given the coverage row at generate-adapter-packs.py:486 now expects n_entry (or the manifest-declared
+    contract), when a hand-authored adapter is deleted from data/provider-adapters/codex/entrypoints/,
+    then `python3 data/scripts/generate-adapter-packs.py --check` exits 3 naming the entry and the provider.
+  - Given any non-empty omission set, when `python3 data/scripts/generate-root-contract.py --check` runs
+    against a CONTEXT.md that still claims capabilities render `rather than being silently dropped`, then
+    it exits non-zero; with the corrected generated preamble it exits 0.
+  - Given the conformance suite, when it runs, then for every catalog entry x every declared provider
+    it asserts the entry either appears in that provider's pack or is listed in CONTEXT.md's omitted section
+    — a fixture that satisfies neither fails the suite naming the pair.
+  depends_on:
+  - providers-as-data-t-lossiness-report
+  - providers-as-data-t-root-contract-per-provider
+  tags:
+  - F034
+  - coverage
+  - context-md
+  - goal-C
+  - packs
+- id: providers-as-data-t-provider-status-and-guard-legs
+  kind: task
+  title: Wire the OpenCode plant and the Codex secret-guard leg, or mark the provider experimental in
+    data
+  status: planned
+  parent: providers-as-data-e2
+  summary: 'OpenCode is presented as one of three supported providers (README.md:20) but nothing installs
+    it: bootstrap.sh Step 7/10 plants .mcp.json (:266-286) and .codex/config.toml (:293-309) and nothing
+    else, template-opencode.json:2 is a stub key, and the Codex leg of the shared secret guard asserted
+    at data/hooks/block-plaintext-secret-write.sh:11 has no implementing file. Using spike-1''s measurements:
+    replace the stub key with a real `_comment` and add a bootstrap plant step mirroring :293-309; author
+    data/scripts/template-codex-hooks.json implementing the `.tool_input.*` contract and plant it; extend
+    tests/hooks/block-plaintext-secret-write.test.sh to feed each provider''s native payload through the
+    shared core. Where a leg could not be measured, set `status: experimental` in the manifest and generate
+    the README provider list from that field so ''supported'' becomes a checkable data claim. The supported-vs-experimental
+    call for each provider is the owner''s.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the change, when `grep -rn '_TODO_S1_2_PENDING_LIVE_VERIFICATION\|PENDING LIVE-VERIFICATION'
+    data/` runs, then it returns nothing.
+  - Given data/scripts/template-codex-hooks.json, when `bash tests/hooks/block-plaintext-secret-write.test.sh`
+    runs, then it feeds the Claude, Codex and OpenCode native payload shapes (as recorded by spike-1)
+    through the shared core and each denies a write of a fake `glpat-` token to .mcp.json; the script
+    exits 0 and prints one PASS line per provider.
+  - 'Given a manifest with `status: experimental`, when `python3 data/scripts/generate-root-contract.py
+    --check` runs against a README whose provider table calls that provider supported, then it exits non-zero
+    naming the disagreement; the generated table marks it experimental.'
+  - 'Given bootstrap runs on a bare clone, when it completes, then the OpenCode MCP config is planted
+    at the manifest-declared path and a post-condition check reports it present; if the provider is experimental
+    the plant is skipped with an explicit `skipped: opencode is experimental` line rather than silently.'
+  - Given any provider whose spike-1 verdict was NOT-MEASURABLE, then its provider.json status is `experimental`
+    — asserted by a test that cross-references data/references/provider-verification-log.md.
+  depends_on:
+  - providers-as-data-spike-1
+  - providers-as-data-t-provider-manifest-schema
+  - ci-proves-it-e4
+  tags:
+  - F020
+  - secret-guard
+  - bootstrap
+  - provider-status
+  - goal-C
+  - goal-A
+  - security
+- id: providers-as-data-t-spec-pins-drift-watchdog
+  kind: task
+  title: Pin upstream spec revisions and watch them for drift
+  status: planned
+  parent: providers-as-data-e2
+  summary: 'The upstream specs are the only unversioned inputs in a system whose whole premise is that
+    derived state is verified against pinned sources: MCP has just adopted a formal deprecation policy
+    with three core features (Roots, Sampling, Logging) entering a twelve-month window, and Agent Skills
+    publishes no changelog or spec version at all, which makes silent drift the likely failure mode. Add
+    data/facts/spec-pins.json recording the exact revisions targeted, mirror each provider''s CLI version
+    and doc revision into its provider.json specRevisions block, add data/scripts/spec-pins-check.py with
+    an offline `--check` and a network `--fetch`, and schedule the fetch weekly in CI.'
+  priority: should
+  lane: later
+  size: S
+  acceptance:
+  - 'Given data/facts/spec-pins.json, then it records with a dated `checked_at`: the Agent Skills spec
+    revision, the MCP protocol revision, the SEP-2640 draft SHA, and per-provider CLI version plus doc
+    revision; and `python3 data/scripts/spec-pins-check.py --check` exits 0 offline, validating shape
+    and that every provider.json specRevisions block matches the pins file.'
+  - Given a provider.json specRevisions value edited to disagree with spec-pins.json, when `--check` runs,
+    then it exits 1 naming the provider, the field, and both values.
+  - 'Given `--fetch` and an upstream revision that has moved, then it exits 1 printing one `DRIFT <name>:
+    pinned=<a> observed=<b>` line per drifted pin; with no drift it exits 0.'
+  - Given .github/workflows/spec-drift.yml, when the weekly schedule fires and `--fetch` exits 1, then
+    the job fails and opens or updates a single tracking issue rather than creating a new one per run.
+  - Given the deprecated-feature clocks, then spec-pins.json carries dated rows for MCP Roots, Sampling
+    and Logging with a `removal_deadline` field, and `--check` exits 1 when a deadline is within 60 days
+    and no tracking issue id is recorded.
+  depends_on:
+  - providers-as-data-t-provider-manifest-schema
+  - ci-proves-it-e1
+  tags:
+  - X052
+  - spec-pins
+  - drift
+  - goal-C
+  - goal-B
+  - portability
+- id: providers-as-data-e3
+  kind: epic
+  title: Neutral tier-0 output, signed packs, the Claude plugin, and instrumented delivery
+  status: planned
+  summary: 'Make the provider-neutral `.agents/skills/` tree the first render target with per-provider
+    trees only for what it cannot express; give every pack a pack.json with semver and per-file sha256,
+    signed and verified before it is trusted; ship the Claude target as a versioned plugin with a marketplace
+    entry; land a ''how to add a provider'' reference with a worked fourth-provider example; and stamp
+    each rendered skill and agent with its catalog id and revision so the file-delivered Codex and OpenCode
+    paths stop being invisible to the outcome ledger. Outcome: a team can pin a version of the kit, verify
+    it, install it without cloning, and see which skills their non-Claude sessions actually used.'
+  priority: should
+  lane: later
+  size: XL
+  acceptance:
+  - Given a build, when `ls dist/packs/agents/skills/` runs, then it lists a directory for every catalog
+    skill, and a test asserts each per-provider file has a declared reason in compile-report.json for
+    why the neutral tree could not express it.
+  - Given a built pack, then dist/packs/<provider>/pack.json carries {name, version (semver), provider,
+    catalogSchemaVersion, files:[{path, sha256}]} with every hash matching, and `python3 data/scripts/pack-verify.py
+    --pack dist/packs/codex` exits 0 while a single flipped byte makes it exit 1 naming the file.
+  - Given .claude-plugin/plugin.json, then `python3 data/scripts/claude-plugin-check.py --check` exits
+    0, the plugin version equals package.json's version, and no plugin-shipped agent declares hooks, mcpServers
+    or permissionMode.
+  - Given data/references/provider-adapters.md and the worked gemini-cli example, when `python3 data/scripts/skill-ref-check.py
+    --check` runs, then it exits 0 and every link in the reference resolves.
+  - Given a fixture session for each provider, when the event log is consumed, then per-catalog-id usage
+    counts are non-zero for codex and opencode as well as claude, joined to the outcome ledger on run_id.
+  depends_on:
+  - providers-as-data-e1
+  - providers-as-data-e2
+  - named-and-installable-e1
+  - author-and-measure-e3
+  tags:
+  - F029
+  - F085
+  - F088
+  - F177
+  - X009
+  - X015
+  - X051
+  - distribution
+  - instrumentation
+  - goal-C
+  - goal-F
+  - packs
+- id: providers-as-data-t-agents-tier0-tree
+  kind: task
+  title: Render .agents/skills/ as the tier-0 provider-neutral tree
+  status: planned
+  parent: providers-as-data-e3
+  summary: Restructure the generator so the first render target is the provider-neutral `.agents/skills/<name>/`
+    tree, with per-provider trees existing only for what `.agents/` cannot express. Codex already consumes
+    `WORKSPACE/.agents/skills/<name>/SKILL.md` (generate-adapter-packs.py:309-312) — that must become
+    a consumption of the one neutral tree, not a second render, which is exactly the transform-bug class
+    the generator's own docstring (:6-8) says motivated its rewrite. Keep `.claude/skills` as a byte-identical
+    copy for the pragmatic path. Codex, Cursor, OpenCode and Antigravity all scan `.agents/skills` natively.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given a build, when `ls dist/packs/agents/skills/` runs, then it lists one directory per catalog skill,
+    each containing SKILL.md plus any assets, and the neutral tree has its own section in tests/fixtures/adapter-packs.golden.json.
+  - Given the codex pack, when a test compares each `.agents/skills/<n>/SKILL.md` byte-for-byte against
+    the neutral tree's file, then they are identical for every skill — the test fails if the codex leg
+    re-renders rather than reuses.
+  - Given the Claude path, when a test compares `.claude/skills/<n>/SKILL.md` against the neutral tree,
+    then they are byte-identical for every skill.
+  - Given any file emitted only into a per-provider tree, when the conformance suite runs, then compile-report.json
+    contains a record naming the manifest field that the neutral tree cannot express; a per-provider file
+    with no such record fails the suite.
+  - Given the change, when `python3 data/scripts/generate-adapter-packs.py --check` runs, then it exits
+    0 with the regenerated golden committed.
+  depends_on:
+  - providers-as-data-t-manifest-driven-renderer
+  - providers-as-data-t-lossiness-report
+  - author-and-measure-e2
+  tags:
+  - X009
+  - agents-tree
+  - portability
+  - goal-C
+- id: providers-as-data-t-pack-format
+  kind: task
+  title: Define a versioned pack artifact and redefine --apply as an install from it
+  status: planned
+  parent: providers-as-data-e3
+  summary: 'There is no distributable pack: `--apply` renders and writes straight into two inferred anchors,
+    and tests/fixtures/adapter-packs.golden.json is a drift manifest, not a release artifact, so a team
+    cannot pin a version of the knowledge kit or roll back a bad skill. Define the pack format — a directory
+    or .tgz containing pack.json {name, version (semver), provider, catalogSchemaVersion, generatedFrom
+    {commit}, files:[{path, sha256}]} plus the rendered tree — build it under `--out` (default `<repo>/dist/packs/<provider>/`),
+    and redefine `--apply` as an install FROM a built pack INTO an explicit `--target`. The anchor and
+    refuse-outside-repo safety work lands in providers-as-data-t-anchor-resolver; this story adds versioning,
+    hashing and install semantics on top of it.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given `python3 data/scripts/generate-adapter-packs.py --out dist/packs`, then each dist/packs/<provider>/pack.json
+    validates against data/schemas/pack.schema.json and every listed sha256 matches the file on disk —
+    asserted by `python3 data/scripts/pack-verify.py --pack dist/packs/<provider> --hashes-only` exiting
+    0.
+  - Given `--apply` with no `--target`, then it exits 2 printing `--apply installs a built pack; pass
+    --target DIR`, and creates no files.
+  - Given a source skill body is edited and the pack rebuilt, then pack.json.version differs from the
+    previous build and the changed file's sha256 in files[] reflects the new content — asserted by a test
+    that captures both builds.
+  - Given the release workflow, when a tag is pushed, then dist/packs/*.tgz are attached as GitHub Release
+    assets and the job is green; the workflow step names each uploaded asset.
+  - Given the change, when `grep -nE 'parents\[1\]|Work/workspace' data/scripts/generate-adapter-packs.py`
+    runs, then it returns no hits.
+  depends_on:
+  - providers-as-data-t-anchor-resolver
+  - named-and-installable-e3
+  - starts-everywhere-e1
+  tags:
+  - F177
+  - pack-format
+  - distribution
+  - goal-C
+  - goal-A
+  - packs
+- id: providers-as-data-t-pack-signing
+  kind: task
+  title: Sign pack manifests and verify before a pack is trusted
+  status: planned
+  parent: providers-as-data-e3
+  summary: A skill is arbitrary instructions plus executable assets — the highest-trust, lowest-scrutiny
+    artifact in the repo. Exact per-artifact sha256 already exists; the missing piece is binding it to
+    the distributed pack. Add data/scripts/pack-sign.py and data/scripts/pack-verify.py producing and
+    checking a detached signature over pack.json, shape the files[] array the same way SEP-2640's resources
+    array requires so the digests can later be exposed through an MCP skills surface, and make the installer
+    refuse an unverified or mismatched pack. The signing key identity, where its public half is published,
+    and the rotation policy are owner decisions.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given a built pack, when `python3 data/scripts/pack-sign.py --pack dist/packs/codex` runs, then dist/packs/codex/pack.json.sig
+    is produced and `python3 data/scripts/pack-verify.py --pack dist/packs/codex --key <pubkey>` exits
+    0 printing the trusted key id.
+  - Given one byte flipped in any file listed in pack.json, when pack-verify runs, then it exits 1 naming
+    the file plus the expected and observed digest; given one byte flipped in pack.json.sig, it exits
+    1 with a signature-verification error. Both are tests in tests/provider_conformance/.
+  - 'Given `--apply --target <dir>` against an unsigned or mismatched pack, then the install refuses and
+    exits 1 unless `--allow-unsigned` is passed; with the flag it proceeds and prints an explicit `WARNING:
+    installing an unverified pack` line.'
+  - Given SECURITY.md, then it documents the public key, its fingerprint, the rotation policy and how
+    to verify a release; `python3 data/scripts/skill-ref-check.py --check` resolves the links.
+  - Given data/references/provider-adapters.md, then it documents that files[] uses the SEP-2640 resources
+    shape, and a test asserts each entry has exactly the keys {path, sha256} (plus optional size).
+  depends_on:
+  - providers-as-data-t-pack-format
+  - ci-proves-it-e3
+  tags:
+  - X051
+  - signing
+  - integrity
+  - supply-chain
+  - goal-A
+  - goal-C
+  - security
+- id: providers-as-data-t-claude-plugin
+  kind: task
+  title: Ship the Claude target as a versioned plugin with a marketplace entry
+  status: planned
+  parent: providers-as-data-e3
+  summary: The plugin is the only Claude distribution unit that carries skills, subagents, hooks and MCP
+    config together, and the 20 subagents are where this repo's value concentrates; without an explicit
+    version field Claude Code falls back to the commit SHA and treats every commit as a release. Add .claude-plugin/plugin.json
+    with an explicit semver version, hooks/hooks.json, .mcp.json referencing ${CLAUDE_PLUGIN_ROOT}, the
+    skills/ and agents/ trees, and a marketplace.json entry. Audit the 20 agents against the restriction
+    that plugin-shipped agents may not declare hooks, mcpServers or permissionMode, and enforce it with
+    a gate.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given the repo, then .claude-plugin/plugin.json exists with an explicit semver `version` (not a SHA),
+    hooks/hooks.json, an .mcp.json whose server command path is expressed via ${CLAUDE_PLUGIN_ROOT}, plus
+    skills/ and agents/; a marketplace.json entry is committed.
+  - Given `python3 data/scripts/claude-plugin-check.py --check`, then it exits 0; given a test that injects
+    `permissionMode:` into one of data/agents/*.md, it exits 1 naming the agent and the forbidden key.
+    The same check asserts no plugin-shipped agent declares hooks or mcpServers.
+  - Given package.json version 0.2.0, when the check runs against a plugin.json declaring a different
+    version, then it exits 1 printing both values; a release that bumps package.json must bump plugin.json
+    in the same commit.
+  - Given the plugin manifest, when the check runs, then it asserts every catalog skill and all 20 catalog
+    agents are reachable from the plugin's declared skills/ and agents/ paths, failing with the count
+    and the missing names if not.
+  - Given `grep -rn '\${CLAUDE_PLUGIN_ROOT}' .claude-plugin/`, then every path in .mcp.json that points
+    into the repo is expressed relative to that variable — no absolute path literal survives, asserted
+    by the check.
+  depends_on:
+  - providers-as-data-t-pack-format
+  - starts-everywhere-e1
+  - named-and-installable-e1
+  tags:
+  - X015
+  - claude-plugin
+  - distribution
+  - goal-C
+  - goal-A
+  - packs
+- id: providers-as-data-t-provider-authoring-reference
+  kind: task
+  title: Write the 'how to add a provider' reference with a worked fourth-provider example
+  status: planned
+  parent: providers-as-data-e3
+  summary: 'There is no documentation of the adapter architecture anywhere a contributor would look: data/references/
+    holds 31 files and none is about providers, the frontmatter opt-in contract exists only in a Python
+    docstring (catalog-generate.py:194-202), and the only worked adapter is one 17 KB file under data/provider-adapters/codex/entrypoints/milestone-pipeline/
+    with no authoring guide. Add data/references/provider-adapters.md covering the catalog->pack pipeline,
+    every manifest field, per-kind layout templates, the ref-rewrite modes, the degradation model (native/adapted/degraded
+    and when to hand-author under data/provider-adapters/<id>/), the conformance suite a new provider
+    must pass, and a file-by-file checklist. Ship a complete worked fourth provider — Gemini CLI is cheapest:
+    Markdown agents, GEMINI.md root contract, MCP support — as documentation-grade, status: experimental.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - 'Given data/references/provider-adapters.md, then it contains a section for each of: pipeline overview,
+    every manifest field with its type and effect, per-kind layout templates, ref-rewrite modes, the degradation
+    model, the conformance requirements, and a checklist; a docs test asserts every manifest property
+    in data/schemas/provider-manifest.schema.json is mentioned by name in the reference and fails listing
+    any that is not.'
+  - Given the worked example commit, when `git show --stat <sha>` runs, then it lists files only under
+    data/providers/gemini-cli/, data/provider-adapters/gemini-cli/, tests/fixtures/ and data/facts/catalog.json
+    — and no file under data/scripts/.
+  - Given the example is committed, when `python3 data/scripts/generate-adapter-packs.py --check` runs,
+    then it exits 0 with the gemini-cli pack rendered and its GEMINI.md root contract emitted within its
+    declared byte budget.
+  - Given README.md and data/references/runtime-contract.md, then both link data/references/provider-adapters.md
+    and `python3 data/scripts/skill-ref-check.py --check` exits 0.
+  - Given data/references/provider-capability-matrix.md, then it is generated (not hand-written), linked
+    from the reference, and a stale copy makes `python3 data/scripts/generate-adapter-packs.py --check`
+    exit 3.
+  depends_on:
+  - providers-as-data-t-manifest-driven-renderer
+  - providers-as-data-t-conformance-suite
+  - providers-as-data-t-capabilities-block
+  tags:
+  - F029
+  - docs
+  - onboarding
+  - goal-C
+  - goal-A
+- id: providers-as-data-t-catalog-id-stamping
+  kind: task
+  title: Stamp every rendered skill and agent with its catalog id and revision
+  status: planned
+  parent: providers-as-data-e3
+  summary: 'The kit''s primary delivery mechanism is file rendering, not MCP — the generator''s own header
+    (generate-adapter-packs.py:13-26) states that for Claude the .claude tree IS data/ via symlinks so
+    no get_skill call is made, and that OpenCode declares no mcp block at all — so TokenLogger (src/logging/token-logger.ts:265-345)
+    observes only the subset of sessions that route through the server. Step one of closing that gap:
+    have the renderer stamp each rendered skill and agent with `agent-kit-catalog-id` and `agent-kit-revision`
+    (the 12-hex content revision landed by M6''s content-identity work) so a read of a rendered file can
+    be attributed to a specific skill revision.'
+  priority: should
+  lane: later
+  size: S
+  acceptance:
+  - Given a build, when a test walks every rendered skill and agent across all declared providers, then
+    each carries `agent-kit-catalog-id` and `agent-kit-revision` in its frontmatter (or, for TOML agents,
+    as top-level keys), and the test names any file missing either.
+  - Given `python3 data/scripts/pack-identify.py dist/packs/codex/.codex/agents/<name>.toml`, then it
+    prints the catalog id and revision and exits 0; run over every file in every built pack it exits 0
+    for all of them.
+  - Given the revision stamp, when a source skill body changes and the pack is rebuilt, then the stamped
+    revision changes for that entry and for no other — asserted by comparing two builds.
+  - Given the expectation tree, when the stamping lands, then the tests/fixtures/expected/ diff for each
+    affected file shows only the two added keys and no other line.
+  depends_on:
+  - author-and-measure-e3
+  - providers-as-data-t-manifest-driven-renderer
+  tags:
+  - F088
+  - instrumentation
+  - catalog-identity
+  - goal-F
+  - goal-C
+  - evals
+- id: providers-as-data-t-provider-event-hooks
+  kind: task
+  title: One provider-neutral edit-event contract with three thin adapters
+  status: planned
+  parent: providers-as-data-e3
+  summary: The only edit-time instrumentation point is data/scripts/template-settings.json:46-59, a Claude-Code-specific
+    PostToolUse Edit|Write chain running two scripts that record nothing measurable; template-codex-config.toml
+    has no hooks section at all and template-opencode-plugin.mjs wires only the secret guard. Define one
+    provider-neutral contract — data/hooks/record-edit-event (ported to the non-bash implementation M3
+    lands) reading the same {tool_input:{file_path, content|new_string}} payload and appending {ts, run_id,
+    provider, tool, file_path, bytes_delta, catalog_id?} to $AGENT_KIT_EVENT_LOG — and register it in
+    all three provider config templates, mirroring the secret-guard pattern. Then document, generated
+    from the manifests, which providers produce usage signal and which do not, so no one draws a conclusion
+    from a partial denominator.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given the measured payload shapes from spike-1, when a unit test feeds each provider's native payload
+    to data/hooks/record-edit-event, then each produces exactly one well-formed JSONL line with all required
+    keys and a parseable ts; a malformed payload produces no line and exit code 0 (fail-open, parity with
+    the secret-guard core).
+  - Given the three templates, when a test inspects them, then data/scripts/template-settings.json registers
+    record-edit-event in its PostToolUse Edit|Write array, data/scripts/template-codex-hooks.json registers
+    it, and data/scripts/template-opencode-plugin.mjs registers a tool.execute.after handler for it; the
+    test fails naming any template that does not.
+  - Given a fixture event log covering all three providers, when the usage consumer runs (`python3 data/scripts/mcp-token-stats.py
+    --by-provider` or its successor), then it reports non-zero per-catalog-id counts for codex and opencode
+    as well as claude, joined to the M6 outcome ledger on run_id — asserted against expected counts.
+  - Given README.md's instrumentation section, then it is generated from the manifests' capabilities.hookEvents
+    and a stale hand-edit makes `python3 data/scripts/generate-root-contract.py --check` exit non-zero.
+  - Given a provider whose manifest declares no supported hook events, then the generated README marks
+    it as producing no usage signal and the consumer reports its denominator as unmeasured rather than
+    zero.
+  depends_on:
+  - providers-as-data-spike-1
+  - providers-as-data-t-catalog-id-stamping
+  - providers-as-data-t-provider-status-and-guard-legs
+  - author-and-measure-e5
+  - ci-proves-it-e4
+  tags:
+  - F085
+  - F088
+  - instrumentation
+  - telemetry
+  - goal-F
+  - goal-C
+  - evals

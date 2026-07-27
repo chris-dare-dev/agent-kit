@@ -1,0 +1,777 @@
+schema: roadmap/1
+slug: memory-you-can-trust
+project: agent-kit
+title: M8 Memory You Can Trust — configurable retrieval and a gold set behind a CI non-regression gate
+status: draft
+phase: sequenced
+brief: 'Make retrieval something an adopter can configure, reproduce and trust: break the 384-dimension
+  pin, put the whole retrieval configuration behind one signed profile digest, fix the ASCII/English-only
+  lexical path, and ship a gold set a second engineer can actually run, wired to a CI non-regression gate
+  so a ranking change cannot silently degrade recall.'
+goal:
+  hmw: How might we make retrieval quality a measured, reproducible property instead of an assertion?
+  objective: Retrieval is configurable (model, chunking, fusion, weights), reproducible by a second engineer
+    from a committed gold suite, and defended by a CI gate that fails on regression.
+  key_results:
+  - From a bare clone on all three CI operating systems, `npm run eval:retrieval` completes and prints
+    nDCG@10 and recall@10 for all four modes in artifact_retrieval_eval.MODES against a tracked gold set;
+    today the eval has no corpus any adopter can supply (F045, F082).
+  - '`grep -nE ''^(EMBEDDING_MODEL|RERANKER_MODEL|EMBEDDING_DIMENSIONS|QDRANT_SERVER_VERSION) *='' workspace-tooling/artifact_retrieval.py`
+    returns zero matches, and a 768-dimension profile ingests, searches and passes the gold gate without
+    a source edit (F042, X021).'
+  - A pull request that changes the retrieval profile digest and drops nDCG@10 or recall@10 beyond the
+    declared tolerance fails CI; a profile change that does not run the gold suite also fails CI (X017).
+  - Every artifact-memory tool result carries canonical_path, content sha256, outbox unit id, catalog
+    generation, embedding model + dimension, memory_type, scope and validity window; a contract test asserts
+    each field is non-null on a live search (X018, X019, X032).
+  - '`grep -rn ''lessons.md'' data/agents/ | grep -c ''>>''` returns 0 and no code path outside the outbox
+    applier writes canonical Markdown; every write is reconstructible from the outbox alone (F039, X029,
+    X034).'
+  - The access ledger has recorded at least 30 days of real access events, with a reproducible `artifact_tier_plan.py
+    plan` output, before any demotion predicate is enabled in a shipped configuration (F056, X048).
+  - 'A lessons trim loses zero lines: regression test T6 in data/scripts/milestone-pipeline-consolidate-memory-test.sh
+    asserts every trimmed line is present in lessons-cold.md, and the marker line no longer accumulates
+    in the untrimmable tail (F058).'
+  - stale_hit_rate@10 and orphan_rate are reported beside nDCG in every eval run and are gated with committed
+    thresholds (X020).
+  wont:
+  - Multimodal ingestion — the modality half of F043 (PDF/image/notebook extractors, widening DOCUMENT_SUFFIXES
+    at artifact_catalog.py:43-46) is explicitly out of scope; only the language half ships. 'Multimodal'
+    stays an unmet claim and the README must stop asserting it.
+  - The content-addressed unit store (F060) and cold-representation compaction (F061). Rehydration in
+    this milestone resolves through the live file and the existing unit archive only; the CAS tier is
+    deferred until the access ledger justifies it.
+  - The two-collection hot/cold split with alias-fronted quantized cold storage, SIEVE-style demotion,
+    minimum dwell time and lazy promotion (the deferred half of F057 and all of X048's build phase). Storage-class
+    configurability and a gated eviction path ship; the second collection does not.
+  - Quantization tuning (X046) and AST-aware/tree-sitter chunking (X047) — both belong with the deferred
+    cold-plane engineering, not with the chunk-profile registry that ships here.
+  - A shared or team memory tier (F038). The store stays uid-scoped and private; multi-tenant trust boundaries
+    belong with the threat model in M3, not here.
+  - Asynchronous consolidation as a supervised event-consumer job (X035). The write path and the reconciliation
+    consumer ship; the importance/merge/decay/eviction consolidation pass does not.
+  - Any per-skill retrieval or prompt-optimisation machinery. data/skills/ contains exactly one skill
+    (handoff/); that work is n=1 until M6 builds a corpus.
+  - 'Everything on the KILLED list, restated so it cannot creep back in: PAM portable memory artifacts,
+    cryptographic erasure over the immutable outbox, W3C CG conformance packs, Qdrant miniCOIL sparse
+    vectors, a three-backend reranker plugin registry, LLM-generated contextual chunk prefixes, an LLM-arbitrated
+    write path, and promoting the Graphiti pilot into the canonical path.'
+generated_by:
+  agent: claude-opus-5
+  at: '2026-07-26'
+  brief: multi-workflow audit + landscape benchmark synthesis
+retired: []
+items:
+- id: memory-you-can-trust-e1
+  kind: epic
+  title: Retrieval you can configure, in any language, behind one signed profile digest
+  status: planned
+  summary: Retrieval today is four module constants, a hard 384-dimension/cosine assertion, an ASCII-only
+    tokenizer on both the Python and TypeScript sides, a single chunking profile, and workspace scoping
+    the caller is trusted to supply. This epic turns all of that into a versioned retrieval profile hashed
+    into the existing ranking_contract() digest, so configurability arrives without losing the freeze
+    guarantee. It also lands the fused recall entry point — but only after a spike settles how many tools
+    the server may register, since that literature governs both this epic's recall design and the write
+    tools in e4.
+  priority: must
+  lane: later
+  size: XL
+  acceptance:
+  - Given a runtime config declaring any of the three shipped retrieval profiles, when the memory service
+    starts, then it starts and reports the active profile_id and profile_digest — and `grep -nE '^(EMBEDDING_MODEL|RERANKER_MODEL|EMBEDDING_DIMENSIONS|QDRANT_SERVER_VERSION)
+    *=' workspace-tooling/artifact_retrieval.py` returns no matches.
+  - Given a corpus containing one CJK and one accented-Latin document, when the Python FTS5 index and
+    the TypeScript inverted index are both queried with a term from each, then both return a non-zero
+    lexical hit (today both return zero).
+  - Given a query carrying a scope filter, when it reaches Qdrant, then the ACORN query-time flag is set,
+    the scope/type/tier payload indexes exist, and the workspace_id must-clause was injected by the service
+    rather than the caller.
+  - Given the ADR produced by memory-that-earns-it-spike-1 declares a maximum registered tool count, when
+    `npm test` runs, then the tool-budget test fails if the server registers more tools than the ADR permits.
+  tags:
+  - F042
+  - F043
+  - F047
+  - F041
+  - X016
+  - X017
+  - X021
+  - X022
+  - X023
+  - retrieval
+  - profile-digest
+  - i18n
+  - memory
+- id: memory-you-can-trust-spike-1
+  kind: spike
+  title: 'Time-boxed: MCP tool-count degradation and progressive disclosure — set a tool-surface budget
+    before adding recall and the write tools'
+  status: planned
+  parent: memory-you-can-trust-e1
+  summary: 'The research corrections flag this as never searched: the server already registers 17 read-only
+    tools into every session, and this roadmap proposes to add recall, remember, forget, get_artifact_revision,
+    reconcile and as-of variants. There is a live body of work on tool-count degrading selection accuracy
+    and on progressive disclosure (one fan-out search tool versus N flat tools) whose conclusions likely
+    contradict several recommendations here. Time-box the reading, then publish an ADR that fixes a maximum
+    registered tool count and decides whether the four search primitives stay separately registered behind
+    a fused recall or are consolidated.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given the spike is complete, when docs/adr/ is listed, then adr-012-tool-surface-budget.md exists,
+    cites at least three primary sources with dates, states a maximum registered tool count N with rationale,
+    and rules explicitly on (a) whether search_platform_knowledge, search_memory, search_artifacts and
+    query_temporal_facts remain individually registered alongside recall, and (b) the maximum number of
+    tools the e4 write path may add.
+  - Given the ADR is merged, when `npm test` runs, then src/tool-budget.test.ts counts the tools registered
+    by src/index.ts under each SERVER_PROFILE and fails if any profile exceeds N, naming the ADR in the
+    failure message.
+  - Given the spike is complete, when the ADR index in docs/adr/README.md is read, then adr-012 is listed
+    and memory-that-earns-it-t-fused-recall and memory-that-earns-it-t-gated-write-path reference it as
+    their governing decision.
+  - 'Given the time-box (5 working days) expires without a defensible N, then the ADR records ''no change:
+    N = current registered count'' with the evidence gap named, and the fused recall task is descoped
+    to a non-registered internal function rather than left ambiguous.'
+  depends_on:
+  - starts-everywhere-e3
+  tags:
+  - F041
+  - X029
+  - tool-surface
+  - progressive-disclosure
+  - research-correction
+  - mcp-server
+- id: memory-you-can-trust-t-retrieval-profile
+  kind: task
+  title: Promote the four welded model constants into a versioned retrieval profile hashed into the ranking
+    contract
+  status: planned
+  parent: memory-you-can-trust-e1
+  summary: workspace-tooling/artifact_retrieval.py:26-30 declares EMBEDDING_MODEL, RERANKER_MODEL, QDRANT_SERVER_VERSION
+    and EMBEDDING_DIMENSIONS as module constants, and artifact_memory_service.py:415-421 refuses to start
+    when the runtime config names anything else, while :756-760 refuses any Qdrant server whose version
+    string is not exactly 1.16.3. Move all four into a retrieval_profile object carried in the runtime
+    config and hashed into ranking_contract() (artifact_retrieval.py:108-151), so the values become data
+    while the freeze guarantee survives as a profile_digest. Ship three named profiles and delete the
+    divergent DEFAULT_EMBEDDING_MODEL at artifact_ingestion.py:56 so one profile governs both ingest and
+    query.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a runtime config declaring retrieval_profile bge-small-en-384, when ranking_contract() is printed,
+    then the output contains profile_id, embedding_model, reranker_model, embedding_dimensions, min_qdrant_version
+    and a profile_digest — and `grep -nE '^(EMBEDDING_MODEL|RERANKER_MODEL|EMBEDDING_DIMENSIONS|QDRANT_SERVER_VERSION)
+    *=' workspace-tooling/artifact_retrieval.py` returns no matches.
+  - Given a runtime config declaring a profile with a different embedding model, when artifact_memory_service.py
+    starts, then it starts and logs the active profile_id instead of raising 'exact retrieval model identity
+    does not match' at artifact_memory_service.py:415-421.
+  - Given a live Qdrant reporting server version 1.17.0 and a profile declaring min_qdrant_version 1.16.3,
+    when qdrant_readiness runs, then readiness passes (today artifact_memory_service.py:756-760 raises
+    on any string other than 1.16.3).
+  - Given the profile is edited, when the frozen-policy test in workspace-tooling/tests/ runs, then profile_digest
+    differs from the committed baseline and the test fails until the baseline is consciously updated.
+  - Given the repo at HEAD, when `grep -n DEFAULT_EMBEDDING_MODEL workspace-tooling/artifact_ingestion.py`
+    runs, then there is no match, and README.md:34 names the model the shipped default profile actually
+    serves.
+  depends_on:
+  - starts-everywhere-e3
+  - gates-green-e4
+  tags:
+  - F042
+  - X017
+  - retrieval
+  - profile-digest
+  - substrate
+  - memory
+- id: memory-you-can-trust-t-model-registry
+  kind: task
+  title: 'Break the 384-dimension pin: a models registry, profile-derived collection names, and a stable
+    alias in front of every collection'
+  status: planned
+  parent: memory-you-can-trust-e1
+  summary: The ingest path asserts a hard dimension and cosine distance when creating the collection (artifact_ingestion.py:1036-1043
+    plus the two migrate variants) and the collection name is baked into the code path rather than derived.
+    Ship data/facts/retrieval-models.json declaring model_id, revision, digest, dim, distance, max_tokens
+    and query/document prefixes per model, derive the collection name as spans_<profile>_<generation>,
+    and have every reader address a stable alias rather than a literal collection name. Delete the assertion
+    that rejects any non-384-dimension cosine collection.
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - Given a profile referencing a 768-dimension model in data/facts/retrieval-models.json, when `artifact_ingestion.py
+    prepare` and the Qdrant upsert run against a throwaway generation, then the collection is created
+    with size 768 and the run completes — today the dimension assertion in artifact_ingestion.py:1036-1055
+    rejects it.
+  - Given any code path that reads the collection, when `grep -rn 'personal_artifact_spans' workspace-tooling/*.py
+    src/**/*.ts` runs, then no literal collection name appears outside a test fixture or a migration script;
+    readers resolve through the alias.
+  - Given two generations exist, when the alias is repointed, then a reader started before the flip and
+    a reader started after it both return results from exactly one collection, asserted by an integration
+    test in workspace-tooling/tests/integration/test_collection_alias.py.
+  - Given data/facts/retrieval-models.json, when the data-lint gate runs, then it validates against data/schemas/retrieval-models.schema.json
+    (Draft 2020-12, additionalProperties:false) and fails on a missing digest or dim.
+  depends_on:
+  - memory-you-can-trust-t-retrieval-profile
+  tags:
+  - X021
+  - F042
+  - qdrant
+  - model-registry
+  - aliases
+  - memory
+- id: memory-you-can-trust-t-named-vector-migration
+  kind: task
+  title: 'Named-vector embedding migration: dual-write, backfill from the span manifest, validate on gold,
+    flip the alias'
+  status: planned
+  parent: memory-you-can-trust-e1
+  summary: 'Once the registry exists, an existing deployment still needs a route from one embedding model
+    to another without a cold rebuild. Implement the migration as a documented, resumable procedure over
+    Qdrant named vectors: create_vector_name, dual-write new ingests, backfill historical points from
+    the SQLite span manifest (never from the payload — the no-body-content-in-payload rule stays), validate
+    on the gold suite, flip the alias, then delete_vector_name. Ship it as a subcommand of workspace-tooling/artifact_qdrant_migrate.py
+    with a runbook.'
+  priority: should
+  lane: later
+  size: L
+  acceptance:
+  - Given a collection carrying only the old named vector, when `artifact_qdrant_migrate.py add-vector
+    --profile <new>` runs, then the new named vector exists on the live collection and existing searches
+    against the old vector are unaffected, proven by an integration test asserting identical top-10 before
+    and after.
+  - Given a partially completed backfill, when the backfill subcommand is re-run, then it resumes from
+    its checkpoint and re-processes zero already-migrated points, asserted by a point-count delta of zero
+    on the second run.
+  - Given the backfill is complete, when the gold suite runs against both named vectors, then both nDCG@10
+    numbers are printed side by side and the alias flip refuses to proceed if the new vector regresses
+    beyond the declared tolerance.
+  - Given the migration completes, when workspace-tooling/README-artifact-lifecycle.md is read, then it
+    contains a step-by-step runbook naming every subcommand, and the migration procedure asserts it never
+    reads chunk bodies from the Qdrant payload.
+  depends_on:
+  - memory-you-can-trust-t-model-registry
+  - memory-you-can-trust-t-repo-gold-set
+  tags:
+  - X021
+  - qdrant
+  - named-vectors
+  - migration
+  - memory
+- id: memory-you-can-trust-t-unicode-lexical
+  kind: task
+  title: Make lexical retrieval Unicode-aware on both the Python and TypeScript sides
+  status: planned
+  parent: memory-you-can-trust-e1
+  summary: 'artifact_retrieval.py:46 tokenizes with `[A-Za-z0-9][A-Za-z0-9_.:/@-]{0,127}`, so every CJK,
+    Cyrillic, Greek, Arabic and accented-Latin token is discarded before the FTS5 query is built at :189-197,
+    and the 40-word English stopword list at :47-90 is hardcoded. src/search/indexer.ts:82 has the identical
+    defect: `normalized.replace(/[^a-z0-9-]/g, '' '')` strips every non-ASCII character. Replace both
+    with Unicode-property-aware tokenization plus a CJK bigram fallback, move STOPWORDS into the retrieval
+    profile so it swaps per language, and enable FTS5 unicode61 with remove_diacritics 2.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a corpus containing a Japanese document and a French accented document, when the Python lexical
+    leg is queried with a term from each, then both return a non-zero BM25 hit — asserted by workspace-tooling/tests/test_artifact_retrieval_i18n.py,
+    which fails against HEAD.
+  - Given the same two documents indexed by src/search/indexer.ts, when search() is called with a CJK
+    term and with an accented term, then both return the document — asserted by src/search/indexer.i18n.test.ts
+    run under `npm test`.
+  - 'Given a profile declaring stopwords_lang: fr, when the tokenizer runs, then the French stopword list
+    is applied and `grep -n ''STOPWORDS = {'' workspace-tooling/artifact_retrieval.py` shows the set is
+    loaded from the profile rather than declared inline.'
+  - Given the FTS5 table is created, when its schema is dumped, then the tokenizer clause reads `unicode61
+    remove_diacritics 2`, and a query for 'resume' matches a document containing 'résumé'.
+  depends_on:
+  - memory-you-can-trust-t-retrieval-profile
+  tags:
+  - F043
+  - i18n
+  - lexical
+  - tokenizer
+  - memory
+- id: memory-you-can-trust-t-bm25-ts
+  kind: task
+  title: Replace the TypeScript term-frequency scorer with real BM25 and export a matching ranking contract
+  status: planned
+  parent: memory-you-can-trust-e1
+  summary: src/search/search.ts computes IDF per query term but scores with raw term frequency plus a
+    flat 3x title boost and a multiplicative match-ratio factor (`rawScore * (1 + matchRatio)` at :217)
+    — there is no term-frequency saturation and no document-length normalisation, so a long document beats
+    a short exact match on volume alone. Rewrite the scorer as BM25 (k1=1.2, b=0.75) over per-field indexes
+    with document-length normalisation, matching the FTS5 column weighting the Python side already uses
+    (FTS_BM25_WEIGHTS at artifact_retrieval.py:37). Export a rankingContract() from TypeScript in the
+    same shape as the Python one so both surfaces are provably one ranking system.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a short document containing the query term twice and a 50x-longer document containing it eight
+    times, when search() ranks them, then the short document ranks first — asserted by a case in src/search/search.test.ts
+    that fails against HEAD.
+  - Given the BM25 implementation, when `npm test` runs, then a test asserts k1 and b are read from a
+    single exported constant object and that scores are finite and monotonic in term frequency with saturation
+    (doubling TF must increase the score by less than 2x).
+  - Given the TypeScript index, when rankingContract() is called, then it returns bm25_k1, bm25_b, field_weights,
+    tokenizer_id and a contract digest, and a cross-language test asserts the field-weight vector equals
+    FTS_BM25_WEIGHTS in workspace-tooling/artifact_retrieval.py.
+  - Given the search relevance suite from memory-that-earns-it-t-search-relevance-suite, when it runs
+    before and after this change, then recall@3 and MRR are printed for both and the committed baseline
+    is updated in the same commit.
+  depends_on:
+  - gates-green-e2
+  tags:
+  - X016
+  - bm25
+  - search
+  - mcp-server
+- id: memory-you-can-trust-t-chunk-profiles
+  kind: task
+  title: Make chunking a per-artifact-type profile and add parent-document retrieval
+  status: planned
+  parent: memory-you-can-trust-e1
+  summary: 'There is exactly one chunking strategy for every artifact type: DEFAULT_CHUNK_PROFILE_ID =
+    ''markdown-heading-char-v1'' (artifact_ingestion.py:57), a heading-aware character splitter with a
+    fixed 400-character overlap, applied identically to a roadmap table, a YAML config and a ten-line
+    lesson. Introduce a chunk_profiles registry keyed by artifact_type, add --chunk-profile to `prepare`
+    alongside the existing --max-chars/--overlap-chars at artifact_ingestion.py:2003-2004, and store parent_unit_id
+    on each chunk so get_artifact can expand a hit to its full section — which also relieves the MAX_RESULTS_PER_ARTIFACT
+    = 2 cap at artifact_retrieval.py:38. AST/tree-sitter chunking is explicitly out of scope.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given a YAML artifact and a Markdown artifact ingested in one run, when the unit manifest is inspected,
+    then each unit records the chunk profile that produced it and the two artifacts used different profiles.
+  - Given `artifact_ingestion.py prepare --chunk-profile whole-file-below-max`, when a 900-byte Markdown
+    file is prepared, then exactly one unit is emitted, asserted by workspace-tooling/tests/test_artifact_ingestion_chunking.py.
+  - Given a search hit on a chunk, when get_artifact is called with expand=parent, then the full parent
+    section is returned and the response names the parent_unit_id — a route the adapter's ALLOWED_ROUTES
+    set at src/tools/artifact-memory.ts:72-77 must be extended to permit.
+  - Given the chunk profile changes, when ranking_contract() is recomputed, then the chunk profile id
+    is part of the profile digest and the gold gate re-runs.
+  - Given this task, when the diff is reviewed, then it contains no tree-sitter dependency — AST-aware
+    chunking (X047) is deferred and must not be added here.
+  depends_on:
+  - memory-you-can-trust-t-retrieval-profile
+  tags:
+  - F047
+  - chunking
+  - parent-document
+  - ingestion
+  - memory
+- id: memory-you-can-trust-t-acorn-payload-indexes
+  kind: task
+  title: Enable ACORN on filtered searches and create the payload indexes those filters require
+  status: planned
+  parent: memory-you-can-trust-e1
+  summary: Any scope-, tier- or type-aware query is a low-selectivity filtered vector search, which is
+    the documented case where HNSW gets disconnected and recall collapses. Qdrant 1.16 ships ACORN for
+    exactly this. Pass the ACORN query-time flag on every query carrying a filter, and create keyword
+    payload indexes on the scope, artifact_type and tier fields at bootstrap time — extending _ensure_qdrant_payload_indexes,
+    which artifact_ingestion.py:1238-1243 already calls during reconcile.
+  priority: must
+  lane: later
+  size: S
+  acceptance:
+  - Given a search request carrying any filter, when the Qdrant query is constructed, then the ACORN flag
+    is set — asserted by a unit test that captures the outgoing query params and fails when the flag is
+    absent.
+  - Given a fresh collection, when `artifact_qdrant_bootstrap.py` completes, then get_collection reports
+    keyword payload indexes on scope, artifact_type and tier, asserted in the nightly integration job.
+  - Given the filtered-recall gold case added by this task, when the gold suite runs, then recall@10 for
+    the filtered query is reported separately and gated, so a regression here fails rather than being
+    assumed away.
+  - Given ACORN is unavailable on the connected server version, when a filtered query runs, then the service
+    logs one explicit degradation line naming the minimum required version and continues, rather than
+    failing or silently ranking worse.
+  depends_on:
+  - memory-you-can-trust-t-qdrant-integration-job
+  tags:
+  - X022
+  - qdrant
+  - acorn
+  - filtered-search
+  - memory
+- id: memory-you-can-trust-t-workspace-scoping
+  kind: task
+  title: Enforce workspace scoping inside the service as a must-clause the caller cannot omit
+  status: planned
+  parent: memory-you-can-trust-e1
+  summary: Scoping today is a binary SERVER_PROFILE=shared|personal switch, which is not scoping at all.
+    Add a workspace_id payload field indexed as keyword with is_tenant set, one collection per embedding
+    model, and inject the workspace filter as a must-clause inside artifact_memory_service.py — so a caller
+    cannot omit it and a compromised tool cannot bypass it. Mirror the scope in the catalog rows and the
+    outbox path layout. Retrofitting a mandatory filter after a corpus has grown is the migration everyone
+    regrets, so this lands before the write path exists, not after.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a search request that supplies no workspace filter, when it reaches Qdrant, then the outgoing
+    query still contains a must-clause on workspace_id — asserted by a test that constructs the request
+    without the field and inspects the emitted filter.
+  - Given a request that supplies a workspace_id different from the service's configured scope, when it
+    is handled, then the service rejects it with an explicit scope-violation error rather than honouring
+    the caller's value.
+  - Given two workspaces ingested into one collection, when the cross-scope leakage gold case runs, then
+    zero results from workspace B appear for a workspace A query, and the case is gated in CI.
+  - Given the collection is created, when get_collection is inspected, then workspace_id carries a keyword
+    index with is_tenant true.
+  - Given the outbox, when a unit is published, then its path layout encodes the workspace scope, and
+    the catalog row carries the same workspace_id.
+  depends_on:
+  - memory-you-can-trust-t-acorn-payload-indexes
+  tags:
+  - X023
+  - multitenancy
+  - qdrant
+  - is-tenant
+  - security
+  - memory
+- id: memory-you-can-trust-t-fused-recall
+  kind: task
+  title: Add a fused recall entry point over the four corpora, with one ranking contract
+  status: planned
+  parent: memory-you-can-trust-e1
+  summary: 'Four tools search four disjoint corpora with mutually incomparable scores and no router: search_platform_knowledge
+    (TypeScript inverted index), search_memory (the same index post-filtered to type===''memory'' at src/index.ts:142-148),
+    search_artifacts (Qdrant hybrid + rerank), and query_temporal_facts (Cypher). Introduce recall({query,
+    scopes?, max_results}) that fans out in parallel, normalises to {id, text, source_tier, native_score,
+    native_rank}, fuses with the RRF constants already at artifact_retrieval.py:31-35, dedupes by canonical
+    path and returns tier-labelled results. Whether the four primitives stay individually registered is
+    decided by adr-012 from spike-1 — implement whichever the ADR mandates.'
+  priority: should
+  lane: later
+  size: L
+  acceptance:
+  - Given a query whose best answer lives in the artifact store and whose second-best lives in the TypeScript
+    knowledge index, when recall is called once, then both are returned in one ranked list with source_tier
+    labels — replacing today's 2-4 tool-call sequence.
+  - Given the same document reachable from two backends, when recall runs, then it appears exactly once
+    in the output, deduped by canonical path, asserted by a unit test with a fixture present in both indexes.
+  - Given one backend is unavailable, when recall is called, then it returns the results from the remaining
+    backends and names the degraded tier in the response, rather than failing the whole call.
+  - Given adr-012-tool-surface-budget.md, when `npm test` runs, then the tool-budget test passes with
+    recall registered — i.e. the registered tool count after this change is within the ADR's N.
+  - Given the gold suite, when it runs in recall mode, then nDCG@10 and recall@10 are reported for the
+    fused entry point end to end, not only for the Qdrant path.
+  depends_on:
+  - memory-you-can-trust-spike-1
+  - memory-you-can-trust-t-bm25-ts
+  - memory-you-can-trust-t-workspace-scoping
+  tags:
+  - F041
+  - recall
+  - rrf
+  - fusion
+  - mcp-server
+- id: memory-you-can-trust-e2
+  kind: epic
+  title: A gold set a second engineer can run, wired to a CI non-regression gate
+  status: planned
+  summary: 'The retrieval eval harness is well built and completely unrunnable by anyone but its author:
+    every default points at private local state (artifact_retrieval_eval.py:38-46), no tool in the repo
+    produces a gold suite, and data/artifact-memory/evals/ — the directory the manifest gate at data/scripts/artifact-memory-eval-manifest-check.py:26-28
+    targets — does not exist. This epic ships a public gold set derived from the repo''s own tracked Markdown,
+    a gold-suite builder, a CI-runnable mode, a relevance suite for search_platform_knowledge, forgetting
+    cases with a staleness metric, a self-contamination canary, and the first true end-to-end integration
+    proof against a real Qdrant.'
+  priority: should
+  lane: later
+  size: XL
+  acceptance:
+  - Given a bare clone with no private state, when `npm run eval:retrieval` runs, then it catalogs the
+    repo itself, builds a throwaway generation and prints nDCG@10 and recall@10 per mode for every entry
+    in artifact_retrieval_eval.MODES.
+  - Given a pull request that changes any input to the retrieval profile digest, when CI runs, then the
+    gold suite executes and the job fails if nDCG@10 or recall@10 regresses beyond the declared tolerance.
+  - Given the nightly integration workflow, when it runs, then a real Qdrant is stood up from workspace-tooling/services/qdrant/compose.yaml
+    and an end-to-end test proves catalog to outbox to embedding to upsert to socket search.
+  - Given every file under data/artifact-memory/evals/ and data/evals/, when the canary check runs, then
+    each contains the BIG-bench canary GUID and a test asserts none of them is reachable through the substrate's
+    own ingestion.
+  tags:
+  - F045
+  - F082
+  - F091
+  - F157
+  - X020
+  - X043
+  - evals
+  - gold-set
+  - non-regression
+- id: memory-you-can-trust-t-repo-gold-set
+  kind: task
+  title: Commit a public retrieval gold set derived from the repo's own tracked Markdown
+  status: planned
+  parent: memory-you-can-trust-e2
+  summary: 'artifact_retrieval_eval.py has four comparable modes and full judgment validation but no corpus
+    an adopter can supply: DEFAULT_MANIFEST, DEFAULT_COLLECTION and DEFAULT_POLICY all point at ~/.local/share/personal-artifacts
+    paths (artifact_retrieval_eval.py:38-46), and data/scripts/artifact-memory-eval-manifest-check.py:27-36
+    permits only an 8 KB manifest of hashes to be tracked. Commit data/artifact-memory/evals/repo-gold-v1.json
+    with roughly 40 queries over data/references/** and workspace-tooling/README*.md, hard negatives included,
+    and keep the manifest-only gate for the author''s private suite rather than making it the only option.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a bare clone, when `npm run eval:retrieval` runs, then it catalogs the repo, builds a throwaway
+    generation, and prints nDCG@10 and recall@10 for vector, lexical, hybrid and hybrid-rerank without
+    reading anything under ~/.local/share.
+  - Given repo-gold-v1.json, when validate_gold (artifact_retrieval_eval.py:648) is applied to it, then
+    it passes every judgment-shape assertion the private suite must pass.
+  - Given the gold set, when the queries are counted, then there are at least 40, at least 10 are hard
+    negatives, and every expected span resolves to a path that exists in `git ls-files`.
+  - Given data/scripts/artifact-memory-eval-manifest-check.py, when it runs at HEAD, then it passes —
+    the previously non-existent data/artifact-memory/evals/ directory now exists with a live tracked target.
+  depends_on:
+  - gates-green-e3
+  - gates-green-e4
+  tags:
+  - F045
+  - evals
+  - gold-set
+  - retrieval
+- id: memory-you-can-trust-t-gold-builder
+  kind: task
+  title: 'Ship the missing authoring half of the gold contract: artifact_gold_build.py'
+  status: planned
+  parent: memory-you-can-trust-e2
+  summary: validate_gold (artifact_retrieval_eval.py:648-868) enforces a strict gold-suite contract —
+    30 records per split, 20 answerable plus 10 negatives, exact span/revision/point-id judgments — and
+    no tool in the repo produces one; `grep -rl retrieval-gold` matches only the eval and its tests. Add
+    workspace-tooling/artifact_gold_build.py that samples spans from a span manifest, emits query stubs
+    for human adjudication and writes the binding manifest, so a second engineer can build a suite for
+    their own corpus rather than hand-writing point ids.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a span manifest sqlite3 file, when `artifact_gold_build.py --manifest <db> --out retrieval-gold-v2`
+    runs, then it writes both .dev.json and .holdout.json plus the binding manifest, and the outputs pass
+    validate_gold unmodified except for the adjudication fields.
+  - Given a partially adjudicated suite, when the builder is re-run with --resume, then already-adjudicated
+    queries are preserved verbatim and only unadjudicated stubs are regenerated.
+  - Given the builder output, when it is checked against data/scripts/artifact-memory-eval-manifest-check.py,
+    then the emitted manifest satisfies the SHA256, GOLD_VERSION and GENERATION regexes that check enforces
+    at :33-35.
+  - Given the builder, when `python workspace-tooling/artifact_gold_build.py --self-test` runs, then it
+    exits 0 and is enumerated by the committed gate runner from M3.
+  depends_on:
+  - memory-you-can-trust-t-repo-gold-set
+  tags:
+  - F082
+  - evals
+  - gold-builder
+  - reproducibility
+- id: memory-you-can-trust-t-eval-hermetic-mode
+  kind: task
+  title: Give the retrieval eval a hermetic, CI-runnable mode and a re-runnable holdout ledger
+  status: planned
+  parent: memory-you-can-trust-e2
+  summary: 'Even with a gold set, the harness cannot gate a release cycle: _reserve_holdout (artifact_retrieval_eval.py:1452-1495)
+    opens the ledger with O_CREAT|O_EXCL so the holdout can be run exactly once, and there is no fixture-backed
+    mode that stands up a throwaway store. Add a `--split dev --fixture <dir>` hermetic mode that builds
+    a disposable generation from committed fixture vectors, and give the holdout ledger a declared per-release
+    budget so a release candidate can be evaluated without burning the split forever. The POSIX-only geteuid
+    dependency in artifact_security.py is fixed upstream in M2 and must not be re-solved here.'
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given no Qdrant and no network, when `artifact_retrieval_eval.py --split dev --fixture workspace-tooling/tests/fixtures/eval/`
+    runs, then it completes and prints per-mode metrics, so the dev split can run on every pull request.
+  - Given a holdout ledger with a declared budget of N runs for a release, when the holdout is evaluated
+    N times, then the (N+1)th attempt fails with an explicit budget-exhausted error naming the release
+    — replacing today's single-shot O_CREAT|O_EXCL behaviour.
+  - Given the hermetic mode runs on windows-latest in CI, when the job completes, then it is green — proving
+    the private-file checks resolved by gates-green-e4 hold for the eval path too.
+  - Given the harness, when it is invoked from a directory other than the repo root, then it resolves
+    the manifest-derived corpus path against the manifest's own parent rather than the CWD and does not
+    raise FileNotFoundError.
+  depends_on:
+  - memory-you-can-trust-t-gold-builder
+  - gates-green-e4
+  tags:
+  - F082
+  - evals
+  - hermetic
+  - ci
+  - portability
+- id: memory-you-can-trust-t-search-relevance-suite
+  kind: task
+  title: Add a relevance suite for search_platform_knowledge — the discovery surface upstream of every
+    skill use
+  status: planned
+  parent: memory-you-can-trust-e2
+  summary: The kit ships a rigorous gold harness for the Qdrant memory and nothing at all for its own
+    retrieval. search_platform_knowledge (src/tools/search.ts:36-52) delegates to the hand-rolled ranker
+    in src/search/search.ts whose only test is a two-marker smoke assertion in src/mcp-contract.test.ts:134-142
+    — so a tokenizer or weight change can silently degrade whether an agent finds the right skill at all.
+    Add data/evals/search-gold.json with 20-30 {query, expected_ids[], hard_negatives[]} cases drawn from
+    real phrasings over the catalog entries, and a relevance test asserting recall@3 and MRR against a
+    committed baseline.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given data/evals/search-gold.json, when `npm test` runs, then src/search/relevance.test.ts computes
+    recall@3 and MRR and fails if either falls below the committed baseline in the same file.
+  - Given a deliberate one-character change to the tokenizer at src/search/indexer.ts, when `npm test`
+    runs, then the relevance test fails — proving the gate has teeth.
+  - Given the gold file, when it is validated, then every expected_id resolves to an entry present in
+    data/facts/catalog.json, and there are at least 20 cases with at least one hard negative each.
+  - Given the suite naming and structure, when it is compared with the artifact-memory gold contract,
+    then both use the same {query, expected, hard_negatives} idiom so the repo has one gold-suite vocabulary.
+  depends_on:
+  - gates-green-e2
+  tags:
+  - F091
+  - evals
+  - search
+  - relevance
+  - mcp-server
+- id: memory-you-can-trust-t-retrieval-ci-gate
+  kind: task
+  title: Wire the gold suite to a CI non-regression gate keyed on the retrieval profile digest
+  status: planned
+  parent: memory-you-can-trust-e2
+  summary: Closes the CI half of F045 and the gate half of X017. The profile digest from memory-that-earns-it-t-retrieval-profile
+    is stamped on every eval run and on the collection metadata; CI must then refuse a profile change
+    that has not run the gold suite, and refuse a run that regresses beyond a declared tolerance. This
+    is the mechanism that makes 'did this change help' answerable — the project's own stated return-on-churn
+    goal.
+  priority: must
+  lane: later
+  size: M
+  acceptance:
+  - Given a pull request that changes any file feeding the profile digest (artifact_retrieval.py, the
+    profile JSON, the models registry, the chunk profiles), when CI runs, then the retrieval gold job
+    executes; given a pull request that touches none of them, then the job is skipped.
+  - Given an eval run, when its output JSON is inspected, then it carries the profile_digest, and the
+    collection metadata carries the same digest — a mismatch between them fails the job.
+  - Given a change that drops nDCG@10 by more than the tolerance committed in data/artifact-memory/evals/tolerances.json,
+    when CI runs, then the job fails and the summary names the metric, the baseline, the observed value
+    and the tolerance.
+  - Given a legitimate improvement, when the baseline is updated in the same commit, then the job passes
+    — so the baseline can only move by a conscious, reviewable edit.
+  depends_on:
+  - memory-you-can-trust-t-retrieval-profile
+  - memory-you-can-trust-t-repo-gold-set
+  - ci-proves-it-e1
+  tags:
+  - F045
+  - X017
+  - ci
+  - non-regression
+  - evals
+- id: memory-you-can-trust-t-forgetting-cases
+  kind: task
+  title: Add forgetting cases to the gold suite and report a staleness metric beside nDCG
+  status: planned
+  parent: memory-you-can-trust-e2
+  summary: 'The existing harness measures exactly recall, while the failure mode that actually bites in
+    production is failing to forget. Add a second suite of negative cases with its own gate: superseded
+    (an old revision must not outrank its replacement), deleted (absent from catalog, vectors, projection
+    and graph simultaneously), demoted (cold content still reachable within a bounded escalation budget)
+    and canonicalization (renamed or aliased identifiers resolve to one span). Report stale_hit_rate@k
+    and orphan_rate as gated metrics alongside nDCG.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given an artifact with a superseded revision and its replacement both present, when the forgetting
+    suite runs, then the superseded revision does not appear above the replacement, and stale_hit_rate@10
+    is reported.
+  - Given an artifact deleted through the sanctioned path, when the deleted case runs, then it asserts
+    absence simultaneously from the catalog, the Qdrant collection, the Obsidian projection and (if enabled)
+    the graph — a single-surface deletion fails the case.
+  - Given demoted content, when the demoted case runs, then the content is retrievable within the declared
+    escalation budget and the case fails if it is unreachable — so demotion can never be silently equivalent
+    to loss.
+  - Given the suite, when CI runs it, then stale_hit_rate@10 and orphan_rate are gated against committed
+    thresholds in the same tolerances file as nDCG.
+  depends_on:
+  - memory-you-can-trust-t-repo-gold-set
+  - memory-grows-and-tiers-t-bitemporal-catalog
+  tags:
+  - X020
+  - evals
+  - forgetting
+  - staleness
+  - lifecycle
+- id: memory-you-can-trust-t-eval-canary
+  kind: task
+  title: Embed a canary GUID in every eval file and prove the eval set is excluded from the substrate's
+    own ingestion
+  status: planned
+  parent: memory-you-can-trust-e2
+  summary: 'This repo is the rare project that ships both an eval suite and a memory substrate that ingests
+    its own repository Markdown — so an eval task can silently become a retrievable memory, after which
+    the eval measures recall rather than capability. Embed the BIG-bench canary GUID in every file under
+    data/evals/ and data/artifact-memory/evals/, add a CI check asserting its presence, and add the repo-specific
+    self-contamination check: assert that no eval material is reachable through artifact_catalog.py''s
+    include globs or through a live search.'
+  priority: should
+  lane: later
+  size: S
+  acceptance:
+  - Given every tracked file under data/evals/ and data/artifact-memory/evals/, when the canary check
+    runs, then each contains the BIG-bench canary GUID and the check fails if any file lacks it.
+  - Given a full catalog run over the repo, when the resulting catalog is queried for any eval path, then
+    zero rows match — asserted by a test that fails if artifact-policy.json's include globs ever start
+    matching the eval directories.
+  - Given a live search against a generation built from this repo, when a distinctive string from a gold
+    query is searched, then zero results are returned, proving the eval set never entered the substrate.
+  - Given the eval tiers, when data/artifact-memory/evals/ is inspected, then public-demo, sealed-holdout
+    and team-private tiers are declared with a sha256 manifest covering each tier's directory.
+  depends_on:
+  - memory-you-can-trust-t-repo-gold-set
+  tags:
+  - X043
+  - evals
+  - canary
+  - contamination
+  - security
+- id: memory-you-can-trust-t-qdrant-integration-job
+  kind: task
+  title: Stand up a real Qdrant in a nightly integration job — the substrate's first end-to-end proof
+  status: planned
+  parent: memory-you-can-trust-e2
+  summary: 'workspace-tooling/README.md:84-87 correctly states the unit suite is hermetic, but the consequence
+    is that nothing in the repo ever exercises the real path: catalog to gzip-JSONL outbox to ONNX embedding
+    to Qdrant upsert to semantic search over the socket. All three docker-touching tests mock it (test_artifact_qdrant_bootstrap.py:47).
+    A digest-pinned, loopback-bound, read-only service definition already exists at workspace-tooling/services/qdrant/compose.yaml.
+    Add an integration workflow that uses it and a test_end_to_end.py kept outside the unit discovery
+    pattern.'
+  priority: must
+  lane: later
+  size: L
+  acceptance:
+  - 'Given the integration workflow on pull_request (label `integration`), push to main and a nightly
+    schedule, when it runs, then it generates throwaway QDRANT_API_KEY and QDRANT_READ_ONLY_API_KEY, brings
+    up the compose file with --wait, and tears down with `docker compose down -v` under if: always().'
+  - Given workspace-tooling/tests/integration/test_end_to_end.py, when it runs, then it ingests two fixture
+    Markdown files through artifact_catalog.py and artifact_ingestion.py, runs artifact_qdrant_bootstrap.py,
+    starts artifact_memory_service.py, issues a semantic search over the socket, and asserts the expected
+    document ranks first.
+  - Given a deliberately corrupted fixture whose content hash does not match its manifest, when the end-to-end
+    test runs, then the pipeline fails closed and the test asserts the failure rather than a silent skip.
+  - Given the integration tests, when `python -m unittest discover -s workspace-tooling/tests -p 'test_*.py'`
+    runs, then the integration directory is NOT collected, so the unit suite stays hermetic.
+  - Given workspace-tooling/README.md, when :83-87 is read, then it says the UNIT suite is hermetic and
+    points at the integration job, rather than implying no service container is ever required.
+  depends_on:
+  - ci-proves-it-e1
+  - gates-green-e4
+  tags:
+  - F157
+  - ci
+  - integration
+  - qdrant
+  - end-to-end

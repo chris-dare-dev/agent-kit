@@ -1,0 +1,1178 @@
+schema: roadmap/1
+slug: named-and-installable
+project: agent-kit
+title: M4 Named and Installable — a published, provenance-attested release that runs without Docker
+status: draft
+phase: sequenced
+brief: 'M4 turns a repo you must clone, hand-build and hand-configure into a product a team can install.
+  It ships the first thing anyone will pin: a real npm package with bin/files/exports and a prepublishOnly
+  that runs the gates, a PEP 621 Python distribution replacing 46 flat modules on a hand-set PYTHONPATH,
+  and release-please plus OIDC trusted publishing so npm, PyPI and server.json move in lockstep with automatic
+  provenance.
+
+  Two things ride along because they are expensive to change after publication. The MCP 2026-07-28 revision
+  lands with the package rather than as a breaking v2, so adopters absorb it once. And the server surface
+  is collapsed from four hand-synced registries into one typed ToolDescriptor registry before external
+  code depends on the shape.
+
+  The milestone''s adoption payload is the no-Docker, no-Qdrant first run: the catalog plus the existing
+  SQLite FTS5 lexical leg serves all 17 tools with vectors disabled, degrading recall rather than failing,
+  proved by a CI job on a runner where docker is absent. That is the single strongest adoption lever in
+  the whole audit and it appeared nowhere as a recommendation.
+
+  Everything here is gated on M1''s naming decision and on M1-M3 having made the first pinned version
+  worth pinning.'
+goal:
+  hmw: How might we turn a repo that must be cloned, hand-built and hand-configured into a provenance-attested
+    package a team installs under one decided name in one command — and have it serve its full tool surface
+    on a laptop where Docker is not allowed?
+  objective: Publish the kit as an installable, provenance-attested release on npm and PyPI under its
+    decided name, speaking the current MCP revision, and prove on CI that it serves all 17 tools on a
+    machine with no Docker, no Qdrant and no ONNX runtime.
+  key_results:
+  - '`npm pack --dry-run` produces a tarball containing dist/index.js and data/ and zero .py and zero
+    .plist paths with no gitignore-fallback warning; installing that tarball into an empty directory and
+    launching its bin answers tools/list with 17 tools on ubuntu-latest, macos-latest and windows-latest.'
+  - In a clean venv with PYTHONPATH unset, `pip install .` then `python -c "import agent_kit_substrate"`
+    exits 0, `python -m unittest discover -s tests -p 'test_*.py'` collects the pre-move test count and
+    exits 0, and every entry in [project.scripts] answers `--help` with exit 0; the uvx path is CI-run.
+  - One release-please PR bumps package.json, pyproject.toml and server.json to identical versions; merging
+    it tags, and the tag publishes to npm with `--provenance` and to PyPI with PEP 740 attestations under
+    OIDC with no long-lived token in any workflow, plus an SBOM, an MCP Registry entry and a .mcpb release
+    asset.
+  - A required CI job on a runner with no `docker` on PATH and the substrate installed without extras
+    drives all 17 MCP tools to non-error results, asserts artifact_memory_status reports mode `lexical`
+    / vectors `disabled`, and fails if docker is invoked at any point.
+  - The server answers `server/discover` per MCP 2026-07-28 with the v2 SDK pinned to an exact version,
+    every list result carries resultType/ttlMs/cacheScope, and src/transport-lock.test.ts fails if any
+    deprecated-feature import is reintroduced.
+  - '`git grep -c "PERSONAL_"` over tracked files matches only the deprecation shim and its test, and
+    `grep -rn "personal multi-repo workspace|personal fork|on my own projects" README.md package.json
+    workspace-tooling/README.md` returns nothing.'
+  wont:
+  - Deciding or executing the rename itself. The name/licence/fork-provenance decision is starts-everywhere-e1
+    and blocks every publishing task here; M4 consumes the decision, it does not make it.
+  - Removing the four unused @aws-sdk dependencies. X003 bundles that with the package metadata, but the
+    dependency half is the same defect as F099/F125/F135/F184 and closes in starts-everywhere-e5 (clone
+    hygiene). M4 only asserts the tarball is clean.
+  - Adding any tool to the 17-tool read-only surface — no write path, no remember/forget, no skills/list,
+    no recall. The per-pack context budget report exists precisely to make the tool-count argument with
+    numbers later (memory-that-earns-it).
+  - Porting the IPC transport to Windows named pipes, or rendering systemd units and Scheduled Tasks.
+    M4 only stops pinning an absolute venv interpreter path; the supervision contract is native-everywhere-e1/e2.
+  - Introducing or changing the ruff/mypy rule set, the cross-OS matrix, action SHA-pinning or zizmor.
+    Those are ci-proves-it-e1/e3; M4 moves the existing tool config into pyproject.toml without altering
+    enforced rules, and adds only the publish-side OIDC leg.
+  - Building the skills corpus, the golden task set, the outcome ledger v2 or any ROI statistic (author-and-measure).
+    data/skills/ still contains exactly one skill; nothing here is premised on a population.
+  - Implementing SEP-2640 skills/list, signed packs, provider capability manifests, or the .agents/ tier-0
+    tree (providers-as-data).
+  - Fixing where generate-adapter-packs.py --apply writes its output. The env-var rename touches the same
+    lookup (data/scripts/generate-adapter-packs.py:523) and M4 removes only the ~/Work/workspace fallback;
+    the --out DIR default is providers-as-data-e3.
+generated_by:
+  agent: claude-opus-5
+  at: '2026-07-26'
+  brief: multi-workflow audit + landscape benchmark synthesis
+retired: []
+items:
+- id: named-and-installable-e1
+  kind: epic
+  title: A real npm package, a maintainable server surface, and a team-product voice
+  status: planned
+  summary: Make the Node half publishable and maintainable in one pass, because everything in it is expensive
+    to change once someone pins it. package.json gains bin, files, exports, license, repository, engines
+    and a prepublishOnly that runs build, test and the four generator gates (F098, F129, F161, X003).
+    The four hand-synced tool registries in src/index.ts collapse into one typed ToolDescriptor registry
+    with zod-validated dispatch (F114) and one shared error contract replaces the ad-hoc result shapes
+    and the 33 unparented Python exception classes (F121). The server migrates to the MCP 2026-07-28 revision
+    and SDK v2 with server/discover and the stateless _meta envelope (X012), under a per-pack context
+    budget enforced in CI (X042). README, package.json and the PERSONAL_* env namespace are rewritten
+    from personal-workspace voice to team-product voice with a runnable quickstart (F106, F104).
+  priority: must
+  lane: next
+  size: XL
+  acceptance:
+  - Given a clean clone at the release tag, when `npm pack --dry-run --json` runs, then the file list
+    contains dist/index.js and data/, contains no path matching \.py$ or \.plist$, and npm emits no gitignore-fallback
+    warning.
+  - Given the packed tarball installed into an empty temp directory, when its bin is launched over stdio
+    with SERVER_PROFILE=personal on ubuntu-latest, macos-latest and windows-latest, then tools/list returns
+    17 tools on all three.
+  - Given `npm test`, then src/tools/registry.test.ts asserts all 17 tools come from one TOOLS array,
+    `grep -n "CACHE_EXEMPT_TOOLS\|CHUNKABLE_TOOLS" src/tools/token-stats.ts` returns no matches, and `grep
+    -c "argObj as {" src/index.ts` returns 0.
+  - Given a client sending `server/discover`, then the server responds per MCP 2026-07-28 and src/transport-lock.test.ts
+    fails when a deprecated-feature import is reintroduced.
+  - Given `git grep -c "PERSONAL_"` over tracked files, then the only matches are the compatibility shim
+    module and its test; and `grep -rn "personal multi-repo workspace\|personal fork\|on my own projects\|Personal
+    provider-neutral" README.md package.json workspace-tooling/README.md` returns nothing.
+  depends_on:
+  - starts-everywhere-e1
+  - gates-green-e1
+  - ci-proves-it-e1
+  tags:
+  - F098
+  - F129
+  - F161
+  - F114
+  - F121
+  - F104
+  - F106
+  - X003
+  - X012
+  - X042
+  - packaging
+  - mcp-server
+- id: named-and-installable-t-npm-package-metadata
+  kind: task
+  title: Give package.json the metadata that makes `npm publish` produce an installable server
+  status: planned
+  parent: named-and-installable-e1
+  summary: package.json (verified at HEAD, lines 1-30) declares no main, no exports, no bin, no files,
+    no license, no repository, no bugs, no homepage, no publishConfig and no prepublishOnly. There is
+    no .npmignore, so npm falls back to .gitignore whose line 2 is `dist/` — `npm pack --dry-run` therefore
+    emits a gitignore-fallback warning and produces a 291-file tarball carrying all 24 workspace-tooling
+    test_*.py files, all 46 Python modules and the 5 com.personal.* plists, and not one byte of dist/.
+    engines.node is ">=20", a runtime that reached end of life in April 2026. src/index.ts:1 already carries
+    `#!/usr/bin/env node`, so the bin entry needs no source change. This closes the metadata half of F161;
+    the release-automation half is named-and-installable-t-release-please-manifest. The @aws-sdk removal
+    bundled into X003 is the same defect as F099/F125/F135/F184 and closes in starts-everywhere-e5.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given package.json at HEAD, when `node -e "const p=require('./package.json');for(const k of ['name','version','description','license','repository','bugs','homepage','bin','files','exports','engines','publishConfig','scripts'])if(!p[k])throw
+    new Error('missing '+k)"` runs, then it exits 0.
+  - Given a clean tree, when `npm pack --dry-run --json > pack.json` runs, then jq over pack.json shows
+    dist/index.js and data/ present, zero paths matching \.py$, zero matching \.plist$, zero starting
+    with workspace-tooling/, and npm's stderr contains no 'gitignore-fallback'.
+  - Given `npm run prepublishOnly` at HEAD, then it runs `npm run build && npm test` followed by all four
+    generator gates (data/scripts/catalog-generate.py --check, generate-adapter-packs.py --check, generate-root-contract.py
+    --check, model-policy-apply.py --check) and exits 0.
+  - Given a deliberately reverted generator output, when `npm run prepublishOnly` runs, then it exits
+    non-zero naming the failing gate — proving a red gate cannot be published.
+  - Given the tarball from `npm pack`, when it is installed into an empty temp directory and its bin is
+    launched over stdio, then tools/list returns 17 tools on ubuntu-latest, macos-latest and windows-latest.
+  - Given `node -e "console.log(require('./package.json').engines.node)"`, then it prints a range that
+    excludes Node 20 and matches the Node versions in the ci-proves-it-e1 matrix.
+  depends_on:
+  - starts-everywhere-e1
+  - gates-green-e1
+  - ci-proves-it-e1
+  tags:
+  - F098
+  - F129
+  - F161
+  - X003
+  - packaging
+  - npm
+  - release
+  - mcp-server
+- id: named-and-installable-t-tool-descriptor-registry
+  kind: task
+  title: Collapse the four hand-synced tool registries into one typed ToolDescriptor registry
+  status: planned
+  parent: named-and-installable-e1
+  summary: 'src/index.ts is 834 lines and holds the whole server: a ~230-line inline JSON literal of all
+    17 tool schemas (:324-558), a 70-line switch dispatch (:713-782), and three string sets kept consistent
+    by hand — ARTIFACT_MEMORY_TOOL_NAMES (:153-158), CACHE_EXEMPT_TOOLS (:562-573, 10 entries), CHUNKABLE_TOOLS
+    (:578-582). They have already diverged: src/tools/token-stats.ts:8-20 declares its own copies and
+    its cache-exempt set has 5 entries where index.ts has 10 (missing list_memory and all four artifact-memory
+    tools), so get_token_stats reports cache-bypass against a stale policy. There is also no runtime input
+    validation — eight `argObj as { … }` casts. Add src/tools/registry.ts exporting `interface ToolDescriptor
+    { name; description; inputSchema: z.ZodType; cacheExempt: boolean; chunkable: boolean; profiles: ServerProfile[];
+    handler(args): Promise<ToolResult> }` and a TOOLS array assembled from the per-tool modules in src/tools/;
+    derive the ListTools response with zod-to-json-schema and derive all three sets from descriptor flags.
+    Closes F114.'
+  priority: must
+  lane: next
+  size: L
+  acceptance:
+  - Given src/tools/registry.ts, when `npm test` runs, then a new src/tools/registry.test.ts asserts TOOLS.length
+    === 17 and that every descriptor has a name, description, inputSchema, cacheExempt, chunkable, profiles
+    and handler.
+  - Given the refactor, when `grep -n "CACHE_EXEMPT_TOOLS\|CHUNKABLE_TOOLS" src/tools/token-stats.ts`
+    runs, then it returns no matches, and token-stats imports the derived sets from the registry.
+  - Given a test asserting descriptor-derived sets, then it fails if any tool is flagged cacheExempt in
+    the registry but absent from the set token-stats consumes — i.e. the divergence at src/tools/token-stats.ts:8-20
+    cannot reappear.
+  - Given the derived ListTools response, when the mcp-contract golden test runs, then tests/fixtures/tools-list.golden.json
+    is byte-identical to its pre-refactor content, proving the change is behaviour-preserving.
+  - 'Given a call to get_skill with `{"name": 123}`, when it is dispatched, then the server returns an
+    isError result naming the failing zod path instead of throwing, and `grep -c "argObj as {" src/index.ts`
+    returns 0.'
+  - Given one new descriptor appended to TOOLS and no other file edited, when the server starts, then
+    the tool appears in tools/list, dispatches, and is honoured by the cache-exempt and chunkable policies.
+  depends_on:
+  - gates-green-e2
+  tags:
+  - F114
+  - mcp-server
+  - refactor
+  - zod
+- id: named-and-installable-t-tool-result-contract
+  kind: task
+  title: Define one TypeScript ToolResult type and version the cache and token-log JSONL
+  status: planned
+  parent: named-and-installable-e1
+  summary: 'The tool-handler return contract is not a type: skillTools.list_skills returns a plain string
+    while memoryTools.list_memory returns `{content:[…]}` (src/tools/memory.ts:31-86), so src/index.ts:786-791
+    sniffs the shape at runtime to normalise it. Define `type ToolResult = { content: {type:''text'';
+    text:string}[]; isError?: boolean }` in src/types.ts, make every handler in src/tools/*.ts return
+    it, and delete the sniff. Separately add `schemaVersion: 1` to CachedResponse (src/cache/response-cache.ts:26)
+    and to TokenLogEntry (src/logging/token-logger.ts), and have the snapshot restore loop at src/index.ts:234-243
+    drop rows whose schemaVersion is absent or unknown instead of trusting them. This is the TypeScript
+    half of F121; the Python half is named-and-installable-t-python-error-contract.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given `npm run build` under tsc strict, then every exported handler in src/tools/*.ts is declared
+    `Promise<ToolResult>` and the build exits 0.
+  - Given src/index.ts, then the runtime shape-sniff branch at :786-791 is deleted and `grep -n "'content'
+    in raw\|\"content\" in raw" src/index.ts` returns no matches.
+  - Given a cache snapshot file seeded with one row lacking schemaVersion and one row with schemaVersion
+    99, when the server restarts, then both rows are dropped, exactly one stderr line reports the dropped
+    count, and surviving rows are restored — asserted by a new case in src/cache/response-cache.test.ts.
+  - Given `npm test`, then the mcp-contract golden output is unchanged by this refactor.
+  depends_on:
+  - named-and-installable-t-tool-descriptor-registry
+  tags:
+  - F121
+  - mcp-server
+  - error-contract
+  - typescript
+- id: named-and-installable-t-python-error-contract
+  kind: task
+  title: Give the Python substrate one exception base and force broad catches to justify themselves
+  status: planned
+  parent: named-and-installable-e1
+  summary: There are 33 module-local exception classes across the Python tree with no shared base, inconsistently
+    derived from ValueError, RuntimeError or bare Exception — IngestionError(ValueError) at artifact_ingestion.py:96-102,
+    RetrievalError, ServiceError at artifact_memory_service.py:90-96, EvalError at artifact_retrieval_eval.py:149,
+    QuarantineError, WatermarkError and others. MigrationError is defined twice with different bases (artifact_qdrant_migrate.py:42
+    as RuntimeError, data/scripts/milestone-pipeline-migrate.py:84 as Exception). A caller cannot write
+    `except AgentKitError`. There are also 76 broad `except Exception` or bare `except:` handlers, concentrated
+    in artifact_memory_service.py (14) and artifact_event_consumer.py (10). Add errors.py to the package
+    with AgentKitError, UserError (bad input/config, exit 2) and InvariantError (fail-closed integrity
+    violation, exit 3), reparent the module exceptions, de-duplicate MigrationError, and enable ruff BLE001
+    with an explicit shrinking allowlist. Python half of F121.
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given the installed package, when `python -c "from agent_kit_substrate.errors import AgentKitError,
+    UserError, InvariantError"` runs, then it exits 0.
+  - Given tests/test_error_contract.py, when the suite runs, then an ast walk asserts every class defined
+    in an artifact_*.py module whose name ends in 'Error' is a subclass of AgentKitError, and that the
+    name MigrationError is defined exactly once across the whole tree.
+  - Given `ruff check --select BLE001`, then it exits 0 against a committed allowlist file, and a test
+    asserts the allowlist entry count is less than or equal to the count recorded at the start of this
+    task (recorded in the commit message).
+  - Given a CLI invoked with an unresolvable --collection, then it exits 2; given a fail-closed integrity
+    violation (a tampered manifest digest), then it exits 3 — both asserted by subprocess cases.
+  depends_on:
+  - named-and-installable-t-package-move
+  tags:
+  - F121
+  - substrate
+  - error-contract
+  - ruff
+- id: named-and-installable-spike-1
+  kind: spike
+  title: Pin the MCP v2 SDK surface and decide the dual-revision support window
+  status: planned
+  parent: named-and-installable-e1
+  summary: The server imports the v1 SDK layout — Server from @modelcontextprotocol/sdk/server/index.js,
+    StdioServerTransport, CallToolRequestSchema and ListToolsRequestSchema (src/index.ts:11-16) — against
+    a `^1.12.1` range that resolves to 1.29.0 in this clone. The MCP 2026-07-28 revision removes the initialize
+    handshake and protocol-level sessions, adds a mandatory server/discover, and moves to a stateless
+    _meta envelope. Before committing to the migration, time-box an investigation that establishes the
+    exact v2 package names and versions, whether one process can answer both revisions or a compatibility
+    shim is required, how long clients on the older revision are supported, and every call site that changes.
+    Being stdio-only means none of the expensive session/transport work applies, but a server that does
+    not answer server/discover reads as broken to a probing host rather than merely old.
+  priority: must
+  lane: next
+  size: S
+  acceptance:
+  - 'Given a 2-day time box, when the spike closes, then docs/adr/adr-011-mcp-2026-07-28-migration.md
+    exists and records: the exact v2 package names with pinned versions, whether v1 and v2 request handlers
+    can coexist in one process, the decided support window for clients on the older revision, and a file-by-file
+    change list naming src/index.ts, src/mcp-contract.test.ts and src/transport-lock.test.ts.'
+  - Given the spike branch, when a throwaway prototype is driven by a client issuing server/discover,
+    then the response is captured verbatim in the ADR as evidence.
+  - Given the ADR, then it records an explicit go/no-go for landing the migration in this milestone and,
+    if no-go, names the release it moves to and why.
+  depends_on:
+  - ci-proves-it-e3
+  tags:
+  - X012
+  - mcp-server
+  - protocol
+  - adr
+- id: named-and-installable-t-mcp-2026-07-28-migration
+  kind: task
+  title: Migrate the server to the MCP 2026-07-28 revision and SDK v2
+  status: planned
+  parent: named-and-installable-e1
+  summary: Move off @modelcontextprotocol/sdk ^1.12.1 to the v2 server/node packages pinned exactly per
+    named-and-installable-spike-1. Implement the mandatory server/discover, carry protocol version and
+    client info in the stateless _meta envelope, emit resultType on all results, add ttlMs and cacheScope
+    to every list result, and audit for Roots/Sampling/Logging usage. Land it with the first published
+    package so adopters absorb the revision once rather than as a breaking v2. Extend src/transport-lock.test.ts
+    — which already fails on any HTTP/SSE transport import — to also fail on deprecated-feature imports.
+    Closes X012.
+  priority: must
+  lane: next
+  size: L
+  acceptance:
+  - Given the migrated server, when a client sends server/discover, then the response validates against
+    the 2026-07-28 schema and a new case in src/mcp-contract.test.ts asserts it.
+  - Given package.json, then the SDK dependency is pinned to an exact version (no caret) and `grep -n
+    "@modelcontextprotocol/sdk/server/index.js" src/index.ts` returns no matches.
+  - Given src/transport-lock.test.ts, when a deprecated-feature import is added in a fixture branch, then
+    the test fails — demonstrated in the PR by a failing run, then reverted.
+  - Given any list result (list_skills, list_agents, list_references, list_context_guides, list_memory),
+    then it carries resultType, ttlMs and cacheScope, asserted against the regenerated tests/fixtures/tools-list.golden.json.
+  - Given `npm test` on ubuntu-latest, macos-latest and windows-latest, then every suite passes with the
+    v2 SDK.
+  - Given the golden fixture diff, then it is reviewed in the same PR and the reason for each field addition
+    is stated in the commit body.
+  depends_on:
+  - named-and-installable-spike-1
+  - named-and-installable-t-tool-descriptor-registry
+  tags:
+  - X012
+  - mcp-server
+  - protocol
+  - sdk-v2
+- id: named-and-installable-t-pack-context-budget
+  kind: task
+  title: Emit a per-pack context budget report with a committed baseline and a CI gate
+  status: planned
+  parent: named-and-installable-e1
+  summary: 17 read-only tools plus 20 agents plus 32 references is a permanent context tax paid on every
+    request whether or not anything fires, and nothing measures it. data/scripts/mcp-token-stats.py today
+    is a colour terminal dashboard with no argparse and a bare main() at :309. Extend it with a `budget`
+    subcommand emitting, per provider pack and for the MCP tool surface, total tool-description tokens,
+    a per-tool breakdown, and total frontmatter-description tokens across data/skills, data/agents and
+    data/commands; commit a baseline and fail CI on regression beyond a configured percentage. This is
+    also the honest place to gather evidence for the tool-count question the audits never researched —
+    the report should make the case for consolidating the surface better than an argument can. Closes
+    X042.
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - 'Given `python3 data/scripts/mcp-token-stats.py budget --json`, then it prints per-pack (claude, codex,
+    opencode) and MCP-surface totals: total tool-description tokens, a per-tool breakdown covering all
+    17 tools, and total frontmatter-description tokens across data/skills, data/agents and data/commands.'
+  - Given data/facts/context-budget-baseline.json committed at HEAD, when `python3 data/scripts/mcp-token-stats.py
+    budget --check` runs, then it exits 0.
+  - Given a tool description lengthened so one pack exceeds its baseline by more than the configured percentage,
+    when `budget --check` runs, then it exits non-zero naming the pack, the tool and the delta — asserted
+    by a `--self-test` case that constructs the regression in a temp tree.
+  - Given the committed gate runner from ci-proves-it-e2, then `mcp-token-stats.py budget --check` is
+    one of its named steps and appears as a distinct line in the CI log.
+  depends_on:
+  - ci-proves-it-e2
+  - named-and-installable-t-tool-descriptor-registry
+  tags:
+  - X042
+  - evals
+  - context-budget
+  - ci
+- id: named-and-installable-t-team-product-voice
+  kind: task
+  title: Rewrite README and package.json from personal-workspace voice to team product, with a runnable
+    quickstart
+  status: planned
+  parent: named-and-installable-e1
+  summary: 'Every top-level document describes a personal artifact. README.md:14-15 opens ''A provider-neutral
+    agent kit and a local artifact-memory substrate for a personal multi-repo workspace''; README.md:126-132
+    is titled Provenance and says ''a personal fork of an internal tool I built at work'' and ''content
+    I use on my own projects''; package.json:4 reads ''Personal provider-neutral agent kit + artifact-memory
+    substrate (fork of the kit architecture)''; workspace-tooling/README.md:3 says the Python ''runs against
+    the workspace on an engineer''s Mac''. There is no examples/ directory and nothing in the repo runs
+    end to end without the owner''s vault. Rewrite the four sites, add examples/quickstart/ wired into
+    CI as executable documentation, and state in the README that codex and opencode packs are generated
+    to external anchors at install time. Per the verified correction, do NOT act on the provider-adapter
+    half of F106: data/provider-adapters/ is a source overlay, not pack output, and the three-provider
+    claim is already enforced green by generate-adapter-packs.py --check against tests/fixtures/adapter-packs.golden.json.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given `grep -rn "personal multi-repo workspace\|personal fork\|on my own projects\|engineer's Mac\|Personal
+    provider-neutral" README.md package.json workspace-tooling/README.md`, then it returns no matches.
+  - Given a clean clone with no vault, no Docker and no Qdrant, when the quickstart runner in examples/quickstart/
+    is executed, then it builds the server, registers it, calls list_skills and get_skill for the handoff
+    skill, prints their output, and exits 0.
+  - Given the CI workflow, then a named job runs the quickstart runner verbatim on ubuntu-latest, macos-latest
+    and windows-latest and fails the build on any non-zero exit.
+  - Given README.md, then its Provenance section states the fork provenance decided in starts-everywhere-e1,
+    and its Requirements section is the generated table from named-and-installable-t-prerequisite-table
+    with no hand-written duplicate.
+  - Given README.md, then it states explicitly that codex and opencode packs are generated to external
+    anchors at install time and names the flag that controls the destination.
+  depends_on:
+  - starts-everywhere-e1
+  - named-and-installable-t-prerequisite-table
+  - named-and-installable-t-npm-package-metadata
+  tags:
+  - F106
+  - docs
+  - adoption
+  - quickstart
+- id: named-and-installable-t-env-namespace-rename
+  kind: task
+  title: Rename the PERSONAL_* environment namespace behind a deprecating compatibility shim
+  status: planned
+  parent: named-and-installable-e1
+  summary: 'The public configuration surface is namespaced PERSONAL_*: 98 references across 7 variables
+    in this clone — PERSONAL_WORKSPACE_ROOT (70), PERSONAL_VAULT_ROOT (9), PERSONAL_SOURCE_ROOT (7), PERSONAL_PRESENTATION_VAULT_ROOT
+    (5), PERSONAL_OBSIDIAN_VAULT (4), PERSONAL_ADAPTER_ROOT (2), PERSONAL_ARTIFACT_PYTHON (1). These are
+    the documented input contract, not internal constants: workspace-tooling/path_contract.py:19-20 defines
+    ${PERSONAL_WORKSPACE_ROOT} and ${PERSONAL_VAULT_ROOT} as the manifest placeholder tokens and :60-70
+    reads them; workspace-tooling/project-map.json uses both as root fields; data/scripts/bootstrap.sh:20
+    documents PERSONAL_WORKSPACE_ROOT as the non-interactive entry point and :118-126 writes it to ~/.workspace-env.sh;
+    data/scripts/template-opencode-plugin.mjs:54 reads it; and data/scripts/generate-adapter-packs.py:523
+    reads it then falls back to ~/Work/workspace. Rename before external adopters pin to it. The pack-destination
+    defect that shares that lookup is providers-as-data-e3; this task removes only the ~/Work/workspace
+    fallback. Closes F104.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given `git grep -c "PERSONAL_"` over tracked files, then the only matching files are the single compatibility
+    shim module and its test.
+  - Given a shell exporting only the legacy variable, when any affected CLI runs, then it resolves the
+    value, emits exactly one deprecation line to stderr naming the replacement variable and the removal
+    release, and produces byte-identical output to the new-variable run — asserted by one test case per
+    variable (7 cases).
+  - Given data/scripts/generate-adapter-packs.py with no --workspace flag and no environment variable
+    set, then it exits non-zero with a message naming the new variable, and `grep -n "Work/workspace"
+    data/scripts/generate-adapter-packs.py` returns no matches.
+  - Given workspace-tooling/path_contract.py, then its placeholder tokens are the renamed forms and `python
+    -m unittest` over the path-contract tests exits 0.
+  - Given data/references/ or CONTRIBUTING.md, then a committed table maps each of the 7 old variables
+    to its new name with the release in which the shim is removed.
+  depends_on:
+  - starts-everywhere-e1
+  - starts-everywhere-e3
+  tags:
+  - F104
+  - portability
+  - config
+  - deprecation
+- id: named-and-installable-e2
+  kind: epic
+  title: Ship the Python substrate as an installable distribution
+  status: planned
+  summary: Replace 46 flat top-level modules on a hand-set PYTHONPATH with a real PEP 621 distribution.
+    workspace-tooling/ has no pyproject.toml, no setup.py, no setup.cfg and no __init__.py anywhere in
+    the repo; modules import each other by bare name (`import artifact_security as security`); 33 of 38
+    test files begin with sys.path.insert; six hyphenated modules are not importable at all and must be
+    loaded through spec_from_file_location; and the documented install pins a venv at an exact absolute
+    path because the LaunchAgent plists reference that interpreter (F014, F112, X025). Land hatchling
+    + requires-python >=3.12, a src-layout package, extras isolating the heavy optional pieces ([qdrant],
+    [graphiti], [onnx]) in line with the starts-everywhere-e3 Graphiti decision, [project.scripts] entry
+    points for the real CLIs, a committed uv.lock, and a working uvx path.
+  priority: should
+  lane: next
+  size: L
+  acceptance:
+  - Given a clean venv with PYTHONPATH unset, when `pip install .` then `python -c "import agent_kit_substrate"`
+    runs, then it exits 0.
+  - Given a base install with no extras, then `python -c "import qdrant_client"` and `python -c "import
+    onnxruntime"` both fail while every script declared in [project.scripts] answers `--help` with exit
+    0.
+  - Given the repo root with PYTHONPATH unset and no -t flag, when `python -m unittest discover -s tests
+    -p "test_*.py"` runs, then it collects the pre-move test count and exits 0.
+  - Given `git grep -c "sys.path.insert"` over the test tree and `git grep -c "spec_from_file_location"`
+    over the repo, then both return 0.
+  - Given the built wheel, when `uvx --from ./dist/<wheel> <operator-cli> --help` runs on a machine with
+    no pre-created venv, then it exits 0.
+  depends_on:
+  - gates-green-e4
+  - starts-everywhere-e3
+  tags:
+  - F014
+  - F112
+  - X025
+  - substrate
+  - packaging
+  - pyproject
+- id: named-and-installable-t-pyproject-skeleton
+  kind: task
+  title: Add a PEP 621 pyproject.toml with hatchling, requires-python >=3.12 and heavy-dependency extras
+  status: planned
+  parent: named-and-installable-e2
+  summary: 'There is no pyproject.toml, setup.py, setup.cfg, ruff.toml, mypy.ini or .pre-commit-config.yaml
+    anywhere in the repo — only two requirements files: workspace-tooling/requirements-artifact-ingestion.txt
+    (two top-level pins: qdrant-client[fastembed]==1.16.1, graphiti-core[falkordb]==0.29.2) and requirements-artifact-ingestion.lock.txt
+    (a pip-freeze transitive closure captured on darwin/arm64, version-pinned not hash-pinned). Create
+    pyproject.toml at the repo root declaring the package with build-backend hatchling and requires-python
+    >=3.12 (matching workspace-tooling/README.md:47, which records 27 failures on 3.9), split the heavy
+    dependencies into optional-dependencies [qdrant], [onnx] and [graphiti], and commit a uv.lock. Move
+    the ruff and mypy configuration created in ci-proves-it-e1 into [tool.ruff] and [tool.mypy] without
+    changing a single enforced rule. Closes X025 (metadata half), F014 and F112 (metadata half).'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given pyproject.toml at the repo root, when `python -m build` runs, then it produces both an sdist
+    and a wheel and exits 0.
+  - Given the metadata, then requires-python is ">=3.12" and a CI step running `pip install .` under Python
+    3.11 fails with a requires-python error.
+  - Given optional-dependencies, then [qdrant] carries qdrant-client[fastembed]==1.16.1, [onnx] carries
+    the onnxruntime and tokenizers pins taken from requirements-artifact-ingestion.lock.txt, and [graphiti]
+    carries graphiti-core[falkordb]==0.29.2 only if starts-everywhere-e3 decided to keep Graphiti — otherwise
+    `grep -in graphiti pyproject.toml` returns no matches.
+  - Given a base `pip install .` in a clean venv, then `python -c "import qdrant_client"` exits non-zero,
+    `python -c "import onnxruntime"` exits non-zero, and `python -c "import agent_kit_substrate"` exits
+    0.
+  - Given uv.lock committed, when `uv sync --frozen` runs in CI, then it exits 0 on ubuntu-latest, macos-latest
+    and windows-latest.
+  - Given [tool.ruff] and [tool.mypy] moved into pyproject.toml, when the ci-proves-it-e1 lint and type
+    gates run, then they exit 0 and a diff of the effective rule set before and after the move is empty.
+  depends_on:
+  - starts-everywhere-e3
+  - ci-proves-it-e1
+  tags:
+  - X025
+  - F014
+  - F112
+  - substrate
+  - packaging
+  - uv
+- id: named-and-installable-t-package-move
+  kind: task
+  title: Move the 46 flat modules into a src-layout package and rename the six unimportable ones
+  status: planned
+  parent: named-and-installable-e2
+  summary: 'Move workspace-tooling/*.py (46 modules, verified count) into src/agent_kit_substrate/ with
+    __init__.py, and rename the six hyphenated modules that no import statement can reach — consolidate-project-folders.py,
+    fix-frontmatter-tags.py, frontmatter-stamp.py, obsidian-repair.py, obsidian-stamp.py, project-linker.py
+    — to underscore names. Rewrite the bare cross-imports (`import artifact_security as security`, `import
+    artifact_ingestion as ingestion`) to package-qualified imports. Update every referencing executable
+    path: workspace-tooling/build-agent-vault.sh, vault-reconcile.sh, roadmap-board-refresh.sh, project-linker-hook.sh,
+    the five com.personal.*.plist files, workspace-tooling/services/, workspace-tooling/project-map.json
+    and the README command blocks. Closes the layout half of F112 and F014.'
+  priority: must
+  lane: next
+  size: L
+  acceptance:
+  - Given the move, then `ls workspace-tooling/*.py` returns nothing and `ls src/agent_kit_substrate/*.py
+    | wc -l` returns 46.
+  - Given the renames, then `python -c "import agent_kit_substrate.project_linker, agent_kit_substrate.frontmatter_stamp,
+    agent_kit_substrate.obsidian_stamp, agent_kit_substrate.obsidian_repair, agent_kit_substrate.fix_frontmatter_tags,
+    agent_kit_substrate.consolidate_project_folders"` exits 0.
+  - Given the repo, then `git grep -c "spec_from_file_location"` returns 0 — every module is now importable
+    by name.
+  - Given a test that extracts every path matching workspace-tooling/*.py from tracked files and calls
+    Path.exists on it, then the test passes because the only remaining textual references are inside CHANGELOG.md
+    or docs/ migration notes, which the test excludes by an explicit allowlist.
+  - Given the substrate suite and `npm test`, then both stay green on ubuntu-latest and macos-latest,
+    and on the Windows scope declared by gates-green-e4.
+  - Given the five plists and the shell entry points, then each names a module path that exists — asserted
+    by the same Path.exists test.
+  depends_on:
+  - named-and-installable-t-pyproject-skeleton
+  - gates-green-e4
+  tags:
+  - F112
+  - F014
+  - X025
+  - substrate
+  - refactor
+- id: named-and-installable-t-remove-syspath-hacks
+  kind: task
+  title: Delete the 33 sys.path.insert lines and make plain unittest discovery work
+  status: planned
+  parent: named-and-installable-e2
+  summary: workspace-tooling/tests/ holds 38 files and has no __init__.py, so 33 of them begin with `sys.path.insert(0,
+    str(SCRIPT_DIR))` — for example tests/test_artifact_memory_service.py:24, tests/test_project_linker_ownership.py:23
+    and tests/test_portfolio_projection.py:8. This is why workspace-tooling/README.md:73-81 has to explain
+    that plain `unittest discover -s tests` raises 'Start directory is not importable' and that both PYTHONPATH
+    and -t are mandatory. With the package installed editable, all of that goes away. Delete the inserts,
+    add the package __init__ files the test tree needs, and replace the documented multi-flag invocation
+    with one command that CI runs verbatim.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given the test tree, then `git grep -c "sys.path.insert" -- 'tests/**'` returns 0.
+  - Given a clean venv with `pip install -e .` and PYTHONPATH unset, when `python -m unittest discover
+    -s tests -p "test_*.py"` runs from the repo root with no -t flag, then it collects the same number
+    of tests as the pre-move baseline recorded in the commit message and exits 0.
+  - Given workspace-tooling/README.md:73-81, then the PYTHONPATH-and--t paragraph is deleted and replaced
+    by the single command above.
+  - Given the CI workflow, then a named step runs that exact documented command string, so the docs and
+    the gate cannot drift.
+  depends_on:
+  - named-and-installable-t-package-move
+  tags:
+  - F112
+  - F014
+  - substrate
+  - tests
+- id: named-and-installable-t-console-scripts
+  kind: task
+  title: Expose the operator CLIs as [project.scripts] and stop pinning an absolute venv interpreter
+  status: planned
+  parent: named-and-installable-e2
+  summary: '39 of the 46 modules are executable CLIs with their own argparse, discoverable only by absolute
+    path. Declare [project.scripts] entry points for the operator-facing set — the memory service, the
+    watchdog, the backup jobs, the Qdrant bootstrap, the event consumer, the catalog and the ingestion
+    CLI — and document module invocation for the rest. Separately, workspace-tooling/README.md:52-61 states
+    the venv must live at exactly ~/.local/share/workspace-artifacts/venv ''because the LaunchAgent plists
+    reference that absolute interpreter''. Break that coupling: have the service renderer resolve the
+    interpreter with sys.executable at render time. Rendering to systemd units and Scheduled Tasks is
+    native-everywhere-e2 — this task only removes the hardcoded path.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given `pip install .` in a clean venv, when a CI step reads the [project.scripts] table out of pyproject.toml
+    and invokes each declared script with --help, then every one exits 0.
+  - Given the repo, then `git grep -c "workspace-artifacts/venv"` returns 0.
+  - Given the service renderer run in a venv at an arbitrary path, then the rendered unit's interpreter
+    string equals that venv's sys.executable — asserted by a test that renders from two different venv
+    locations and diffs the results.
+  - Given workspace-tooling/README.md:52-61, then the 'the venv must live at that exact absolute path'
+    paragraph is deleted and the install section names the console scripts instead of interpreter paths.
+  depends_on:
+  - named-and-installable-t-package-move
+  tags:
+  - F014
+  - F112
+  - X025
+  - substrate
+  - cli
+- id: named-and-installable-t-uvx-entry-point
+  kind: task
+  title: Make the substrate runnable through uvx with no pre-created venv
+  status: planned
+  parent: named-and-installable-e2
+  summary: The documented substrate install (workspace-tooling/README.md:52-56) is a hand-created python3.12
+    venv followed by pip install from the lockfile — a create-a-venv-first step that gates onboarding
+    before anything can be tried. With a real distribution and console scripts, uvx removes it entirely.
+    Wire and CI-test the uvx path, including the extras form for the hybrid retrieval upgrade, and keep
+    the pip path documented and CI-run as the fallback for machines without uv. Closes the uvx half of
+    X025.
+  priority: should
+  lane: next
+  size: S
+  acceptance:
+  - Given the built wheel, when `uvx --from ./dist/<wheel> <operator-cli> --help` runs on a machine with
+    no pre-created venv, then it exits 0.
+  - Given the extras form, when `uvx --from '<dist-name>[qdrant]' <operator-cli> --help` runs, then it
+    exits 0 and `qdrant_client` is importable inside that ephemeral environment.
+  - Given README.md and workspace-tooling/README.md, then the documented substrate install is one uvx
+    line plus the extras form, and a CI step on ubuntu-latest and macos-latest runs both documented lines
+    verbatim.
+  - Given a runner with uv absent from PATH, then the documented pip fallback line is CI-run and exits
+    0.
+  depends_on:
+  - named-and-installable-t-console-scripts
+  tags:
+  - X025
+  - substrate
+  - uvx
+  - adoption
+- id: named-and-installable-t-substrate-import-layering
+  kind: task
+  title: Add an ast-based import-layering test and keep heavy dependencies out of module import time
+  status: planned
+  parent: named-and-installable-e2
+  summary: 'Once the modules are a package, the import graph becomes enforceable rather than accidental.
+    Add an ast-based layering test against a committed layer table asserting the invariants the substrate
+    already relies on informally: artifact_security imports no sibling module; artifact_runtime imports
+    only artifact_security; and no module in the base layer imports a module from a higher layer. Separately,
+    make the heavy optional dependencies lazy so a base install can import the retrieval and memory modules
+    — this is the import-time half of the no-extras story; the runtime behaviour of ranking_contract()
+    belongs to named-and-installable-t-lexical-only-retrieval. Closes the layering half of F112.'
+  priority: should
+  lane: later
+  size: M
+  acceptance:
+  - Given tests/test_import_layering.py and a committed layer table, when the suite runs, then it parses
+    every module's ast and passes; and when a deliberate violation is introduced in a fixture branch (artifact_security
+    importing a sibling), then it fails naming the offending module and import.
+  - Given a base install with no extras, then `python -c "import agent_kit_substrate.artifact_retrieval"`
+    and `python -c "import agent_kit_substrate.artifact_memory"` both exit 0.
+  - Given the same base install, then `python -X importtime -c "import agent_kit_substrate.artifact_retrieval"
+    2>&1 | grep -c "qdrant_client\|onnxruntime\|fastembed"` returns 0 — the heavy dependencies are imported
+    inside functions, not at module top.
+  depends_on:
+  - named-and-installable-t-package-move
+  tags:
+  - F112
+  - substrate
+  - architecture
+  - tests
+- id: named-and-installable-e3
+  kind: epic
+  title: Automated releases, provenance and registry presence
+  status: planned
+  summary: Three publishing targets whose versions must agree is exactly where hand-rolled releases start
+    shipping a server.json version the registry rejects. `git tag` returns empty and history is one squashed
+    commit, so the commit convention can still be set before anything accumulates. Adopt release-please
+    with a polyglot manifest — node strategy for the root package, python strategy for the substrate,
+    extra-files covering server.json — under Conventional Commits (X049, and the release-automation half
+    of F161). Publish to npm and PyPI through OIDC trusted publishing so provenance, SBOM and build attestations
+    are automatic with no long-lived token. Land the MCP Registry and skills.sh entries with a .mcpb per
+    release (X014). And extract the release-attestation logic that currently lives inside the eval harness
+    and reaches into four private cross-module functions from the request-serving path (F120). The action
+    SHA-pinning and zizmor half of the supply-chain work is ci-proves-it-e3, not here.
+  priority: must
+  lane: next
+  size: L
+  acceptance:
+  - Given a merged Conventional Commit of type feat, when release-please runs, then it opens exactly one
+    release PR whose diff bumps package.json, pyproject.toml and server.json to identical version strings.
+  - Given the tag produced by merging that PR, then `npm audit signatures` reports a verified provenance
+    attestation for the published version and the PyPI project page shows PEP 740 attestations for both
+    the wheel and the sdist.
+  - Given the GitHub release, then an SPDX SBOM and a build-provenance attestation are attached as assets
+    and `gh attestation verify` succeeds against each.
+  - Given the decided mcpName, then the MCP Registry API resolves the server and a .mcpb asset is attached
+    to the release.
+  - Given the repo, then `git grep -n "retrieval_eval\._" src/` returns no matches and no workflow file
+    contains NPM_TOKEN or PYPI_TOKEN.
+  depends_on:
+  - starts-everywhere-e1
+  - ci-proves-it-e3
+  - named-and-installable-e1
+  - named-and-installable-e2
+  tags:
+  - F120
+  - X014
+  - X049
+  - F161
+  - ci
+  - release
+  - provenance
+- id: named-and-installable-t-conventional-commits
+  kind: task
+  title: Adopt Conventional Commits and seed a Keep-a-Changelog CHANGELOG
+  status: planned
+  parent: named-and-installable-e3
+  summary: '`git tag` returns nothing and `git log --oneline` shows a single squashed commit, so there
+    is no changelog, no versioning policy and no history to migrate — the commit convention should be
+    set now, before any accumulates, because release-please derives everything from it. Add a commitlint
+    configuration enforced both by a commit-msg hook and by a CI check on the PR title and commits, create
+    CHANGELOG.md in Keep-a-Changelog format with a [0.1.0] entry, and extend the CONTRIBUTING.md created
+    in ci-proves-it-e3 with a Releases section stating the commit convention, the semver policy, that
+    the Python substrate ships under the same tag, and that requirements-artifact-ingestion.lock.txt is
+    regenerated only at release time.'
+  priority: must
+  lane: next
+  size: S
+  acceptance:
+  - 'Given a commit message ''wip'', when the commit-msg hook and the CI check run, then both fail and
+    the message names the allowed types; given ''feat(mcp-server): add server/discover'', then both pass.'
+  - Given CHANGELOG.md, then it parses as Keep-a-Changelog with an [0.1.0] entry and an Unreleased section,
+    asserted by a CI lint step.
+  - Given CONTRIBUTING.md, then it contains a Releases section stating the commit convention, the semver
+    policy, the single-tag rule for the substrate, and the lockfile regeneration rule.
+  - Given a PR that changes src/ or workspace-tooling/ without touching CHANGELOG.md's Unreleased section,
+    then the CI check fails with an actionable message.
+  depends_on:
+  - ci-proves-it-e3
+  tags:
+  - X049
+  - F161
+  - ci
+  - release
+  - governance
+- id: named-and-installable-t-release-please-manifest
+  kind: task
+  title: Wire release-please with a polyglot manifest keeping npm, PyPI and server.json in lockstep
+  status: planned
+  parent: named-and-installable-e3
+  summary: Add release-please-config.json and .release-please-manifest.json declaring a node strategy
+    for the root package.json, a python strategy for the substrate distribution, and extra-files covering
+    the root server.json so the registry version never drifts from the package version. One release PR
+    must bump everything; merging it must tag once, and the tag must be the sole trigger for the publish
+    workflow. Closes X049 and the release-automation half of F161.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given release-please-config.json, then it declares a node strategy for the root package, a python
+    strategy for the substrate package, and extra-files including server.json — asserted by a schema-validating
+    CI step.
+  - Given a dry run against a synthetic feat commit, when the release PR diff is produced, then a CI step
+    greps package.json, pyproject.toml and server.json out of that diff and asserts all three carry identical
+    version strings.
+  - Given a merge of the release PR, then exactly one v<version> tag is created and the publish workflow
+    is triggered exactly once — asserted by a workflow-run count check on a rehearsal release.
+  - Given a commit that is not Conventional, when release-please runs, then no release PR is opened and
+    the reason is visible in the workflow log.
+  depends_on:
+  - named-and-installable-t-conventional-commits
+  - named-and-installable-t-npm-package-metadata
+  - named-and-installable-t-pyproject-skeleton
+  tags:
+  - X049
+  - F161
+  - ci
+  - release
+- id: named-and-installable-t-trusted-publishing
+  kind: task
+  title: Publish to npm and PyPI through OIDC trusted publishing with provenance, SBOM and attestations
+  status: planned
+  parent: named-and-installable-e3
+  summary: 'Wire the tag-triggered publish workflow to npm with `--provenance --access public` and to
+    PyPI through trusted publishing, both under `id-token: write` with no long-lived credential anywhere
+    in .github/. Attach an SPDX SBOM and a build-provenance attestation to the GitHub release. This is
+    the publishing leg of the supply-chain work; action SHA-pinning and zizmor are ci-proves-it-e3. This
+    is owner-gated: the first publish irreversibly claims a name on two public registries, and the naming
+    decision from starts-everywhere-e1 must be confirmed in writing on the release issue before the workflow
+    is allowed to run.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - 'Given the publish workflow, then `grep -rn "NPM_TOKEN\|PYPI_TOKEN\|NODE_AUTH_TOKEN" .github/` returns
+    no matches and the job declares permissions id-token: write.'
+  - Given a published version, then `npm audit signatures` reports a verified provenance attestation and
+    `gh attestation verify` succeeds against this repository.
+  - Given the PyPI release, then the project page shows PEP 740 attestations for both the wheel and the
+    sdist, and the upload used trusted publishing (no API token configured on the project).
+  - Given the GitHub release, then an SPDX SBOM asset and a build-provenance attestation asset are present
+    and `gh attestation verify --predicate-type` succeeds for each.
+  - Given the release issue, then it records the owner's written confirmation of the npm scope and name
+    and the PyPI project name before the first publish ran.
+  depends_on:
+  - starts-everywhere-e1
+  - named-and-installable-t-release-please-manifest
+  - named-and-installable-t-npm-package-metadata
+  - named-and-installable-t-pyproject-skeleton
+  tags:
+  - X049
+  - F161
+  - ci
+  - provenance
+  - supply-chain
+  - release
+- id: named-and-installable-t-registry-and-mcpb
+  kind: task
+  title: Land the MCP Registry and skills.sh entries and ship a .mcpb per release
+  status: planned
+  parent: named-and-installable-e3
+  summary: 'There is no server.json in the repo and no mcpName in package.json. Add mcpName in reverse-DNS
+    form matching the name decided in starts-everywhere-e1 and a root server.json validating against the
+    dated MCP Registry schema, and publish from the tag-triggered workflow using `mcp-publisher login
+    github-oidc`. Publish the skills tree to skills.sh under the decided handle. Build a .mcpb bundle
+    per release and document the Windows `cmd /c npx` form alongside it — the .mcpb specifically retires
+    the number-one Windows support ticket for every npx-distributed MCP server, which matters for a project
+    whose headline claim is any-OS. Owner-gated: this claims a reverse-DNS namespace and a public registry
+    handle. Closes X014.'
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given package.json, then it declares mcpName in reverse-DNS form matching the starts-everywhere-e1
+    decision, and a CI step validates root server.json against the dated MCP Registry schema with ajv
+    and exits 0.
+  - Given a v* tag, when the workflow runs `mcp-publisher login github-oidc` and publishes, then the registry
+    API returns the server record for the declared mcpName — asserted by a post-publish curl step in the
+    workflow.
+  - Given the GitHub release, then a .mcpb bundle is attached as an asset, and installing it into an MCP
+    client on windows-latest starts the server and answers tools/list without the cmd /c npx workaround.
+  - Given README.md, then it documents both the .mcpb install and the `cmd /c npx` form for Windows, and
+    both lines are exercised by the CI quickstart job.
+  - Given the skills tree published to skills.sh, then the entry resolves and its URL is recorded in the
+    CHANGELOG entry for that release.
+  depends_on:
+  - starts-everywhere-e1
+  - named-and-installable-t-trusted-publishing
+  tags:
+  - X014
+  - ci
+  - registry
+  - mcpb
+  - distribution
+- id: named-and-installable-t-extract-artifact-release
+  kind: task
+  title: Extract release attestation out of the eval harness and stop pinning gitignored dist/ artifacts
+  status: planned
+  parent: named-and-installable-e3
+  summary: 'artifact_memory_service.py:464-483 — inside ExactRetrievalState, on the request-serving path
+    — lazily imports the 2,454-line evaluation harness and calls four private cross-module functions:
+    retrieval_eval._material_source_manifest(), ._evaluation_runtime_contract(), ._validate_migration_evidence()
+    (:662) and .validate_completed_holdout_ledger() (:585), plus the CURRENT_ONLY_SCOPE/CURRENT_ONLY_FILTERS
+    constants. _material_source_manifest() then calls _resolve_adapter_root(), which walks the filesystem
+    looking for a package.json whose name is @chris-dare-dev/agent-kit, and SHA-256s MATERIAL_ADAPTER_FILES
+    (artifact_retrieval_eval.py:60-75) — a tuple that includes three dist/* build outputs and package-lock.json.
+    dist/ is gitignored, so the service''s startup validation depends on a per-machine build artefact
+    and on locating a sibling Node checkout. Create artifact_release.py with a public API imported at
+    module top by both consumers, and rebind the manifest to the package''s declared version plus digests
+    of the three TypeScript sources. Closes F120.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given the refactor, then `git grep -n "retrieval_eval\._" src/agent_kit_substrate/` returns no matches,
+    and artifact_memory_service.py imports artifact_release at module top with no lazy import remaining
+    at the former :464.
+  - Given the new module, then `python -c "from agent_kit_substrate import artifact_release as r; assert
+    not [p for p in r.MATERIAL_ADAPTER_FILES if 'dist/' in p[0] or 'package-lock' in p[0]]"` exits 0,
+    and the manifest instead binds the package's declared version plus sha256 digests of src/config.ts,
+    src/index.ts and src/tools/artifact-memory.ts.
+  - Given a temp directory containing only the installed substrate and no Node checkout anywhere on the
+    path, when the memory service starts, then it starts successfully — asserted by a test that runs it
+    with the repo absent, proving the filesystem walk for @chris-dare-dev/agent-kit is gone.
+  - Given a faked patch-version bump of a ranking dependency, then evaluation_runtime_contract() records
+    the observed version and emits a warning rather than raising on exact importlib.metadata equality
+    — asserted by a test that monkeypatches importlib.metadata.version.
+  - Given the substrate suite, then it stays green and no test imports a private underscore-prefixed name
+    across module boundaries — asserted by an ast check.
+  depends_on:
+  - named-and-installable-t-package-move
+  - named-and-installable-t-npm-package-metadata
+  tags:
+  - F120
+  - substrate
+  - release
+  - refactor
+- id: named-and-installable-e4
+  kind: epic
+  title: A first run that needs no Docker and no Qdrant
+  status: planned
+  summary: 'Today the sequence before anything works is Docker plus Qdrant plus a Python 3.12 venv plus
+    a pinned ONNX model — on machines where Docker is often not allowed. Ship a first-run path where the
+    catalog plus SQLite FTS5 lexical retrieval and exact-hash lookup serve the full 17-tool surface with
+    vectors disabled, degrading semantic recall rather than failing, and prove it in CI on a runner with
+    no docker binary (X024). The pieces already exist and are not wired: LexicalIndex.search at workspace-tooling/artifact_retrieval.py:410-455
+    runs BM25 over the spans_fts FTS5 table created at artifact_span_generation.py:690 with FTS_BM25_WEIGHTS
+    at :39, and LexicalIndex.lookup does exact point lookup — but ranking_contract() at :108-126 hard-raises
+    RetrievalError the moment fastembed, numpy, onnxruntime, qdrant-client or tokenizers is not importable,
+    so nothing downstream can run without the heavy extras. Then add the devcontainer and the honest prerequisite
+    table (X028, F180), with the digest-pinned loopback Qdrant compose as the opt-in upgrade rather than
+    the only path.'
+  priority: should
+  lane: next
+  size: L
+  acceptance:
+  - Given a machine with no docker on PATH and the substrate installed with no extras, when the MCP server
+    starts under the default profile and a client calls each of the 17 tools, then every call returns
+    a non-error result.
+  - Given that same machine, then artifact_memory_status reports mode 'lexical' and vectors 'disabled'
+    with a reason and the one command that upgrades to hybrid, and search_artifacts returns FTS5-ranked
+    hits rather than an error.
+  - Given CI, then a required job named no-docker runs the above on ubuntu-latest, macos-latest and windows-latest
+    and fails if docker is invoked at any point.
+  - Given README.md, then its Requirements section is generated from data/facts/prerequisites.json and
+    a --check gate fails if the rendered table and the file disagree.
+  - Given .devcontainer/devcontainer.json, then a devcontainer build with a postCreateCommand running
+    the installer and doctor exits 0.
+  depends_on:
+  - starts-everywhere-e2
+  - starts-everywhere-e3
+  - starts-everywhere-e4
+  - named-and-installable-e2
+  tags:
+  - X024
+  - X028
+  - F180
+  - portability
+  - adoption
+  - memory
+- id: named-and-installable-t-lexical-only-retrieval
+  kind: task
+  title: Add a lexical-only retrieval mode that runs with no Qdrant, no ONNX and no fastembed
+  status: planned
+  parent: named-and-installable-e4
+  summary: 'ranking_contract() at workspace-tooling/artifact_retrieval.py:108-126 loops over fastembed,
+    numpy, onnxruntime, qdrant-client and tokenizers and raises RetrievalError(''ranking dependency is
+    unavailable: …'') on the first PackageNotFoundError — so the entire retrieval path is dead on a base
+    install. The lexical leg is already standalone and needs no vectors: LexicalIndex.search (:410-455)
+    issues a bm25(spans_fts, …) query with FTS_BM25_WEIGHTS (:39) against the spans_fts virtual table
+    created at artifact_span_generation.py:690, and LexicalIndex.lookup (:458+) does exact point-id retrieval.
+    Introduce an explicit lexical mode selected by the runtime configuration decided in starts-everywhere-e3,
+    make ranking_contract() return a mode-tagged contract with null vector and reranker fields instead
+    of raising, and route search through the lexical leg alone with an explicit degradation marker on
+    results. Hybrid ranking must not change by a single byte. Closes X024''s retrieval leg.'
+  priority: must
+  lane: next
+  size: L
+  acceptance:
+  - Given a venv with none of fastembed, onnxruntime or qdrant-client installed and lexical mode selected,
+    when ranking_contract() is called, then it returns a contract whose mode is 'lexical', whose vector
+    and reranker fields are null, whose digest differs from the hybrid digest, and it does not raise.
+  - Given the same venv, when the retrieval CLI is invoked with a query, then it returns FTS5-ranked span
+    rows carrying an explicit degradation marker and exits 0.
+  - Given a hybrid-capable install, when ranking_contract() is called, then its digest is byte-identical
+    to the value recorded at HEAD before this task — asserted by a committed golden digest, proving the
+    degraded path did not perturb hybrid ranking.
+  - Given a query in lexical mode, then each result carries a recall field valued 'degraded'; given the
+    same query in hybrid mode, then that field is absent — asserted by one test per mode.
+  - Given lexical mode and a missing spans database, then the failure is a typed UserError naming the
+    file and the command that builds it, not an unhandled exception.
+  depends_on:
+  - starts-everywhere-e3
+  - named-and-installable-t-pyproject-skeleton
+  tags:
+  - X024
+  - memory
+  - retrieval
+  - fts5
+  - degraded-mode
+- id: named-and-installable-t-degraded-tool-surface
+  kind: task
+  title: Serve all 17 MCP tools in lexical mode, with status reporting the degradation honestly
+  status: planned
+  parent: named-and-installable-e4
+  summary: The four artifact-memory tools (artifact_memory_status, search_artifacts, get_artifact, query_temporal_facts)
+    plus the 13 kit tools must all answer when there is no Qdrant to reach and no vectors to search. Wire
+    the lexical retrieval mode through src/tools/artifact-memory.ts and make artifact_memory_status report
+    the mode, the reason and the upgrade command rather than a generic failure. query_temporal_facts must
+    return the empty-with-reason shape decided in starts-everywhere-e3 when Graphiti is absent. One code
+    path must serve both modes so the hybrid branch is proved by the same test file. Closes X024's tool-surface
+    leg.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given the server started with no Qdrant reachable and the substrate installed with no extras, when
+    a new src/degraded-mode.test.ts drives the real stdio server and calls all 17 tools in turn, then
+    none returns isError.
+  - Given artifact_memory_status in that state, then its payload names mode 'lexical', vectors 'disabled',
+    a human-readable reason, and the single command that upgrades to hybrid — asserted by exact-field
+    assertions, not substring matching.
+  - Given query_temporal_facts with Graphiti absent, then it returns the empty-with-reason shape decided
+    in starts-everywhere-e3 and not an unhandled error.
+  - Given a hybrid-capable environment, when the same test file's hybrid branch runs, then artifact_memory_status
+    reports mode 'hybrid' and all 17 tools answer — proving one code path serves both modes.
+  - Given search_artifacts in lexical mode, then the returned results carry the degradation marker from
+    named-and-installable-t-lexical-only-retrieval so a caller can tell recall is reduced.
+  depends_on:
+  - named-and-installable-t-lexical-only-retrieval
+  - starts-everywhere-e2
+  - starts-everywhere-e3
+  - named-and-installable-t-tool-descriptor-registry
+  tags:
+  - X024
+  - mcp-server
+  - memory
+  - degraded-mode
+- id: named-and-installable-t-degraded-mode-ci-job
+  kind: task
+  title: Add a required CI job that proves the full tool surface on a runner with no Docker
+  status: planned
+  parent: named-and-installable-e4
+  summary: The no-Docker claim is worth nothing unenforced. Add a job to .github/workflows/ci.yml that
+    runs on ubuntu-latest, macos-latest and windows-latest with docker made unavailable, installs the
+    base wheel with no extras, builds the server, and runs src/degraded-mode.test.ts. Prove docker is
+    genuinely not used by shimming a fake docker earlier on PATH that writes a sentinel file and exits
+    1, then asserting the sentinel is absent at the end of the job. Make it a required check — this is
+    the first CI proof of the any-OS claim without a container runtime, and it is the assertion the prerequisite
+    table's hard-vs-soft column depends on.
+  priority: must
+  lane: next
+  size: M
+  acceptance:
+  - Given .github/workflows/ci.yml, then a job named no-docker exists with a matrix over ubuntu-latest,
+    macos-latest and windows-latest, installs the distribution with no extras, and runs src/degraded-mode.test.ts.
+  - Given that job, then it fails if any of the 17 tools returns isError, with the failing tool name in
+    the log.
+  - Given the docker shim placed first on PATH, then at job end the sentinel file does not exist; and
+    when a deliberate docker invocation is added in a scratch branch, the job fails — demonstrated once
+    in the PR.
+  - Given the branch protection ruleset from ci-proves-it-e1, then no-docker is listed as a required status
+    check on the default branch.
+  depends_on:
+  - named-and-installable-t-degraded-tool-surface
+  - ci-proves-it-e1
+  tags:
+  - X024
+  - ci
+  - portability
+  - degraded-mode
+- id: named-and-installable-t-prerequisite-table
+  kind: task
+  title: Generate an honest prerequisite table naming every binary, its minimum version and hard-vs-soft
+  status: planned
+  parent: named-and-installable-e4
+  summary: 'README.md:138-140 claims the requirement set is ''Node >= 20 · Python 3.12 (substrate only)
+    · Docker (Qdrant, substrate only)''. The real set, gathered from the scripts themselves: git, node,
+    npm, python3, jq and curl as hard requirements plus gpg, aws and kubectl as soft ones (data/scripts/bootstrap.sh:74-88);
+    bash for every hook in template-settings.json, which means Git Bash on Windows; python3.12 specifically,
+    because workspace-tooling/README.md:46-49 records 27 failures on 3.9; age for off-device backup (artifact_backup_offdevice.py:50-52);
+    uvx for the MCP template entry; shasum in BSD flavour rather than sha256sum (workspace-tooling/build-agent-vault.sh:150-151);
+    and Docker Desktop with WSL integration on Windows (artifact_qdrant_bootstrap.py:50-95). None of it
+    is documented. Commit a machine-readable list, render the README table from it, and make the doctor
+    command from starts-everywhere-e4 read the same file so the two cannot drift. Closes the documentation
+    half of F180.'
+  priority: should
+  lane: next
+  size: M
+  acceptance:
+  - Given data/facts/prerequisites.json, then every entry has id, min_version, subsystem, requirement
+    (hard|soft) and probe_command, and a test asserts every binary the starts-everywhere-e4 doctor probes
+    appears in the file and vice versa.
+  - Given `python3 data/scripts/prerequisites-render.py --check` at HEAD, then it exits 0; and when the
+    README table is edited by hand, then it exits non-zero showing the diff.
+  - Given the committed gate runner from ci-proves-it-e2, then prerequisites-render.py --check is one
+    of its named steps.
+  - Given the file, then docker is marked soft and a self-test cross-checks that every entry marked hard
+    is one the no-docker CI job actually needed — the job's absence of docker must be consistent with
+    docker's soft classification.
+  - Given README.md, then its Requirements section is the rendered table and contains no free-text requirement
+    sentence.
+  depends_on:
+  - named-and-installable-t-degraded-mode-ci-job
+  - starts-everywhere-e4
+  - ci-proves-it-e2
+  tags:
+  - F180
+  - docs
+  - portability
+  - adoption
+- id: named-and-installable-t-devcontainer-and-compose
+  kind: task
+  title: Add a devcontainer, .nvmrc and .editorconfig, and make the Qdrant compose an honest opt-in upgrade
+  status: planned
+  parent: named-and-installable-e4
+  summary: 'There is no .devcontainer/, no .nvmrc and no .editorconfig. The compose file is in better
+    shape than the audit implies and must not be rewritten blindly: workspace-tooling/services/qdrant/compose.yaml
+    already pins qdrant/qdrant:v1.16.3-unprivileged by sha256 digest, binds only 127.0.0.1:6343, drops
+    all capabilities, sets no-new-privileges, disables telemetry and takes its API keys from .env. The
+    real remaining defects are that it bind-mounts ./storage and ./restore-storage — host paths that are
+    neither tracked nor gitignored — while workspace-tooling/README.md:63-69 claims there is ''no state
+    to gitignore here'' because the volume is Docker-managed, and that the file is buried three directories
+    deep with no root-level discovery. Add the devcontainer as the fast path, never the only path, sequenced
+    after the degraded mode. Closes X028 and the tooling half of F180.'
+  priority: could
+  lane: later
+  size: M
+  acceptance:
+  - Given .devcontainer/devcontainer.json declaring Node and Python 3.12 features, when a devcontainer
+    build runs in CI, then the postCreateCommand runs the installer and the doctor command and the build
+    exits 0.
+  - Given `docker compose -f workspace-tooling/services/qdrant/compose.yaml config`, then it validates
+    and exits 0, and the README names that exact command as the opt-in upgrade to hybrid retrieval, presented
+    after the no-Docker default.
+  - Given the repo, then either .gitignore ignores workspace-tooling/services/qdrant/storage/ and restore-storage/,
+    or both compose volumes are converted to named Docker volumes and the 'no state to gitignore here'
+    claim at workspace-tooling/README.md:63-69 is made true; a test fails if any bind-mounted host path
+    in a tracked compose file is neither tracked nor ignored.
+  - Given .nvmrc and .editorconfig at the repo root, then a CI step asserts .nvmrc's version satisfies
+    package.json engines.node and fails if they diverge.
+  - Given README.md, then the devcontainer and compose route appears only after the no-Docker first run,
+    and a reader following the document top-to-bottom reaches a working server before Docker is mentioned.
+  depends_on:
+  - named-and-installable-t-degraded-mode-ci-job
+  - named-and-installable-t-prerequisite-table
+  tags:
+  - X028
+  - F180
+  - portability
+  - devcontainer
+  - docker
