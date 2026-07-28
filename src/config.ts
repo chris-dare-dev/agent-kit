@@ -7,6 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PlatformConfig, ServerProfile } from "./types.js";
@@ -145,20 +146,29 @@ export function loadConfig(): PlatformConfig {
   //
   // Priority:
   //   1. MEMORY_ROOT env var (explicit absolute path, or "" to disable)
-  //   2. Derived: $HOME/.claude/projects/<workspace-slug>/memory, where
+  //   2. Derived: <home>/.claude/projects/<workspace-slug>/memory, where
   //      <workspace-slug> is the workspace root with every "/" replaced by "-"
   //      (matches Claude Code's project-directory naming convention).
-  //   3. "" (disabled) when HOME is unset or no WORKSPACE_ROOT was provided
-  //      (sandbox / CI). A missing or "" dir makes discoverMemory return [].
+  //   3. "" (disabled) when the home directory or WORKSPACE_ROOT cannot be
+  //      resolved (sandbox / CI). A missing or "" dir makes discoverMemory
+  //      return [].
+  //
+  // Home comes from os.homedir(), NOT process.env.HOME. Under native PowerShell
+  // — how Claude Code actually launches on Windows — HOME is undefined while
+  // USERPROFILE is set, so keying on HOME silently disabled the entire tier and
+  // list/get/search_memory returned empty results indistinguishable from "this
+  // user has no memory files". homedir() consults USERPROFILE on Windows and
+  // still honours HOME on POSIX.
   // ---------------------------------------------------------------------------
+  const home = homedir();
   let memoryDir: string;
   if (process.env.MEMORY_ROOT !== undefined) {
     memoryDir = process.env.MEMORY_ROOT;
-  } else if (process.env.HOME && workspaceRootEnv) {
+  } else if (home && workspaceRootEnv) {
     // Claude Code's project-dir slug replaces EVERY non-alphanumeric character
     // (path separators AND dots, e.g. "chris.dare" → "chris-dare") with "-".
     const slug = workspaceRoot.replace(/[^a-zA-Z0-9]/g, "-");
-    memoryDir = resolve(process.env.HOME, ".claude", "projects", slug, "memory");
+    memoryDir = resolve(home, ".claude", "projects", slug, "memory");
   } else {
     memoryDir = "";
   }

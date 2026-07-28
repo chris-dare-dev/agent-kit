@@ -12,11 +12,28 @@ import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import {
   createArtifactMemoryTools,
+  probeArtifactMemory,
   type ArtifactMemoryRequest,
   type ArtifactMemoryRequester,
 } from "./artifact-memory.js";
 
 const SOCKET_ERROR_FRAGMENT = "socket is not configured securely";
+
+/**
+ * Every case below binds a real AF_UNIX socket, which Windows cannot do —
+ * `server.listen("C:\\...\\x.sock")` fails EACCES. Skipping with a named reason
+ * keeps the Windows run honest: these assertions genuinely did not execute,
+ * rather than erroring and looking like a defect in the adapter. The Windows
+ * path is covered by the probe cases at the end of this file, which need no
+ * socket at all.
+ */
+const REQUIRES_AF_UNIX =
+  process.platform === "win32"
+    ? "requires AF_UNIX; Windows cannot bind a Unix domain socket"
+    : false;
+
+const posixTest: typeof test = ((name: string, fn: never) =>
+  test(name, { skip: REQUIRES_AF_UNIX }, fn)) as typeof test;
 
 interface CapturedRequest {
   request: ArtifactMemoryRequest;
@@ -97,7 +114,7 @@ async function harness(
   };
 }
 
-test("status posts bounded JSON over the owner-private Unix socket without authorization", async (t) => {
+posixTest("status posts bounded JSON over the owner-private Unix socket without authorization", async (t) => {
   let resolveRequest: ((value: {
     body: string;
     headers: IncomingHttpHeaders;
@@ -142,7 +159,7 @@ test("status posts bounded JSON over the owner-private Unix socket without autho
   assert.equal(request.headers["x-api-key"], undefined);
 });
 
-test("every route announces the adapter's wire protocol to the service", async (t) => {
+posixTest("every route announces the adapter's wire protocol to the service", async (t) => {
   const { calls, tools } = await harness(t);
   await tools.artifact_memory_status();
   await tools.search_artifacts({ query: "ownership" });
@@ -158,7 +175,7 @@ test("every route announces the adapter's wire protocol to the service", async (
   }
 });
 
-test("stale adapter against an upgraded service fails with a restart instruction", async (t) => {
+posixTest("stale adapter against an upgraded service fails with a restart instruction", async (t) => {
   const { socketPath } = await socketFixture(t);
   const invokeWith = (response: Response) =>
     createArtifactMemoryTools(
@@ -222,7 +239,7 @@ test("stale adapter against an upgraded service fails with a restart instruction
   assert.equal(versionless.mode, "resident-service-status");
 });
 
-test("version fencing outranks status decoding and leaks no service detail", async (t) => {
+posixTest("version fencing outranks status decoding and leaks no service detail", async (t) => {
   const { socketPath } = await socketFixture(t);
   const upgradeSecret = "qdrant-admin-key-in-upgrade-body";
   const tools = createArtifactMemoryTools(
@@ -245,7 +262,7 @@ test("version fencing outranks status decoding and leaks no service detail", asy
   });
 });
 
-test("search validates bounds and maps only current-revision filters", async (t) => {
+posixTest("search validates bounds and maps only current-revision filters", async (t) => {
   const { calls, tools } = await harness(t);
   await tools.search_artifacts({
     query: "milestone ownership",
@@ -285,7 +302,7 @@ test("search validates bounds and maps only current-revision filters", async (t)
   );
 });
 
-test("get and facts map JSON bodies and retain pilot denial", async (t) => {
+posixTest("get and facts map JSON bodies and retain pilot denial", async (t) => {
   const { calls, tools } = await harness(t);
   await tools.get_artifact({
     relative_path: "plans/roadmap.md",
@@ -326,7 +343,7 @@ test("get and facts map JSON bodies and retain pilot denial", async (t) => {
   );
 });
 
-test("configuration accepts only normalized portable Unix socket paths", () => {
+posixTest("configuration accepts only normalized portable Unix socket paths", () => {
   for (const invalid of [
     "artifact-memory.sock",
     "/tmp/../tmp/artifact-memory.sock",
@@ -347,7 +364,7 @@ test("configuration accepts only normalized portable Unix socket paths", () => {
   );
 });
 
-test("socket symlink, endpoint type, mode, and parent permissions fail before a request", async (t) => {
+posixTest("socket symlink, endpoint type, mode, and parent permissions fail before a request", async (t) => {
   let handlerCalls = 0;
   const { root, socketPath } = await socketFixture(t, () => {
     handlerCalls += 1;
@@ -387,7 +404,7 @@ test("socket symlink, endpoint type, mode, and parent permissions fail before a 
   assert.equal(handlerCalls, 0, "unsafe endpoints must never reach the service");
 });
 
-test("socket security is revalidated for every request", async (t) => {
+posixTest("socket security is revalidated for every request", async (t) => {
   const { calls, socketPath, tools } = await harness(t);
   await tools.artifact_memory_status();
   await chmod(socketPath, 0o666);
@@ -398,7 +415,7 @@ test("socket security is revalidated for every request", async (t) => {
   assert.equal(calls.length, 1);
 });
 
-test("socket and backend diagnostics are never reflected in errors", async (t) => {
+posixTest("socket and backend diagnostics are never reflected in errors", async (t) => {
   const { socketPath } = await socketFixture(t);
   const networkSecret = "qdrant-admin-key-super-secret";
   const unavailable = createArtifactMemoryTools(
@@ -432,7 +449,7 @@ test("socket and backend diagnostics are never reflected in errors", async (t) =
   });
 });
 
-test("redirects, content type, JSON shape, and response size fail closed", async (t) => {
+posixTest("redirects, content type, JSON shape, and response size fail closed", async (t) => {
   const invokeWith = async (response: Response) => {
     const { socketPath } = await socketFixture(t);
     const tools = createArtifactMemoryTools({ socketPath }, async () => response);
@@ -524,7 +541,7 @@ test("redirects, content type, JSON shape, and response size fail closed", async
   );
 });
 
-test("adapter forwards no database, graph, model, or bearer credentials", async (t) => {
+posixTest("adapter forwards no database, graph, model, or bearer credentials", async (t) => {
   const { calls, tools } = await harness(t);
   const previous = {
     qdrant: process.env.QDRANT_API_KEY,
@@ -550,4 +567,74 @@ test("adapter forwards no database, graph, model, or bearer credentials", async 
   assert.doesNotMatch(serialized, /model-secret/);
   assert.equal("Authorization" in calls[0].request.headers, false);
   assert.equal("authorization" in calls[0].request.headers, false);
+});
+
+// ---------------------------------------------------------------------------
+// probeArtifactMemory — the startup capability check.
+//
+// These run on every OS and bind nothing. They are the reason the adapter can
+// answer "why is this group missing?" instead of throwing at module scope and
+// taking the other 13 tools down with it.
+// ---------------------------------------------------------------------------
+
+test("probe reports unsupported-platform on a host without AF_UNIX", () => {
+  const result = probeArtifactMemory({ platform: "win32" });
+  assert.equal(result.available, false);
+  assert.equal(result.available === false && result.reason, "unsupported-platform");
+  // The operator needs the attempted path even when the platform is the problem.
+  assert.match(
+    result.available === false ? result.detail : "",
+    /artifact-memory\.sock/,
+  );
+});
+
+test("probe reports disabled-by-profile before it considers capability", () => {
+  // Policy outranks capability: a shared deployment excludes the group even on
+  // a host that could serve it, and must not imply the transport was broken.
+  const result = probeArtifactMemory({ serverProfile: "shared", platform: "linux" });
+  assert.equal(result.available, false);
+  assert.equal(result.available === false && result.reason, "disabled-by-profile");
+});
+
+test("probe reports socket-missing and names the path it checked", () => {
+  const socketPath = join(homedir(), "definitely-absent-artifact-memory.sock");
+  const result = probeArtifactMemory({ platform: "linux", socketPath });
+  assert.equal(result.available, false);
+  assert.equal(result.available === false && result.reason, "socket-missing");
+  assert.match(
+    result.available === false ? result.detail : "",
+    /definitely-absent-artifact-memory\.sock/,
+    "the detail must name the exact path, so a wrong path is visible",
+  );
+});
+
+test("probe reports socket-insecure for a path outside the user's home", () => {
+  const result = probeArtifactMemory({
+    platform: "linux",
+    socketPath: "/tmp/artifact-memory.sock",
+  });
+  assert.equal(result.available, false);
+  assert.equal(result.available === false && result.reason, "socket-insecure");
+});
+
+test("probe reports socket-insecure for an unnormalized or over-long path", () => {
+  for (const socketPath of [
+    join(homedir(), "..", "artifact-memory.sock"),
+    join(homedir(), `${"x".repeat(120)}.sock`),
+  ]) {
+    const result = probeArtifactMemory({ platform: "linux", socketPath });
+    assert.equal(result.available, false, socketPath);
+    assert.equal(
+      result.available === false && result.reason,
+      "socket-insecure",
+      socketPath,
+    );
+  }
+});
+
+posixTest("probe reports available for a live owner-private socket", async (t) => {
+  const { socketPath } = await socketFixture(t);
+  const result = probeArtifactMemory({ socketPath });
+  assert.equal(result.available, true);
+  assert.equal(result.available === true && result.socketPath, socketPath);
 });

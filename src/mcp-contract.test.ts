@@ -28,12 +28,27 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { probeArtifactMemory } from "./tools/artifact-memory.js";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SERVER_ENTRY = resolve(REPO_ROOT, "src", "index.ts");
 const FIXTURE_ROOT = resolve(REPO_ROOT, "tests", "fixtures", "mcp-contract");
 const GOLDEN_PATH = resolve(REPO_ROOT, "tests", "fixtures", "tools-list.golden.json");
+const DEGRADED_GOLDEN_PATH = resolve(
+  REPO_ROOT,
+  "tests",
+  "fixtures",
+  "tools-list.degraded.golden.json",
+);
 const UPDATE_GOLDEN = process.env.UPDATE_GOLDEN === "1";
+
+// Whether THIS host can serve the artifact-memory group. The spawned server
+// runs the same probe against the same platform and socket, so the in-process
+// answer predicts the child's tool count. Asserting a hardcoded 17 is what made
+// the suite red on Windows for a reason that had nothing to do with the contract.
+const ARTIFACT_MEMORY_AVAILABLE = probeArtifactMemory({
+  serverProfile: "personal",
+}).available;
 
 interface ToolShape {
   name: string;
@@ -49,7 +64,9 @@ function textOf(res: CallResult): string {
   return res.content.map((c) => c.text).join("");
 }
 
-async function startServer(): Promise<{ client: Client; close: () => Promise<void> }> {
+async function startServer(
+  extraEnv: Record<string, string> = {},
+): Promise<{ client: Client; close: () => Promise<void> }> {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: ["--import", "tsx", SERVER_ENTRY],
@@ -63,6 +80,7 @@ async function startServer(): Promise<{ client: Client; close: () => Promise<voi
       MEMORY_ROOT: "",
       TOKEN_LOG_PATH: "",
       CACHE_SNAPSHOT_PATH: "",
+      ...extraEnv,
     },
     stderr: "ignore",
   });
@@ -71,38 +89,53 @@ async function startServer(): Promise<{ client: Client; close: () => Promise<voi
   return { client, close: () => client.close() };
 }
 
+function toolShape(tools: { name: string; inputSchema: unknown }[]): ToolShape[] {
+  return tools
+    .map((tool) => ({ name: tool.name, inputSchema: tool.inputSchema }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function assertGolden(shape: ToolShape[], goldenPath: string): void {
+  if (UPDATE_GOLDEN) {
+    writeFileSync(goldenPath, JSON.stringify(shape, null, 2) + "\n", "utf-8");
+    return;
+  }
+  let golden: ToolShape[];
+  try {
+    golden = JSON.parse(readFileSync(goldenPath, "utf-8"));
+  } catch (err) {
+    assert.fail(
+      `Could not read golden ${goldenPath}: ${
+        err instanceof Error ? err.message : String(err)
+      }. Generate it with: npm run test:update-golden`,
+    );
+  }
+  assert.deepStrictEqual(
+    shape,
+    golden,
+    "tools/list drifted from the golden file — a tool was added/removed or a " +
+      "schema changed. If intentional, run: npm run test:update-golden",
+  );
+}
+
 test("MCP contract (tools/list golden + representative calls)", async (t) => {
   const { client, close } = await startServer();
   try {
     // ---- Layer 1: tools/list golden snapshot -----------------------------
-    await t.test("tools/list matches the golden snapshot", async () => {
-      const listed = await client.listTools();
-      const shape: ToolShape[] = listed.tools
-        .map((tool) => ({ name: tool.name, inputSchema: tool.inputSchema }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      if (UPDATE_GOLDEN) {
-        writeFileSync(GOLDEN_PATH, JSON.stringify(shape, null, 2) + "\n", "utf-8");
-        return;
-      }
-
-      let golden: ToolShape[];
-      try {
-        golden = JSON.parse(readFileSync(GOLDEN_PATH, "utf-8"));
-      } catch (err) {
-        assert.fail(
-          `Could not read golden ${GOLDEN_PATH}: ${
-            err instanceof Error ? err.message : String(err)
-          }. Generate it with: npm run test:update-golden`,
-        );
-      }
-      assert.deepStrictEqual(
-        shape,
-        golden,
-        "tools/list drifted from the golden file — a tool was added/removed or a " +
-          "schema changed. If intentional, run: npm run test:update-golden",
-      );
-    });
+    // Only asserted where the artifact-memory group can actually be served.
+    // On a host without AF_UNIX the 17-tool list is unreachable by design, and
+    // the degraded contract is asserted by its own test below instead.
+    await t.test(
+      "tools/list matches the golden snapshot",
+      {
+        skip: ARTIFACT_MEMORY_AVAILABLE
+          ? false
+          : "artifact memory unavailable on this host — see the degraded-contract test",
+      },
+      async () => {
+        assertGolden(toolShape((await client.listTools()).tools), GOLDEN_PATH);
+      },
+    );
 
     // ---- Layer 2: representative per-behaviour calls ----------------------
 
@@ -167,6 +200,66 @@ test("MCP contract (tools/list golden + representative calls)", async (t) => {
       })) as CallResult;
       assert.doesNotMatch(textOf(agent), MISS, "get_agent('Milestone Researcher') should resolve");
     });
+  } finally {
+    await close();
+  }
+});
+
+/**
+ * The F001 regression, runnable everywhere.
+ *
+ * The default profile used to call createArtifactMemoryTools() unguarded at
+ * module scope; on any host without AF_UNIX that threw and the process exited
+ * before serving a single tool. The platform is stubbed rather than detected so
+ * this fails on macOS and Linux too — the defect must not be catchable only on
+ * a Windows runner.
+ */
+test("default profile starts on a platform without AF_UNIX", async () => {
+  const { client, close } = await startServer({
+    AGENT_KIT_PROBE_PLATFORM: "win32",
+  });
+  try {
+    const shape = toolShape((await client.listTools()).tools);
+
+    assert.equal(
+      shape.length,
+      13,
+      "a host without AF_UNIX must still serve the 13 tools that never touch the substrate",
+    );
+    for (const name of [
+      "artifact_memory_status",
+      "search_artifacts",
+      "get_artifact",
+      "query_temporal_facts",
+    ]) {
+      assert.equal(
+        shape.some((tool) => tool.name === name),
+        false,
+        `${name} must not be advertised when the transport is unavailable`,
+      );
+    }
+
+    // The server is not merely alive — it still answers real work.
+    const skills = (await client.callTool({
+      name: "list_skills",
+      arguments: {},
+    })) as CallResult;
+    assert.notEqual(skills.isError, true, "list_skills must work in the degraded state");
+
+    // An unavailable tool answers with its REASON, not a bare "Unknown tool":
+    // the operator has to be able to tell a host problem from a missing feature.
+    const denied = (await client.callTool({
+      name: "search_artifacts",
+      arguments: { query: "anything" },
+    })) as CallResult;
+    assert.equal(denied.isError, true, "an unavailable tool must answer isError");
+    assert.match(
+      textOf(denied),
+      /unsupported-platform/,
+      "the refusal must name why the group is unavailable",
+    );
+
+    assertGolden(shape, DEGRADED_GOLDEN_PATH);
   } finally {
     await close();
   }

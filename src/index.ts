@@ -36,7 +36,10 @@ import { createMemoryTools } from "./tools/memory.js";
 import { createContextGuideTools } from "./tools/context-guides.js";
 import { createSearchTools } from "./tools/search.js";
 import { createAgentsRegistryTools } from "./tools/agents-registry.js";
-import { createArtifactMemoryTools } from "./tools/artifact-memory.js";
+import {
+  createArtifactMemoryTools,
+  probeArtifactMemory,
+} from "./tools/artifact-memory.js";
 import { TokenLogger } from "./logging/token-logger.js";
 import { createTokenStatsTools } from "./tools/token-stats.js";
 import { ResponseCache } from "./cache/response-cache.js";
@@ -81,6 +84,24 @@ log(`  CLAUDE.md files: ${claudeMdFiles.length}`);
 const memoryVisible = config.serverProfile === "personal" ? memories : [];
 if (config.serverProfile === "shared" && memories.length > 0) {
   log(`  Memory tier EXCLUDED (shared profile): ${memories.length} entries hidden`);
+}
+
+// State the memory tier explicitly. "Disabled because nothing resolved" and
+// "enabled but empty" are the same silent `0` in the count above, so an
+// operator could not tell a misconfiguration from an empty corpus. The enabled
+// line always carries the path — that presence is the discriminator.
+if (config.serverProfile === "personal") {
+  if (config.memoryDir === "") {
+    log(
+      process.env.MEMORY_ROOT === ""
+        ? "memory tier disabled: MEMORY_ROOT is set to the empty string"
+        : "memory tier disabled: no MEMORY_ROOT, and no resolvable home directory or WORKSPACE_ROOT",
+    );
+  } else {
+    log(
+      `memory tier enabled, ${memories.length} entries at ${config.memoryDir}`,
+    );
+  }
 }
 
 // Build search index from all content sources
@@ -156,13 +177,44 @@ const ARTIFACT_MEMORY_TOOL_NAMES = new Set([
   "get_artifact",
   "query_temporal_facts",
 ]);
-const artifactMemoryEnabled = config.serverProfile === "personal";
-const artifactMemoryTools = artifactMemoryEnabled
-  ? createArtifactMemoryTools()
-  : undefined;
-if (!artifactMemoryEnabled) {
+// Registration is decided by a capability PROBE, not by the profile alone: an
+// unusable transport is a state to report, not an exception to die on. Before
+// this, createArtifactMemoryTools() ran unguarded at module scope and threw on
+// any host without AF_UNIX, killing the 13 tools that never touch the substrate.
+//
+// AGENT_KIT_PROBE_PLATFORM is a test-only override (mirroring the socketPath
+// override on ArtifactMemoryConfig) so the win32 branch is reachable from a
+// POSIX developer machine and from a Linux CI runner.
+const artifactMemoryProbe = probeArtifactMemory({
+  serverProfile: config.serverProfile,
+  platform: (process.env.AGENT_KIT_PROBE_PLATFORM as NodeJS.Platform) || undefined,
+});
+
+let artifactMemoryTools: ReturnType<typeof createArtifactMemoryTools> | undefined;
+/** Set only when the group is unavailable through FAILURE, never through policy. */
+let artifactMemoryUnavailable: string | undefined;
+
+if (artifactMemoryProbe.available) {
+  try {
+    artifactMemoryTools = createArtifactMemoryTools({
+      socketPath: artifactMemoryProbe.socketPath,
+    });
+  } catch (err) {
+    // Belt-and-braces: the probe said yes, construction disagreed. Degrade
+    // rather than exit — a stale socket must not cost the operator every tool.
+    artifactMemoryUnavailable = `${
+      err instanceof Error ? err.message : String(err)
+    } (socket: ${artifactMemoryProbe.socketPath})`;
+    log(`artifact-memory tools unavailable: ${artifactMemoryUnavailable}`);
+  }
+} else if (artifactMemoryProbe.reason === "disabled-by-profile") {
   log("  Artifact-memory tools EXCLUDED (shared profile)");
+} else {
+  artifactMemoryUnavailable = `${artifactMemoryProbe.reason}: ${artifactMemoryProbe.detail}`;
+  log(`artifact-memory tools unavailable: ${artifactMemoryUnavailable}`);
 }
+
+const artifactMemoryEnabled = artifactMemoryTools !== undefined;
 
 const tokenLogger = new TokenLogger(config.tokenLogPath, config.serverProfile);
 const tokenStatsTools = createTokenStatsTools(tokenLogger);
@@ -608,9 +660,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   // Defense in depth: shared-profile clients cannot invoke artifact-memory
   // handlers even if they retained a stale tool schema from a personal server.
+  //
+  // Excluded BY POLICY and unavailable BY FAILURE are answered differently on
+  // purpose. A shared deployment must not confirm the group even exists, so it
+  // keeps the flat "Unknown tool". A personal deployment whose transport is
+  // unusable should say so — the operator needs to know it is a host problem,
+  // not a missing feature.
   if (!artifactMemoryEnabled && ARTIFACT_MEMORY_TOOL_NAMES.has(name)) {
+    if (artifactMemoryUnavailable === undefined) {
+      return {
+        content: [{ type: "text", text: `Unknown tool: ${name}` }],
+        isError: true,
+      };
+    }
     return {
-      content: [{ type: "text", text: `Unknown tool: ${name}` }],
+      content: [
+        {
+          type: "text",
+          text:
+            `Tool ${name} is unavailable on this host — ${artifactMemoryUnavailable}. ` +
+            "Every other tool is unaffected.",
+        },
+      ],
       isError: true,
     };
   }
@@ -711,18 +782,44 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     let raw: string | McpContent;
 
     switch (name) {
+      // One guarded branch for the whole group: the dispatch guard above already
+      // rejects these names when the group is unregistered, so reaching here
+      // with no tools would be a bug — answer it as an error, never a crash.
       case "artifact_memory_status":
-        raw = await artifactMemoryTools!.artifact_memory_status();
-        break;
       case "search_artifacts":
-        raw = await artifactMemoryTools!.search_artifacts(argObj);
-        break;
       case "get_artifact":
-        raw = await artifactMemoryTools!.get_artifact(argObj);
+      case "query_temporal_facts": {
+        const tools = artifactMemoryTools;
+        if (!tools) {
+          raw = {
+            content: [
+              {
+                type: "text",
+                text: `Tool ${name} is unavailable — ${
+                  artifactMemoryUnavailable ?? "the tool group is not registered"
+                }.`,
+              },
+            ],
+            isError: true,
+          };
+          break;
+        }
+        switch (name) {
+          case "artifact_memory_status":
+            raw = await tools.artifact_memory_status();
+            break;
+          case "search_artifacts":
+            raw = await tools.search_artifacts(argObj);
+            break;
+          case "get_artifact":
+            raw = await tools.get_artifact(argObj);
+            break;
+          default:
+            raw = await tools.query_temporal_facts(argObj);
+            break;
+        }
         break;
-      case "query_temporal_facts":
-        raw = await artifactMemoryTools!.query_temporal_facts(argObj);
-        break;
+      }
       case "list_skills":
         raw = await skillTools.list_skills();
         break;

@@ -7,6 +7,7 @@
  * model credential.
  */
 
+import { existsSync } from "node:fs";
 import { lstat } from "node:fs/promises";
 import {
   request as httpRequest,
@@ -162,23 +163,130 @@ function boundedInteger(
   return result;
 }
 
-function absoluteSocketPath(value: string): string {
+/**
+ * Why a socket path is unacceptable, or undefined when it is fine.
+ *
+ * Split out of absoluteSocketPath so the startup probe can report WHICH
+ * property failed instead of restating the whole rule. Deliberately says
+ * nothing about platform support or about the socket existing — those are
+ * separate questions with separate answers (see probeArtifactMemory).
+ */
+function insecureSocketPathReason(value: string): string | undefined {
   const home = normalize(homedir());
   const homePrefix = `${home}${sep}`;
-  if (
-    process.platform === "win32" ||
-    !isAbsolute(value) ||
-    value.includes("\0") ||
-    value.endsWith(sep) ||
-    normalize(value) !== value ||
-    !value.startsWith(homePrefix) ||
-    Buffer.byteLength(value, "utf8") > MAX_SOCKET_PATH_BYTES
-  ) {
+  if (!isAbsolute(value)) return "path is not absolute";
+  if (value.includes("\0")) return "path contains a NUL byte";
+  if (value.endsWith(sep)) return "path ends with a separator";
+  if (normalize(value) !== value) return "path is not normalized";
+  if (!value.startsWith(homePrefix)) {
+    return `path is not under the current user's home directory (${home})`;
+  }
+  if (Buffer.byteLength(value, "utf8") > MAX_SOCKET_PATH_BYTES) {
+    return `path exceeds the ${MAX_SOCKET_PATH_BYTES}-byte sun_path limit`;
+  }
+  return undefined;
+}
+
+function absoluteSocketPath(
+  value: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform === "win32" || insecureSocketPathReason(value) !== undefined) {
     throw new Error(
       `artifact memory service socket path must be an absolute, normalized Unix path under the current user's home directory no longer than ${MAX_SOCKET_PATH_BYTES} bytes`,
     );
   }
   return value;
+}
+
+export type ArtifactMemoryUnavailableReason =
+  | "unsupported-platform"
+  | "socket-missing"
+  | "socket-insecure"
+  | "disabled-by-profile";
+
+export type ArtifactMemoryProbeResult =
+  | { available: true; socketPath: string }
+  | {
+      available: false;
+      reason: ArtifactMemoryUnavailableReason;
+      detail: string;
+    };
+
+export interface ArtifactMemoryProbeConfig {
+  /** Trust profile; "shared" excludes this tool group by policy, not by capability. */
+  serverProfile?: "personal" | "shared";
+  /** Test-only override for the fixed local service socket. */
+  socketPath?: string;
+  /**
+   * Test-only override for the host platform, so the win32 branch is
+   * exercisable from a POSIX developer machine and from a Linux CI runner.
+   * Mirrors the existing socketPath override on ArtifactMemoryConfig.
+   */
+  platform?: NodeJS.Platform;
+}
+
+/**
+ * Decide whether the artifact-memory tool group can be served, WITHOUT throwing.
+ *
+ * Registration used to be `config.serverProfile === "personal"` with no check
+ * that the transport was usable, so an unusable transport surfaced as an
+ * uncaught exception at module scope and took the whole server — including the
+ * 13 tools that never touch the substrate — down with it. Four genuinely
+ * different situations are now four distinguishable answers:
+ *
+ *   disabled-by-profile  a shared deployment excludes the group on purpose
+ *   unsupported-platform this host has no AF_UNIX (Windows)
+ *   socket-insecure      the path exists but another account could hijack it
+ *   socket-missing       nothing is listening — the service is probably stopped
+ *
+ * Synchronous on purpose: this runs once at startup and its one filesystem
+ * touch is a single existsSync, so it stays callable from module scope.
+ */
+export function probeArtifactMemory(
+  config: ArtifactMemoryProbeConfig = {},
+): ArtifactMemoryProbeResult {
+  if (config.serverProfile === "shared") {
+    return {
+      available: false,
+      reason: "disabled-by-profile",
+      detail: "SERVER_PROFILE=shared excludes the artifact-memory tool group",
+    };
+  }
+
+  const platform = config.platform ?? process.platform;
+  const socketPath = config.socketPath ?? DEFAULT_SOCKET_PATH;
+
+  if (platform === "win32") {
+    return {
+      available: false,
+      reason: "unsupported-platform",
+      detail:
+        `${platform} has no AF_UNIX support, and the resident service is ` +
+        `reachable only over a Unix domain socket (attempted ${socketPath})`,
+    };
+  }
+
+  const insecure = insecureSocketPathReason(socketPath);
+  if (insecure !== undefined) {
+    return {
+      available: false,
+      reason: "socket-insecure",
+      detail: `${insecure} (attempted ${socketPath})`,
+    };
+  }
+
+  if (!existsSync(socketPath)) {
+    return {
+      available: false,
+      reason: "socket-missing",
+      detail:
+        `no socket at ${socketPath} — the artifact-memory service is ` +
+        "probably not running",
+    };
+  }
+
+  return { available: true, socketPath };
 }
 
 function currentUid(): number {

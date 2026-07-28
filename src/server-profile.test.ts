@@ -9,11 +9,15 @@
  */
 
 import { test } from "node:test";
+import { spawn } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import assert from "node:assert/strict";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { probeArtifactMemory } from "./tools/artifact-memory.js";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SERVER_ENTRY = resolve(REPO_ROOT, "src", "index.ts");
@@ -48,7 +52,10 @@ function textOf(r: CallResult): string {
   return r.content.map((c) => c.text).join("");
 }
 
-async function startServer(profile: string | undefined) {
+async function startServer(
+  profile: string | undefined,
+  extraEnv: Record<string, string> = {},
+) {
   const env: Record<string, string> = {
     PATH: process.env.PATH ?? "",
     HOME: process.env.HOME ?? "",
@@ -58,6 +65,7 @@ async function startServer(profile: string | undefined) {
     TOKEN_LOG_PATH: "",
     CACHE_SNAPSHOT_PATH: "",
   };
+  Object.assign(env, extraEnv);
   if (profile) env.SERVER_PROFILE = profile;
   if (profile === "shared") {
     // Shared must not even initialize the excluded local backend.
@@ -164,14 +172,146 @@ test("default (personal) profile still serves personal memory — no regression"
   }
 });
 
-test("default (personal) profile still advertises artifact memory", async () => {
+// The contract is "advertise if and only if the group can be served", not
+// "always advertise". Asserting the latter made this red on Windows for a
+// capability reason rather than a profile reason — the thing this file tests.
+test("personal profile advertises artifact memory exactly when it is available", async () => {
+  const available = probeArtifactMemory({ serverProfile: "personal" }).available;
   const { client, close } = await startServer(undefined);
   try {
     const listed = new Set((await client.listTools()).tools.map((tool) => tool.name));
     for (const name of ARTIFACT_MEMORY_TOOLS) {
-      assert.equal(listed.has(name), true, `personal omitted ${name}`);
+      assert.equal(
+        listed.has(name),
+        available,
+        available
+          ? `personal omitted ${name} despite the transport being available`
+          : `personal advertised ${name} despite the transport being unavailable`,
+      );
     }
   } finally {
     await close();
   }
+});
+
+// A personal host whose transport is unusable must degrade, never die — and it
+// must still refuse the excluded tools with a reason rather than serving them.
+test("personal profile survives an unavailable artifact-memory transport", async () => {
+  const { client, close } = await startServer(undefined, {
+    AGENT_KIT_PROBE_PLATFORM: "win32",
+  });
+  try {
+    const listed = new Set((await client.listTools()).tools.map((tool) => tool.name));
+    for (const name of ARTIFACT_MEMORY_TOOLS) {
+      assert.equal(listed.has(name), false, `unavailable transport still advertised ${name}`);
+    }
+    // Personal memory is a separate tier and must be untouched by the failure.
+    const list = (await client.callTool({
+      name: "list_memory",
+      arguments: {},
+    })) as CallResult;
+    assert.match(textOf(list), memName, "the memory tier must survive an artifact-memory failure");
+
+    const direct = (await client.callTool({
+      name: "search_artifacts",
+      arguments: SHARED_ARTIFACT_CALLS.search_artifacts,
+    })) as CallResult;
+    assert.equal(direct.isError, true, "unavailable artifact tool must answer isError");
+    assert.match(textOf(direct), /unsupported-platform/, "the refusal must name the reason");
+  } finally {
+    await close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Startup degradation lines.
+//
+// "Disabled because nothing resolved", "enabled but empty", "excluded by
+// profile" and "the transport failed" all used to look the same from outside:
+// a silent `0`, or a dead process. Each is now one greppable line, and this is
+// what stops a future change from quietly removing them again.
+// ---------------------------------------------------------------------------
+
+/** Start the server, collect stderr until it is listening, then stop it. */
+async function startupLog(env: Record<string, string>): Promise<string> {
+  const child = spawn(process.execPath, ["--import", "tsx", SERVER_ENTRY], {
+    cwd: REPO_ROOT,
+    env: { PATH: process.env.PATH ?? "", PLATFORM_ROOT: FIXTURE_ROOT, ...env },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let stderr = "";
+  child.stderr.setEncoding("utf8");
+  try {
+    await new Promise<void>((resolveDone, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`server never started; stderr was:\n${stderr}`)),
+        30_000,
+      );
+      child.stderr.on("data", (chunk: string) => {
+        stderr += chunk;
+        if (stderr.includes("Server started")) {
+          clearTimeout(timer);
+          resolveDone();
+        }
+      });
+      child.on("error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+      child.on("exit", (code) => {
+        clearTimeout(timer);
+        reject(new Error(`server exited early (code ${code}); stderr:\n${stderr}`));
+      });
+    });
+  } finally {
+    child.kill();
+  }
+  return stderr;
+}
+
+test("startup states each emit their own distinguishable line", async (t) => {
+  await t.test("memory tier disabled by an empty MEMORY_ROOT", async () => {
+    const log = await startupLog({ WORKSPACE_ROOT: FIXTURE_ROOT, MEMORY_ROOT: "" });
+    assert.match(log, /memory tier disabled: MEMORY_ROOT is set to the empty string/);
+    assert.doesNotMatch(log, /memory tier enabled/);
+  });
+
+  await t.test("memory tier enabled but empty still names its path", async () => {
+    const empty = await mkdtemp(join(tmpdir(), "agent-kit-empty-memory-"));
+    t.after(() => rm(empty, { recursive: true, force: true }));
+    const log = await startupLog({ WORKSPACE_ROOT: FIXTURE_ROOT, MEMORY_ROOT: empty });
+    // The path is the discriminator between "enabled, nothing in it" and "off".
+    assert.match(log, /memory tier enabled, 0 entries at /);
+    assert.ok(log.includes(empty), "the enabled line must carry the resolved path");
+    assert.doesNotMatch(log, /memory tier disabled/);
+  });
+
+  await t.test("an unavailable transport names its reason exactly once", async () => {
+    const log = await startupLog({
+      WORKSPACE_ROOT: FIXTURE_ROOT,
+      MEMORY_ROOT: "",
+      AGENT_KIT_PROBE_PLATFORM: "win32",
+    });
+    const lines = log
+      .split("\n")
+      .filter((line) => line.includes("artifact-memory tools unavailable"));
+    assert.equal(lines.length, 1, "exactly one unavailability line");
+    assert.match(lines[0], /^\[agent-kit-mcp\] artifact-memory tools unavailable: .+$/);
+    assert.match(lines[0], /unsupported-platform/);
+  });
+
+  await t.test("the shared profile is excluded, never reported as failed", async () => {
+    const log = await startupLog({
+      WORKSPACE_ROOT: FIXTURE_ROOT,
+      MEMORY_ROOT: MEMORY_DIR,
+      SERVER_PROFILE: "shared",
+    });
+    assert.match(log, /Artifact-memory tools EXCLUDED \(shared profile\)/);
+    assert.doesNotMatch(
+      log,
+      /artifact-memory tools unavailable/,
+      "policy exclusion must never be reported as a transport failure",
+    );
+    assert.doesNotMatch(log, /memory tier (enabled|disabled)/, "that line is personal-only");
+  });
 });
