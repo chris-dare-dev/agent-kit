@@ -31,71 +31,93 @@ import type { ReferenceFile } from "../types.js";
  * Returns files sorted alphabetically by name. Missing paths are silently
  * skipped.
  */
+/**
+ * Default discovery patterns, relative to the scan root.
+ *
+ * These replace four hardcoded employer-monorepo tiers (`charts/*`, `source/*`,
+ * `infra/*`, `ci-cd-templates`) that matched nothing in an ordinary clone, so a
+ * new adopter got silent zero-discovery and no way to say where their files are.
+ *
+ * MAX DEPTH IS 3 directories below the root, spelled out one level at a time
+ * rather than as `**` on purpose: an unbounded walk of a monorepo (or of a home
+ * directory someone points this at) is slow and surprising, and the bound is
+ * then visible here instead of hidden in a glob option.
+ */
+export const DEFAULT_CLAUDE_MD_GLOBS = [
+  "CLAUDE.md",
+  "*/CLAUDE.md",
+  "*/*/CLAUDE.md",
+  "*/*/*/CLAUDE.md",
+];
+
+/** Never worth walking, and expensive when present. */
+const IGNORED_DIRS = [
+  "**/node_modules/**",
+  "**/.git/**",
+  "**/dist/**",
+  "**/.venv/**",
+  "**/venv/**",
+  "**/__pycache__/**",
+  "**/.next/**",
+  "**/build/**",
+];
+
+/**
+ * Name a discovered file by its directory path relative to the scan root, so
+ * two files with the same basename stay distinct in the merge map.
+ *
+ * `charts/cert-manager/CLAUDE.md` -> "charts/cert-manager". A file at the root
+ * itself has no directory part and becomes "workspace". Previously the
+ * qualifier came from the first segment of the matching PATTERN, which only
+ * worked because every pattern happened to start with a literal tier name; with
+ * configurable globs that would produce names like "*" and re-introduce the
+ * collision that let source/ silently overwrite charts/ in the search index.
+ */
+function nameForClaudeMd(root: string, filePath: string): string {
+  const rel = path.relative(root, path.dirname(filePath));
+  if (rel === "" || rel === ".") return "workspace";
+  return rel.split(path.sep).join("/");
+}
+
 export async function discoverClaudeMdFiles(
   platformRoot: string,
   workspaceRoot?: string,
+  globs: string[] = DEFAULT_CLAUDE_MD_GLOBS,
 ): Promise<ReferenceFile[]> {
   const results: ReferenceFile[] = [];
+  // One entry per absolute path, so a file matched by several patterns — or
+  // reachable from both roots — is read once and named once.
+  const seen = new Set<string>();
 
-  // Wildcard glob patterns relative to platformRoot. If a directory does not
-  // exist, glob returns [] (no throw), so missing optional directories are
-  // handled gracefully.
-  const patterns = [
-    // Helm charts
-    "charts/*/CLAUDE.md",
-    // Custom app source
-    "source/*/CLAUDE.md",
-    // IaC
-    "infra/*/CLAUDE.md",
-  ];
-
-  for (const pattern of patterns) {
-    // "charts" | "source" | "infra" — used to qualify the display name so a
-    // chart and a source app sharing a basename (6 such pairs today) don't
-    // collide in the merge map. Pre-fix, the flat basename key let source/
-    // silently overwrite charts/, dropping the chart CLAUDE.md from the search
-    // index entirely (there is no name-addressed get_claude_md tool — the merged
-    // list feeds only the search index).
-    const tier = pattern.split("/")[0];
-    let matches: string[];
-    try {
-      matches = await glob(pattern, {
-        cwd: platformRoot,
-        absolute: true,
-      });
-    } catch {
-      continue;
-    }
-
-    for (const filePath of matches) {
-      const base = path.basename(path.dirname(filePath));
-      const ref = await readClaudeMd(filePath, `${tier}/${base}`);
-      if (ref) results.push(ref);
-    }
+  const roots = [platformRoot];
+  if (workspaceRoot && path.resolve(workspaceRoot) !== path.resolve(platformRoot)) {
+    roots.push(workspaceRoot);
   }
 
-  // Standalone (non-wildcard) CLAUDE.md files — single files at a known path.
-  const standalones: Array<{ filePath: string; name: string }> = [
-    {
-      filePath: path.join(platformRoot, "ci-cd-templates", "CLAUDE.md"),
-      name: "ci-cd-templates",
-    },
-    {
-      filePath: path.join(platformRoot, "sandbox", "CLAUDE.md"),
-      name: "sandbox",
-    },
-  ];
+  for (const root of roots) {
+    for (const pattern of globs) {
+      let matches: string[];
+      try {
+        matches = await glob(pattern, {
+          cwd: root,
+          absolute: true,
+          ignore: IGNORED_DIRS,
+          follow: false,
+        });
+      } catch {
+        // A missing or unreadable root is not an error: discovery is
+        // best-effort and every source here is optional.
+        continue;
+      }
 
-  for (const { filePath, name } of standalones) {
-    const ref = await readClaudeMd(filePath, name);
-    if (ref) results.push(ref);
-  }
-
-  // Workspace root CLAUDE.md.
-  if (workspaceRoot) {
-    const wsClaudeMd = path.join(workspaceRoot, "CLAUDE.md");
-    const wsRef = await readClaudeMd(wsClaudeMd, "workspace");
-    if (wsRef) results.push(wsRef);
+      for (const filePath of matches) {
+        const resolved = path.resolve(filePath);
+        if (seen.has(resolved)) continue;
+        seen.add(resolved);
+        const ref = await readClaudeMd(resolved, nameForClaudeMd(root, resolved));
+        if (ref) results.push(ref);
+      }
+    }
   }
 
   results.sort((a, b) => a.name.localeCompare(b.name));
@@ -153,9 +175,10 @@ export async function discoverClaudeMdFilesMerged(
   platformRoot: string,
   workspaceRoot: string | undefined,
   dataClaudeMdDir: string,
+  globs: string[] = DEFAULT_CLAUDE_MD_GLOBS,
 ): Promise<ReferenceFile[]> {
   const [fromRepos, fromData] = await Promise.all([
-    discoverClaudeMdFiles(platformRoot, workspaceRoot),
+    discoverClaudeMdFiles(platformRoot, workspaceRoot, globs),
     discoverReferencesInDir(dataClaudeMdDir),
   ]);
   const merged = new Map<string, ReferenceFile>();

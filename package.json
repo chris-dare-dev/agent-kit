@@ -11,7 +11,8 @@
     "dev": "tsx src/index.ts",
     "build": "tsc",
     "test": "node --import tsx --test src/mcp-contract.test.ts src/server-profile.test.ts src/transport-lock.test.ts src/config.test.ts src/tools/artifact-memory.test.ts",
-    "test:update-golden": "node scripts/update-golden.mjs"
+    "test:update-golden": "node scripts/update-golden.mjs",
+    "verify:quickstart": "node scripts/verify-quickstart.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.750.0",

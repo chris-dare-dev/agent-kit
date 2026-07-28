@@ -10,43 +10,62 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_CLAUDE_MD_GLOBS } from "./discovery/claude-md.js";
 import type { PlatformConfig, ServerProfile } from "./types.js";
 
 /**
  * Build a PlatformConfig from environment variables.
  *
- * PLATFORM_ROOT is required and must point to the platform monorepo root.
+ * Every variable is OPTIONAL — a bare `node dist/index.js` with an empty
+ * environment starts and serves the bundled content. Overrides:
  *
- * WORKSPACE_ROOT is optional.  When absent (e.g. inside the sandbox
- * container where the workspace hierarchy does not exist),
- * it defaults to PLATFORM_ROOT and a warning is emitted to stderr.
- * All .claude/ directory paths are resolved relative to the effective
- * workspace root.
+ *   PLATFORM_ROOT      extra content root (default: the package root)
+ *   WORKSPACE_ROOT     root for .claude/ lookups (default: PLATFORM_ROOT)
+ *   CONTEXT_GUIDES_DIR context-guide directory
+ *   CLAUDE_MD_GLOBS    comma-separated CLAUDE.md patterns, relative to each root
+ *   MEMORY_ROOT        personal-memory directory ("" disables the tier)
+ *   SERVER_PROFILE     "shared" to exclude the personal tiers
+ *   TOKEN_LOG_PATH / CACHE_SNAPSHOT_PATH   ("" disables)
  *
- * @throws if PLATFORM_ROOT is not set.
+ * @throws only if an explicitly supplied PLATFORM_ROOT does not exist — a bad
+ *   value the operator typed must fail loudly rather than silently fall back.
  */
 export function loadConfig(): PlatformConfig {
-  const platformRoot = process.env.PLATFORM_ROOT;
+  const platformRootEnv = process.env.PLATFORM_ROOT;
   const workspaceRootEnv = process.env.WORKSPACE_ROOT;
 
-  if (!platformRoot) {
+  // The package root — the directory containing data/ — for both the source
+  // tree (src/config.ts -> ../) and the compiled output (dist/config.js -> ../).
+  const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+  // PLATFORM_ROOT used to be mandatory, and its error told the reader to point
+  // the tool at a "platform monorepo" that has nothing to do with this
+  // repository — so the documented Quick Start died on the first command. It is
+  // now an optional override that defaults to the package root, which is where
+  // a plain clone's content actually lives.
+  //
+  // An explicitly supplied value is still validated: silently falling back
+  // would leave the operator staring at empty discovery counts, wondering why
+  // the path they set had no effect.
+  if (platformRootEnv !== undefined && !existsSync(platformRootEnv)) {
     throw new Error(
-      "PLATFORM_ROOT environment variable is required. " +
-        "Set it to the platform monorepo root, e.g. " +
-        "/Users/you/Work/workspace/platform",
+      `PLATFORM_ROOT was set to "${platformRootEnv}", which does not exist. ` +
+        "Unset it to use the packaged content, or point it at a directory " +
+        "that does.",
     );
   }
+  const platformRoot = platformRootEnv || packageRoot;
 
   let workspaceRoot: string;
   if (workspaceRootEnv) {
     workspaceRoot = workspaceRootEnv;
   } else {
     process.stderr.write(
-      "[claude-mcp-server] WORKSPACE_ROOT is not set; " +
-        "defaulting to PLATFORM_ROOT (" +
+      "[agent-kit-mcp] WORKSPACE_ROOT is not set; " +
+        "defaulting to " +
         platformRoot +
-        "). " +
-        ".claude/ directories will be resolved relative to the platform root.\n",
+        ". " +
+        ".claude/ directories will be resolved relative to that root.\n",
     );
     workspaceRoot = platformRoot;
   }
@@ -62,7 +81,21 @@ export function loadConfig(): PlatformConfig {
   const agentsDir = resolve(workspaceRoot, ".claude", "agents");
   const referencesDir = resolve(workspaceRoot, ".claude", "references");
   const scriptsDir = resolve(workspaceRoot, ".claude", "scripts");
-  const contextGuidesDir = resolve(platformRoot, "sandbox", "context");
+
+  // ---------------------------------------------------------------------------
+  // Discovery block — where this server looks for content that is NOT bundled.
+  // Every entry is overridable, because the built-in defaults cannot be right
+  // for every layout and the previous hardcoded ones were right for exactly one.
+  // ---------------------------------------------------------------------------
+
+  // Context guides. `.claude/context` is the agent-kit-native location; the
+  // legacy `sandbox/context` is still honoured when present so existing trees
+  // (and the contract fixture) keep working.
+  const workspaceContextDir = resolve(workspaceRoot, ".claude", "context");
+  const legacyContextDir = resolve(platformRoot, "sandbox", "context");
+  const contextGuidesDir =
+    process.env.CONTEXT_GUIDES_DIR ||
+    (existsSync(workspaceContextDir) ? workspaceContextDir : legacyContextDir);
 
   // The platform-level CLAUDE.md may live at the repo root or under sandbox/.
   // Prefer the repo root; fall back to sandbox/CLAUDE.md.
@@ -72,28 +105,28 @@ export function loadConfig(): PlatformConfig {
     ? rootClaudeMd
     : sandboxClaudeMd;
 
-  // Bundled data directory — lives at package root (one level above src/).
-  // Works for both the source tree (src/config.ts → ../data/) and the compiled
-  // output (dist/config.js → ../data/) because data/ sits at the package root
-  // in both cases.
-  const currentFile = fileURLToPath(import.meta.url);
-  const dataDir = resolve(dirname(currentFile), "..", "data");
+  // Bundled data directory — lives at the package root, for both the source
+  // tree (src/config.ts → ../data/) and the compiled output (dist/config.js →
+  // ../data/), because data/ sits at the package root in both cases.
+  const dataDir = resolve(packageRoot, "data");
   const dataSkillsDir = resolve(dataDir, "skills");
   const dataAgentsDir = resolve(dataDir, "agents");
   const dataReferencesDir = resolve(dataDir, "references");
   const dataClaudeMdDir = resolve(dataDir, "claude-md");
 
-  // Glob patterns that discover per-app CLAUDE.md files.
-  const claudeMdGlobs = [
-    // Helm charts
-    resolve(platformRoot, "charts", "*", "CLAUDE.md"),
-    // Custom app source
-    resolve(platformRoot, "source", "*", "CLAUDE.md"),
-    // Infrastructure
-    resolve(platformRoot, "infra", "*", "CLAUDE.md"),
-    // CI templates
-    resolve(platformRoot, "ci-cd-templates", "CLAUDE.md"),
-  ];
+  // Glob patterns that discover per-app CLAUDE.md files, RELATIVE to each scan
+  // root (the platform root and, when different, the workspace root).
+  //
+  // These were four absolute employer-monorepo paths that were also never read:
+  // discoverClaudeMdFilesMerged() ignored this field and used its own hardcoded
+  // copy. Now this is the single source of truth and it is actually passed in.
+  // Override with CLAUDE_MD_GLOBS as a comma-separated list.
+  const claudeMdGlobs = (process.env.CLAUDE_MD_GLOBS
+    ? process.env.CLAUDE_MD_GLOBS.split(",")
+    : DEFAULT_CLAUDE_MD_GLOBS
+  )
+    .map((pattern) => pattern.trim())
+    .filter((pattern) => pattern.length > 0);
 
   // ---------------------------------------------------------------------------
   // Token log path — controls where per-call token estimates are written.

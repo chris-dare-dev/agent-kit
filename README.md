@@ -76,22 +76,54 @@ index and the memory tools, and the artifact-memory tools are not registered at 
 ## Quick start
 
 ```bash
+git clone https://github.com/chris-dare-dev/agent-kit
+cd agent-kit
 npm ci && npm run build
 
-claude mcp add agent-kit -- node /abs/path/to/agent-kit/dist/index.js
+claude mcp add agent-kit -- node "$PWD/dist/index.js"
 ```
+
+No environment variables are required: with none set, the server serves the
+content bundled in `data/` and resolves everything else relative to the package
+root. `PLATFORM_ROOT` (extra content root), `WORKSPACE_ROOT`, `MEMORY_ROOT`,
+`CONTEXT_GUIDES_DIR` and `CLAUDE_MD_GLOBS` are optional overrides — see the
+header of [`src/config.ts`](./src/config.ts).
+
+That block is executed by `node scripts/verify-quickstart.mjs`, so if it drifts
+from what actually works, the check fails.
 
 The substrate is separate and optional — see
 [`workspace-tooling/README.md`](./workspace-tooling/README.md) for provisioning
 (Docker + Qdrant + a Python 3.12 venv from the pinned lockfile).
 
+## Supported platforms
+
+The MCP server runs everywhere. The substrate does not yet — it imports `fcntl`
+and `os.geteuid` at module scope and binds an AF_UNIX socket, so on Windows it
+cannot even be imported. That work is scheduled, and this table is what is true
+today rather than what is intended.
+
+| Component | macOS | Linux | Windows |
+|---|---|---|---|
+| MCP server (`dist/index.js`, 13 tools) | ✅ | ✅ | ✅ |
+| Artifact-memory tools (4, over a Unix socket) | ✅ | ✅ | ❌ — no AF_UNIX ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) |
+| Python substrate + its test suite | ✅ | ✅ | ❌ WSL2 only ([M2](https://github.com/chris-dare-dev/agent-kit/milestone/2)) |
+| Shell hooks (`data/hooks/*.sh`, bash + jq) | ✅ | ✅ | ❌ — fail open, do not run ([M3](https://github.com/chris-dare-dev/agent-kit/milestone/3)) |
+| Obsidian vault projection (symlinks, `dir_fd`) | ✅ | ✅ | ❌ ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) |
+| Service supervision (launchd `.plist` only) | ✅ | ❌ ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) | ❌ ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) |
+
+On Windows the server starts and serves the 13 non-substrate tools, and says on
+stderr exactly which group is unavailable and why.
+
 ## Testing
 
 ```bash
-npm test                                   # MCP contract + golden tool list + transport lock
+npm test                                   # MCP contract + config + transport lock
+npm run verify:quickstart                  # executes the Quick start block above
 
-python3 -m unittest discover -s workspace-tooling/tests \
-        -p 'test_*.py' -t workspace-tooling/tests    # substrate suite (~590 tests)
+# substrate suite (593 tests) — POSIX only; declines with a banner on Windows.
+# Needs the provisioned venv: ~30 cases import qdrant_client at call time.
+python3 workspace-tooling/run-substrate-tests.py
 
 # the four generator gates — all must be clean before committing data/ changes
 python3 data/scripts/catalog-generate.py --check
@@ -126,4 +158,8 @@ attribution and the one deliberate deviation.
 
 ## Requirements
 
-Node ≥ 20 · Python 3.12 (substrate only) · Docker (Qdrant, substrate only)
+**Server:** Node ≥ 20. Nothing else — macOS, Linux and Windows alike.
+
+**Substrate (optional):** Python 3.12 · Docker (Qdrant) · macOS or Linux, or
+Windows via WSL2. See [Supported platforms](#supported-platforms); the substrate
+does not run natively on Windows today.

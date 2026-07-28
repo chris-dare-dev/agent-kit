@@ -66,6 +66,7 @@ const [skills, agents, references, contextGuides, memories, claudeMdFiles] =
       config.platformRoot,
       config.workspaceRoot,
       config.dataClaudeMdDir,
+      config.claudeMdGlobs,
     ),
   ]);
 

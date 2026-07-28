@@ -70,16 +70,28 @@ is the compose *definition*; the Qdrant volume is Docker-managed.
 
 ## Run the tests
 
+**POSIX only.** This substrate imports `fcntl` and `os.geteuid` at module scope
+and binds an AF_UNIX socket, so on Windows it cannot be imported, let alone
+tested. Use macOS, Linux, or Windows via WSL2 — see
+[Supported platforms](../README.md#supported-platforms).
+
 ```bash
 cd <repo-root>
 PYTHONPATH="$PWD/workspace-tooling" \
   ~/.local/share/workspace-artifacts/venv/bin/python \
-  -m unittest discover -s workspace-tooling/tests -p "test_*.py" -t workspace-tooling/tests
+  workspace-tooling/run-substrate-tests.py
 ```
 
+`run-substrate-tests.py` prints a single explanatory banner and does nothing on
+an unsupported platform, instead of emitting ~169 import errors that look like
+substrate defects. It is not a pass — nothing is verified there.
+
+Use the provisioned venv, not the system interpreter: roughly 30 cases import
+`qdrant_client` at call time and error without it.
+
 `tests/` has no `__init__.py`, so plain `unittest discover -s tests` raises
-`Start directory is not importable`. Both `PYTHONPATH` and `-t` are required.
-CI runs exactly this (`substrate-test` in `.gitlab-ci.yml`).
+`Start directory is not importable`. Both `PYTHONPATH` and `-t` are required if
+you invoke `unittest discover` directly.
 
 The suite is **hermetic** — no Qdrant, FalkorDB or network access needed. Every
 `127.0.0.1:6333` in `tests/` is a config fixture or mock return value, and the
