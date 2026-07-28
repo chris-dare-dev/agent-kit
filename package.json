@@ -6,13 +6,19 @@
   "engines": {
     "node": ">=20"
   },
+  "bin": {
+    "agent-kit": "scripts/cli.mjs"
+  },
   "scripts": {
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "build": "tsc",
     "test": "node --import tsx --test src/mcp-contract.test.ts src/server-profile.test.ts src/transport-lock.test.ts src/config.test.ts src/tools/artifact-memory.test.ts",
     "test:update-golden": "node scripts/update-golden.mjs",
-    "verify:quickstart": "node scripts/verify-quickstart.mjs"
+    "verify:quickstart": "node scripts/verify-quickstart.mjs",
+    "init": "node scripts/init.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "test:init": "node --test tests/init.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.750.0",

@@ -92,6 +92,19 @@ header of [`src/config.ts`](./src/config.ts).
 That block is executed by `node scripts/verify-quickstart.mjs`, so if it drifts
 from what actually works, the check fails.
 
+Optionally, plant the bundled skills, agents, commands and hooks into a
+workspace's `.claude/`, and check your machine:
+
+```bash
+node scripts/cli.mjs init      # symlink on POSIX, copy on Windows
+node scripts/cli.mjs doctor    # one PASS/FAIL/SKIP row per prerequisite
+```
+
+`init` refuses to touch anything it did not create unless you pass `--force`,
+never writes outside the clone without `--install-to`, and records every path it
+touched in `.agent-kit/install-receipt.json`. Run `init --dry-run` to see the
+plan first.
+
 The substrate is separate and optional — see
 [`workspace-tooling/README.md`](./workspace-tooling/README.md) for provisioning
 (Docker + Qdrant + a Python 3.12 venv from the pinned lockfile).
@@ -125,12 +138,17 @@ npm run verify:quickstart                  # executes the Quick start block abov
 # Needs the provisioned venv: ~30 cases import qdrant_client at call time.
 python3 workspace-tooling/run-substrate-tests.py
 
-# the four generator gates — all must be clean before committing data/ changes
-python3 data/scripts/catalog-generate.py --check
-python3 data/scripts/generate-adapter-packs.py --check
-python3 data/scripts/generate-root-contract.py --check
-python3 data/scripts/model-policy-apply.py --check
+# the four generator gates — all must be clean before committing data/ changes.
+# PYTHONUTF8=1 is REQUIRED on Windows: without it these mis-decode UTF-8 content
+# under a non-UTF-8 console codepage and report drift that is not there.
+PYTHONUTF8=1 python3 data/scripts/catalog-generate.py --check
+PYTHONUTF8=1 python3 data/scripts/generate-adapter-packs.py --check
+PYTHONUTF8=1 python3 data/scripts/generate-root-contract.py --check
+PYTHONUTF8=1 python3 data/scripts/model-policy-apply.py --check
 ```
+
+`agent-kit doctor` runs all of the above prerequisite checks in one pass, with
+the right encoding, and prints a fix command per failure.
 
 `AGENTS.md` and `CONTEXT.md` are **generated** — edit the coverage map, then regenerate.
 
