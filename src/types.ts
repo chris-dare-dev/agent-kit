@@ -1,3 +1,13 @@
+/** The content tiers this server indexes. Declared ONCE — src/search/indexer.ts
+ * used to re-declare the same union, so adding a tier meant remembering both. */
+export type ContentType =
+  | "skill"
+  | "agent"
+  | "reference"
+  | "context-guide"
+  | "claude-md"
+  | "memory";
+
 /**
  * Shared type definitions for the platform MCP server.
  */
@@ -81,7 +91,7 @@ export interface SearchResult {
   /** Relevance score (higher is better, 0-1 range). */
   score: number;
   /** Content category. */
-  type: "skill" | "agent" | "reference" | "context-guide" | "claude-md" | "memory";
+  type: ContentType;
 }
 
 /**

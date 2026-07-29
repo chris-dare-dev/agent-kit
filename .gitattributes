@@ -1,0 +1,28 @@
+# Line endings and executability, pinned.
+#
+# The repo had no .gitattributes and its single commit was made under
+# core.filemode=false (the Git-for-Windows default), so no tracked file carried
+# the executable bit and a contributor with core.autocrlf=true checked out CRLF
+# shell scripts that fail on POSIX with `bad interpreter: /usr/bin/env bash^M`.
+# The owner's own clone is core.autocrlf=input, which is exactly why this was
+# invisible from here.
+
+* text=auto eol=lf
+
+*.sh    text eol=lf
+*.py    text eol=lf
+*.mjs   text eol=lf
+*.ts    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.toml  text eol=lf
+*.plist text eol=lf
+*.jsonl text eol=lf
+
+# PowerShell is the one thing that genuinely wants CRLF.
+*.ps1   text eol=crlf
+
+*.png binary
+*.gz  binary

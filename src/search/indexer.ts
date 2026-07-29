@@ -5,7 +5,9 @@
  * The corpus is ~800KB of markdown, so indexing is instant.
  */
 
-// ── Types (self-contained — no imports from types.ts) ──────────────────────
+import type { ContentType } from "../types.js";
+
+// ── Types ─────────────────────────────────────────────────────────────────
 
 /** A document to be indexed for full-text search. */
 export interface SearchDocument {
@@ -16,7 +18,7 @@ export interface SearchDocument {
   /** Full text content of the document. */
   content: string;
   /** Content category. */
-  type: 'skill' | 'agent' | 'reference' | 'context-guide' | 'claude-md' | 'memory';
+  type: ContentType;
 }
 
 /** The search index: original documents plus an inverted term-to-document mapping. */

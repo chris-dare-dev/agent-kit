@@ -2,6 +2,15 @@
   "name": "@chris-dare-dev/agent-kit",
   "version": "0.1.0",
   "description": "Personal provider-neutral agent kit + artifact-memory substrate (fork of the kit architecture)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chris-dare-dev/agent-kit.git"
+  },
+  "homepage": "https://github.com/chris-dare-dev/agent-kit#readme",
+  "bugs": {
+    "url": "https://github.com/chris-dare-dev/agent-kit/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=20"

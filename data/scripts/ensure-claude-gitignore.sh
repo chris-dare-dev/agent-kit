@@ -57,6 +57,10 @@ cat >> "$EXCLUDE" <<'EOF'
 .claude/notes/
 .claude/agent-memory/
 .claude/settings.local.json
+# The token log keeps a 120-char raw preview of every tool call's arguments under
+# the default personal profile; the cache snapshot keeps raw argsKeys.
+.claude/mcp-token-log*.jsonl
+.claude/mcp-cache-snapshot*.jsonl
 *_adversary_critique.md
 *_infra_critique.md
 *_frontend_critique.md

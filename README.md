@@ -70,6 +70,17 @@ a composite health watermark, an age-encrypted off-device backup with a fail-clo
 All are read-only. The server exposes exactly one transport (stdio); a static tripwire
 test fails if an HTTP/SSE transport is ever imported.
 
+> **What the default profile writes to disk.** Under the default
+> `SERVER_PROFILE=personal`, the token log keeps a **120-character raw preview of
+> every tool call's arguments** (`summarizeArgs`), and the response-cache
+> snapshot keeps raw `argsKeys`. Both default to
+> `$WORKSPACE_ROOT/.claude/mcp-token-log.jsonl` and
+> `$WORKSPACE_ROOT/.claude/mcp-cache-snapshot.jsonl`. `SERVER_PROFILE=shared`
+> switches the log to `hashArgs` and writes to distinct `*.shared.jsonl` files.
+> Both patterns are gitignored, but if you point `TOKEN_LOG_PATH` or
+> `CACHE_SNAPSHOT_PATH` somewhere else, that is on you. Set either to `""` to
+> disable it.
+
 Under `SERVER_PROFILE=shared` the personal-memory tier is excluded from both the search
 index and the memory tools, and the artifact-memory tools are not registered at all.
 

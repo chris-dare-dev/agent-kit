@@ -1,3 +1,13 @@
+---
+project: agent-kit
+type: doc
+authorship: agent-generated
+tags:
+- project/agent-kit
+- type/doc
+- authorship/agent-generated
+---
+
 # Spike: what does keeping the Graphiti pilot actually cost?
 
 - **Issue:** [#14](https://github.com/chris-dare-dev/agent-kit/issues/14), feeding the owner decision [#15](https://github.com/chris-dare-dev/agent-kit/issues/15)

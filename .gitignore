@@ -4,3 +4,10 @@ __pycache__/
 *.pyc
 .DS_Store
 npm-debug.log*
+
+# Runtime logs written under the DEFAULT personal profile. The token log stores a
+# 120-character raw preview of every tool call's arguments (summarizeArgs), and the
+# cache snapshot stores raw argsKeys -- neither belongs in a public repository.
+# Only SERVER_PROFILE=shared switches the log to hashed arguments.
+.claude/mcp-token-log*.jsonl
+.claude/mcp-cache-snapshot*.jsonl
