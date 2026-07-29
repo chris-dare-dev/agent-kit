@@ -62,7 +62,7 @@ CANONICAL_COMPOSE = Path(__file__).parent / "services" / "qdrant" / "compose.yam
 SOCKET_RELATIVE_PARTS = ("services", "qdrant", "artifact-memory.sock")
 SERVICE_ROOT = artifact_runtime.derived_root().joinpath(*SOCKET_RELATIVE_PARTS[:-1])
 GENERATION = "p20260721v1"
-COLLECTION = f"personal_artifact_chunks_{GENERATION}"
+COLLECTION = ingestion.collection_for(GENERATION)
 # Loopback port for this deployment's Qdrant (6343 main / 6345 restore-test), kept
 # clear of the upstream 6333/6335 so a co-resident work stack cannot collide. A
 # module constant so the runtime template and its tests cannot drift apart.

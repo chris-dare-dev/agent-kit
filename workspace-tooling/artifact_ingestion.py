@@ -53,7 +53,25 @@ DEFAULT_CATALOG = DEFAULT_DERIVED_ROOT / "artifact-catalog.sqlite3"
 DEFAULT_STATE = DEFAULT_DERIVED_ROOT / "ingestion-state.sqlite3"
 DEFAULT_QDRANT_PATH = DEFAULT_DERIVED_ROOT / "qdrant"
 DEFAULT_MODEL_CACHE = DEFAULT_DERIVED_ROOT / "model-cache"
-DEFAULT_COLLECTION = "personal_artifact_chunks_v1"
+COLLECTION_PREFIX = "personal_artifact_chunks"
+# The embedded store's generation. Kept as the bare "v1" so the resulting
+# collection name is byte-identical to the one existing embedded stores were
+# created with -- renaming it would orphan their data.
+EMBEDDED_GENERATION = "v1"
+
+
+def collection_for(generation: str) -> str:
+    """Build a collection name from a generation.
+
+    THE only way a collection name may be constructed. The embedded default and
+    the provisioner used to build their names independently, so they disagreed
+    (`..._v1` here, `..._p20260721v1` there) and the fallback search path queried
+    a collection the provisioner never creates.
+    """
+    return f"{COLLECTION_PREFIX}_{generation}"
+
+
+DEFAULT_COLLECTION = collection_for(EMBEDDED_GENERATION)
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_CHUNK_PROFILE_ID = "markdown-heading-char-v1"
 DEFAULT_NORMALIZATION_VERSION = "utf8-replace-strip-v1"

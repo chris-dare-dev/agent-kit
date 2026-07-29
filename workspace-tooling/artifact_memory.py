@@ -255,16 +255,39 @@ def search_artifacts(
     # answers from the retained rollback copy and takes the local-mode lock on
     # a store the configuration declares read-only.
     runtime, _ = _runtime_selector(config_path)
-    if runtime is not None and runtime.active_backend == "server":
+    if runtime is None:
+        # Fail loudly. This used to fall through to the embedded branch below
+        # with ingestion.DEFAULT_COLLECTION, which the provisioner never
+        # creates -- so an unreadable config degraded into querying a
+        # non-existent collection and returning zero hits that were
+        # indistinguishable from "nothing matched". A search that cannot know
+        # which store to read must say so, not answer emptily.
+        raise MemoryReadError(
+            "artifact memory runtime configuration could not be read: "
+            f"{config_path}. Provision the substrate, or set "
+            "AGENT_KIT_DERIVED_ROOT to the root that holds it."
+        )
+    if runtime.active_backend == "server":
         return _server_search(runtime, {"query": query, "limit": limit, **filters})
+    # Embedded backend: take the collection and model from the SAME runtime
+    # configuration the server branch uses, so the two branches can never
+    # select different collections for one config.
     result = ingestion.qdrant_search(
         workspace=workspace,
         catalog=catalog,
         local_path=ingestion.DEFAULT_QDRANT_PATH,
         url=None,
         api_key_env="QDRANT_API_KEY",
-        collection=ingestion.DEFAULT_COLLECTION,
-        embedding_model=ingestion.DEFAULT_EMBEDDING_MODEL,
+        collection=runtime.qdrant_collection,
+        # The retrieval block is optional (the legacy vector generation has no
+        # lexical index and omits it), so fall back to the ingestion default
+        # only for the model. The COLLECTION is the field that actually
+        # diverged, and it always comes from the runtime config now.
+        embedding_model=getattr(
+            getattr(runtime, "retrieval", None),
+            "embedding_model",
+            ingestion.DEFAULT_EMBEDDING_MODEL,
+        ),
         query=query,
         limit=limit,
         current_only=True,

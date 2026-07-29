@@ -1,7 +1,7 @@
 # `workspace-tooling/` — artifact-memory substrate + vault projection tooling
 
-Python tooling that runs **against the workspace on an engineer's Mac**, not
-in a cluster. Two families share this directory:
+Python tooling that runs **against the workspace on an engineer's own machine**
+(macOS or Linux; Windows via WSL2), not in a cluster. Two families share this directory:
 
 | Family | Modules | Dependencies |
 |---|---|---|
@@ -21,8 +21,10 @@ change embedding numerics or locking behavior with **no diffable record**, and a
 replacement machine could not faithfully reproduce the stack. Hash-pinned tar
 archives gave byte identity but neither provenance nor reinstallability.
 
-Versioning the tree, locking the transitive closure, and running the suite in CI
-is what closes that finding.
+Versioning the tree and locking the transitive closure is what closes the
+reproducibility half of that finding. The enforcement half is NOT closed: there
+is no CI in this repository yet, so nothing runs this suite automatically. That
+is milestone M3.
 
 ## Layout
 
@@ -48,23 +50,35 @@ not "tidy" it into `src/` without reworking both.
 Requires **Python 3.12**. The suite fails on 3.9 (27 failures) — the modules use
 3.10+ syntax, so a wrong interpreter looks like a real regression.
 
+Paths below use the DEFAULT derived root. It resolves in this order, and every
+path in this document follows it:
+
+1. `AGENT_KIT_DERIVED_ROOT` if set
+2. `$XDG_DATA_HOME/agent-kit` if set
+3. per-OS default — `~/.local/share/agent-kit` (Linux),
+   `~/Library/Application Support/agent-kit` (macOS),
+   `%LOCALAPPDATA%gent-kit` (Windows)
+
+`artifact_runtime.derived_root()` is the single implementation; substitute your
+own root below if you set either variable.
+
 ```bash
-python3.12 -m venv ~/.local/share/workspace-artifacts/venv
-~/.local/share/workspace-artifacts/venv/bin/python -m pip install --upgrade pip
+python3.12 -m venv ~/.local/share/agent-kit/venv
+~/.local/share/agent-kit/venv/bin/python -m pip install --upgrade pip
 # Install the LOCK, not the top-level pins — the lock is the proven closure.
-~/.local/share/workspace-artifacts/venv/bin/python -m pip install \
+~/.local/share/agent-kit/venv/bin/python -m pip install \
     -r workspace-tooling/requirements-artifact-ingestion.lock.txt
 ```
 
 The venv lives **outside** the repo, at
-`~/.local/share/workspace-artifacts/venv`, because the LaunchAgent plists reference
+`~/.local/share/agent-kit/venv`, because the LaunchAgent plists reference
 that absolute interpreter path.
 
 ### Runtime state is not in git
 
 All mutable state — catalog and retrieval SQLite databases, health files, the
 runtime config, eval outputs (~2.7 GB) — lives in
-`~/.local/share/workspace-artifacts/`. Nothing under `workspace-tooling/` is written
+`~/.local/share/agent-kit/`. Nothing under `workspace-tooling/` is written
 at runtime, so there is no state to gitignore here. `services/qdrant/compose.yaml`
 is the compose *definition*; the Qdrant volume is Docker-managed.
 
@@ -78,7 +92,7 @@ tested. Use macOS, Linux, or Windows via WSL2 — see
 ```bash
 cd <repo-root>
 PYTHONPATH="$PWD/workspace-tooling" \
-  ~/.local/share/workspace-artifacts/venv/bin/python \
+  ~/.local/share/agent-kit/venv/bin/python \
   workspace-tooling/run-substrate-tests.py
 ```
 
@@ -130,5 +144,5 @@ and three resolve it through `$PERSONAL_WORKSPACE_ROOT/scripts/` (`workspace-vau
 
 `$PERSONAL_WORKSPACE_ROOT/scripts` is a **symlink into this directory**, which is why
 all six keep working unchanged. Repointing the plists at the repo path is optional
-cleanup, not a prerequisite — see `docs/f10-launchagent-cutover.md`. The
+cleanup, not a prerequisite. The
 `artifact-memory-service` agent is `KeepAlive`; treat it as a live service.

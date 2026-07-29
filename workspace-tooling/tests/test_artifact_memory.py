@@ -18,6 +18,7 @@ sys.path.insert(0, str(TEST_DIR))
 
 import artifact_memory as memory  # noqa: E402
 import artifact_service_client as service_client  # noqa: E402
+import artifact_runtime  # noqa: E402
 from test_artifact_runtime import RuntimeFixture  # noqa: E402
 
 
@@ -85,10 +86,19 @@ class ArtifactMemoryControlTests(unittest.TestCase):
         post.assert_not_called()
 
     def test_current_search_is_hard_clamped_to_current_only(self) -> None:
-        # Pinned to an unreadable runtime configuration so this stays a test of
-        # the embedded read path rather than of whichever backend the machine
-        # running the suite happens to declare.
+        # Pinned to a STUBBED embedded runtime so this stays a test of the
+        # embedded read path rather than of whichever backend the machine
+        # running the suite happens to declare. It used to pin to an unreadable
+        # config, which silently degraded to the embedded branch; that degrade
+        # is now a hard error, so the backend is stubbed explicitly instead.
+        embedded = mock.Mock(
+            active_backend="embedded",
+            qdrant_collection="personal_artifact_chunks_v1",
+            embedding_model="sentence-transformers/all-MiniLM-L6-v2",
+        )
         with mock.patch.object(
+            memory, "_runtime_selector", return_value=(embedded, {})
+        ), mock.patch.object(
             memory.ingestion,
             "qdrant_search",
             return_value={"results": []},
@@ -104,7 +114,6 @@ class ArtifactMemoryControlTests(unittest.TestCase):
                 authority_class=None,
                 repository=None,
                 lifecycle_hint=None,
-                config_path=self.root / "absent-runtime.json",
             )
         self.assertEqual(result["results"], [])
         self.assertTrue(search.call_args.kwargs["current_only"])
@@ -677,22 +686,39 @@ class SearchBackendSelectionTests(unittest.TestCase):
 
         post.assert_not_called()
         self.assertTrue(self.embedded_search.call_args.kwargs["current_only"])
+        # The collection must come from the SAME runtime config the server
+        # branch reads. Asserting ingestion.DEFAULT_COLLECTION here is what let
+        # the two branches select different collections for one config.
+        declared = artifact_runtime.load_runtime(config).qdrant_collection
         self.assertEqual(
             self.embedded_search.call_args.kwargs["collection"],
-            memory.ingestion.DEFAULT_COLLECTION,
+            declared,
         )
         self.assertEqual(result["authority"], "discovery-only")
 
-    def test_unreadable_runtime_config_degrades_to_the_embedded_store(
+    def test_unreadable_runtime_config_fails_loudly_instead_of_degrading(
         self,
     ) -> None:
+        """CONTRACT CHANGE: an unreadable config is an error, not a fallback.
+
+        This previously asserted that search degraded to the embedded store. It
+        could only ever return zero hits: the fallback used
+        ingestion.DEFAULT_COLLECTION, which the provisioner never creates, so
+        "degraded" meant querying a collection that does not exist and
+        answering emptily -- indistinguishable from "nothing matched". With no
+        config there is no collection name to use, so the only honest answer is
+        to say which file could not be read.
+        """
+        missing = self.fixture.derived / "absent-runtime.json"
         self.embedded_search.side_effect = None
         self.embedded_search.return_value = {"results": []}
         with mock.patch.object(service_client, "post_json") as post:
-            self._search(self.fixture.derived / "absent-runtime.json")
+            with self.assertRaises(memory.MemoryReadError) as raised:
+                self._search(missing)
 
+        self.assertIn(str(missing), str(raised.exception))
         post.assert_not_called()
-        self.embedded_search.assert_called_once()
+        self.embedded_search.assert_not_called()
 
 
 if __name__ == "__main__":

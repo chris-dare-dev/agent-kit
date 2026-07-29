@@ -21,7 +21,7 @@ python3 scripts/artifact_catalog.py --dry-run --json-summary
 ```
 
 The default derived output is outside the vault at
-`~/.local/share/workspace-artifacts/`:
+`~/.local/share/agent-kit/`:
 
 ```sh
 python3 scripts/artifact_catalog.py --json-summary
@@ -40,7 +40,7 @@ Use an alternative derived-output directory for experiments:
 python3 scripts/artifact_catalog.py \
   --workspace $HOME/Work/workspace \
   --policy scripts/artifact-policy.json \
-  --output-dir /tmp/workspace-artifacts \
+  --output-dir /tmp/agent-kit-catalog \
   --json-summary
 ```
 

@@ -73,6 +73,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import artifact_unit_archive as unit_archive  # noqa: E402
 import artifact_runtime
+import artifact_memory_provision as provision
 
 SCHEMA_VERSION = 1
 
@@ -88,7 +89,9 @@ DEFAULT_ARCHIVE = DEFAULT_DERIVED_ROOT / "artifact-unit-archive.sqlite3"
 # collection across url sinks rather than one exact descriptor string: being
 # over-inclusive here can only enlarge the irreproducible set, which biases
 # toward RETAIN. Narrowing it is the risky direction, so it is opt-in.
-DEFAULT_TARGET_LIKE = "url:%personal_artifact_chunks_p20260721v1%"
+# Derived, not hardcoded: pinning the generation here meant a generation
+# bump silently kept targeting the previous collection.
+DEFAULT_TARGET_LIKE = f"url:%{provision.COLLECTION}%"
 
 UNITS_FILENAME = "ingest-units.jsonl.gz"
 MANIFEST_FILENAME = "manifest.json"

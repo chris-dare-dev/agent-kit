@@ -36,7 +36,7 @@ Python 3.12 and the pinned packages in
 Obsidian/workspace tree:
 
 ```sh
-DERIVED="$HOME/.local/share/workspace-artifacts"
+DERIVED="$HOME/.local/share/agent-kit"
 python3.12 -m venv "$DERIVED/venv"
 "$DERIVED/venv/bin/python" -m pip install \
   -r scripts/requirements-artifact-ingestion.txt
@@ -68,7 +68,7 @@ python3 scripts/artifact_ingestion.py prepare
 The default location is:
 
 ```text
-~/.local/share/workspace-artifacts/outbox/catalog-run-<run>-chunks-v2/
+~/.local/share/agent-kit/outbox/catalog-run-<run>-chunks-v2/
 ├── ingest-units.jsonl.gz
 └── manifest.json
 ```
@@ -92,7 +92,7 @@ The original Phase 2 run 4 produced 35,350 units from 7,594 non-empty
 artifacts. That 47 MB v1 outbox is retained as immutable evidence:
 
 ```text
-~/.local/share/workspace-artifacts/outbox/catalog-run-4-chunks-v1
+~/.local/share/agent-kit/outbox/catalog-run-4-chunks-v1
 ```
 
 V1 remains valid input for Qdrant replay. Graphiti apply from v1 is now
@@ -106,14 +106,14 @@ shared `graphiti_group_prefix`.
 The default is persistent embedded Qdrant storage at:
 
 ```text
-~/.local/share/workspace-artifacts/qdrant
+~/.local/share/agent-kit/qdrant
 ```
 
 Plan a stable chronological prefix:
 
 ```sh
-V="$HOME/.local/share/workspace-artifacts/venv/bin/python"
-OUTBOX="$HOME/.local/share/workspace-artifacts/outbox/catalog-run-7-chunks-v2"
+V="$HOME/.local/share/agent-kit/venv/bin/python"
+OUTBOX="$HOME/.local/share/agent-kit/outbox/catalog-run-7-chunks-v2"
 
 "$V" scripts/artifact_ingestion.py qdrant \
   --outbox "$OUTBOX" \
@@ -227,7 +227,7 @@ persistence in the derived-data tree:
 
 ```sh
 docker-compose \
-  -f "$HOME/.local/share/workspace-artifacts/services/falkordb/compose.yaml" \
+  -f "$HOME/.local/share/agent-kit/services/falkordb/compose.yaml" \
   up -d
 ```
 
@@ -348,7 +348,7 @@ The preserved `qwen3:14b` results are:
   attribute extraction for more than 20 minutes. The attempt was interrupted
   before persistence; its namespace contains zero nodes. Its immutable report
   is
-  `~/.local/share/workspace-artifacts/graphiti-pilots/qwen3_14b/pilot-v1-report.json`.
+  `~/.local/share/agent-kit/graphiti-pilots/qwen3_14b/pilot-v1-report.json`.
 - **v2 quality failure:** `reasoning_effort=none` reduced the decision case to
   67 seconds and persisted one correctly namespaced episode with 9 entities
   and 8 facts. Temporal fields, provenance, required-term recall, typing, and
@@ -356,13 +356,13 @@ The preserved `qwen3:14b` results are:
   (`matchesKind` and `writescope.Check()`) and semantic relations outside the
   controlled vocabulary (`Extends` and `Rejects`). The run stopped before the
   handoff and roadmap cases. Its immutable report is
-  `~/.local/share/workspace-artifacts/graphiti-pilots/qwen3_14b/pilot-v2-report.json`.
+  `~/.local/share/agent-kit/graphiti-pilots/qwen3_14b/pilot-v2-report.json`.
 - **v3 pre-persistence rejection:** the new exact-object entity guard rejected
   `writescope.Check()` and `matchesKind` in 18 seconds, before Graphiti could
   resolve or save them. The fresh v3 decision namespace contains 0 episodes,
   0 entities, and 0 facts; the handoff and roadmap cases were not started.
   The immutable report is
-  `~/.local/share/workspace-artifacts/graphiti-pilots/qwen3_14b/pilot-v3-report.json`.
+  `~/.local/share/agent-kit/graphiti-pilots/qwen3_14b/pilot-v3-report.json`.
 
 `graphiti_policy.py` now wraps the exact extracted nodes and edges used by
 `Graphiti.add_episode`. It blocks incidental path/config/code/hash entities,
@@ -407,7 +407,7 @@ The skills add `--apply` after their own terminal gate. Apply creates exactly
 one exclusive `0600` JSON receipt:
 
 ```text
-~/.local/share/workspace-artifacts/skill-events/<event-prefix>/<event-sha256>.json
+~/.local/share/agent-kit/skill-events/<event-prefix>/<event-sha256>.json
 ```
 
 The event ID is deterministic over producer, stable run ID, and the sorted
@@ -469,7 +469,7 @@ python3 scripts/artifact_event_consumer.py dead-letter resolve \
 ```
 
 The consumer state is
-`~/.local/share/workspace-artifacts/artifact-event-consumer.sqlite3`; per-event
+`~/.local/share/agent-kit/artifact-event-consumer.sqlite3`; per-event
 outboxes are named `skill-event-<sha256>-chunks-v2`. Neither is stored in the
 workspace. The catalog records complete, degraded, and failed scan attempts;
 only the latest complete generation can become authoritative for retrieval,
@@ -506,7 +506,7 @@ python3 scripts/artifact_quarantine.py stage --apply
 The sealed set lives outside the workspace:
 
 ```text
-~/.local/share/workspace-artifacts/quarantine/sets/<set-sha256>/
+~/.local/share/agent-kit/quarantine/sets/<set-sha256>/
 ├── files/          # verified 0400 copies of eligible artifacts only
 └── manifest.json   # written last; eligible, review, and blocked queues
 ```
@@ -610,7 +610,7 @@ stderr logs go to
 `~/Library/Logs/workspace-artifact-event-consumer.out.log` and
 `~/Library/Logs/workspace-artifact-event-consumer.error.log`. Each monitored run
 also atomically updates the owner-only
-`~/.local/share/workspace-artifacts/artifact-event-consumer-health.json` file and
+`~/.local/share/agent-kit/artifact-event-consumer-health.json` file and
 emits a deduplicated local notification when health first becomes degraded.
 
 ## 8. Checkpoints and recovery
@@ -622,7 +622,7 @@ emits a deduplicated local notification when health first becomes degraded.
 The default state database is:
 
 ```text
-~/.local/share/workspace-artifacts/ingestion-state.sqlite3
+~/.local/share/agent-kit/ingestion-state.sqlite3
 ```
 
 Checkpoints are scoped by sink, location, collection/database, and model
@@ -740,7 +740,7 @@ python3 scripts/artifact_supervisor_receipt.py emit \
 ```
 
 Add `--apply` to write it. Receipts land under
-`~/.local/share/workspace-artifacts/supervisor-events/`, content-addressed and
+`~/.local/share/agent-kit/supervisor-events/`, content-addressed and
 0600, published by the same atomic no-replace link as skill-capture receipts —
 an existing receipt is never overwritten.
 

@@ -65,6 +65,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 import artifact_runtime
+import artifact_memory_provision as provision
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -79,7 +80,9 @@ DEFAULT_INGESTION_STATE = DEFAULT_DERIVED_ROOT / "ingestion-state.sqlite3"
 DEFAULT_REPLAY = DEFAULT_DERIVED_ROOT / "qdrant-shadow-replay.sqlite3"
 DEFAULT_ARCHIVE = DEFAULT_DERIVED_ROOT / "artifact-unit-archive.sqlite3"
 
-DEFAULT_TARGET_LIKE = "url:%personal_artifact_chunks_p20260721v1%"
+# Derived, not hardcoded: pinning the generation here meant a generation
+# bump silently kept targeting the previous collection.
+DEFAULT_TARGET_LIKE = f"url:%{provision.COLLECTION}%"
 
 UNITS_FILENAME = "ingest-units.jsonl.gz"
 MANIFEST_FILENAME = "manifest.json"
