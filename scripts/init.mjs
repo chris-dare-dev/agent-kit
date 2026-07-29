@@ -151,11 +151,27 @@ function main() {
   // depend on where the clone happens to sit.
   if (args.buildOnly) {
     // npm is a .cmd shim on Windows, which spawn cannot exec without a shell.
-    const r = spawnSync("npm", ["run", "build"], {
-      cwd: CLONE_ROOT,
-      stdio: "inherit",
-      shell: process.platform === "win32",
-    });
+    const npm = (npmArgs) =>
+      spawnSync("npm", npmArgs, {
+        cwd: CLONE_ROOT,
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
+
+    // A genuinely bare clone has no node_modules, so tsc is not there to run.
+    // Install first — the script this replaces did `npm install && npm run
+    // build`, and "build-only" that cannot build on a fresh clone is useless.
+    if (!existsSync(join(CLONE_ROOT, "node_modules"))) {
+      info("node_modules missing — installing dependencies first");
+      const lockfile = existsSync(join(CLONE_ROOT, "package-lock.json"));
+      const install = npm([lockfile ? "ci" : "install"]);
+      if (install.status !== 0) {
+        console.error(`dependency install failed (${install.error?.message ?? `exit ${install.status}`})`);
+        return install.status ?? 1;
+      }
+    }
+
+    const r = npm(["run", "build"]);
     if (r.status !== 0) {
       console.error(`build failed (${r.error?.message ?? `exit ${r.status}`})`);
       return r.status ?? 1;
@@ -272,6 +288,39 @@ function main() {
       at,
     });
     ok(`${(existed ? "overwritten" : "created").padEnd(11)} ${target}`);
+  }
+
+  // MCP registration. The shipped template carries ${AGENT_KIT_ROOT} rather than
+  // a baked path — the old one hardcoded an employer monorepo path whose entry
+  // point does not exist here, so the registration it produced could not launch.
+  const mcpTemplate = join(DATA_DIR, "scripts", "template-mcp.json");
+  const mcpTarget = join(workspaceRoot, ".mcp.json");
+  if (!existsSync(mcpTemplate)) {
+    warn(`plant source missing, skipped: ${mcpTemplate}`);
+  } else if (existsSync(mcpTarget) && !isOurs(mcpTarget, receipt) && !args.force) {
+    warn(`skipped ${mcpTarget} — exists and was not created by this installer (use --force)`);
+  } else if (args.dryRun) {
+    info(`would have written ${mcpTarget}`);
+  } else {
+    const existed = existsSync(mcpTarget);
+    const shaBefore = existed ? sha256(mcpTarget) : undefined;
+    const rendered = readFileSync(mcpTemplate, "utf-8")
+      .split("${AGENT_KIT_ROOT}")
+      .join(CLONE_ROOT.split("\\").join("/"));
+    // Fail before writing rather than leaving unparseable JSON behind.
+    try {
+      JSON.parse(rendered);
+    } catch (err) {
+      die(`rendered .mcp.json is not valid JSON (${err.message}); ${mcpTemplate} is malformed`);
+    }
+    writeFileSync(mcpTarget, rendered, "utf-8");
+    entries.push({
+      path: mcpTarget,
+      action: existed ? "overwritten" : "created",
+      ...(shaBefore ? { sha256_before: shaBefore } : {}),
+      at,
+    });
+    ok(`${(existed ? "overwritten" : "created").padEnd(11)} .mcp.json`);
   }
 
   if (args.dryRun) { console.log("\ndry run — nothing was changed.\n"); return 0; }

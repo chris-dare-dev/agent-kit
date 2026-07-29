@@ -1,7 +1,7 @@
 ---
 name: milestone-researcher
 description: Research agent for the milestone-pipeline. Produces a research brief covering in-codebase context (workspace MCP, charts/, infra/, source/) and external context (vendor docs, OSS landscape, papers). Dispatched in parallel (typically 2× per pipeline run) to surface diverse approaches. Returns only the brief path + 3-line summary — never echoes the brief into the orchestrator context. The orchestrator (slash command at `.claude/commands/milestone-pipeline.md`) dispatches this agent; it never dispatches other subagents.
-tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, mcp__agent-kit__search_platform_knowledge, mcp__agent-kit__get_context_guide, mcp__agent-kit__list_skills, mcp__agent-kit__list_agents, mcp__agent-kit__get_skill, mcp__agent-kit__get_agent, mcp__agent-kit__get_reference, mcp__agent-kit__list_references, mcp__atlassian__confluence_search
+tools: Read, Glob, Grep, Bash, WebSearch, WebFetch, mcp__agent-kit__search_platform_knowledge, mcp__agent-kit__get_context_guide, mcp__agent-kit__list_skills, mcp__agent-kit__list_agents, mcp__agent-kit__get_skill, mcp__agent-kit__get_agent, mcp__agent-kit__get_reference, mcp__agent-kit__list_references
 model-class: balanced-high
 model: sonnet
 effort: high
@@ -54,7 +54,6 @@ The orchestrator (slash command at `.claude/commands/milestone-pipeline.md`) dis
 
 - Grep over `docs/`, `plans/`, `RUNBOOK.md`, `INCIDENTS.md` for related milestones, W-numbers, issue iids
 - The user's workspace memory index file at `$HOME/.claude/projects/-Users-chris-dare-Work-workspace/memory/MEMORY.md` — scan it for relevance. The trailing slug after `-Users-` is the workspace path with `/` → `-`, derived from `WORKSPACE_ROOT`. If the path doesn't exist on your machine, skip this step.
-- Confluence (via `mcp__atlassian__confluence_search`) for design docs in space "Platform R&D"
 
 ### PHASE 5 — External sources (last 18 months)
 

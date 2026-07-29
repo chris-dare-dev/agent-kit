@@ -2,9 +2,10 @@
 
 `template-settings.json` (sibling file) is the git-tracked baseline for the workspace
 project settings at `<workspace>/.claude/settings.json`. JSON cannot carry comments, so
-every entry is documented here. `data/scripts/bootstrap.sh` merges it into the live
-settings file **without clobbering keys you already have** (env keys are added only if
-absent, permission entries and hook entries are appended only if not already present).
+every entry is documented here. Nothing merges it automatically yet: `agent-kit init`
+plants the knowledge tree but not `settings.json`, so copy the entries you want into
+`<workspace>/.claude/settings.json` by hand. A merging planter that adds only absent
+keys is future work; until it exists, this file is a reference, not an installer input.
 
 **Why this file exists:** before 2026-07, the entire mechanical safety layer (kubectl
 blocker, deploy-repo edit blocker, commit-subject gate) lived only in the gitignored
@@ -78,9 +79,8 @@ not caught — don't root sessions in deploy repos.
 
 ## Updating the baseline
 
-Edit `template-settings.json` + this doc together, then re-run
-`bash data/scripts/bootstrap.sh` (idempotent — the merge adds only what is missing; it
-never rewrites existing entries, so if you *change* a hook command here, engineers must
-remove the old entry from their live `settings.json` once, or delete the file and re-run
+Edit `template-settings.json` + this doc together. Because the merge is manual today,
+a *changed* entry will not propagate on its own: engineers must remove the old entry
+from their live `settings.json` once, or delete the file and re-copy
 bootstrap). Commit both files and push to `origin/main` per the sharing rule in the repo
 CLAUDE.md.

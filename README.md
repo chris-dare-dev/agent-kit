@@ -145,7 +145,13 @@ PYTHONUTF8=1 python3 data/scripts/catalog-generate.py --check
 PYTHONUTF8=1 python3 data/scripts/generate-adapter-packs.py --check
 PYTHONUTF8=1 python3 data/scripts/generate-root-contract.py --check
 PYTHONUTF8=1 python3 data/scripts/model-policy-apply.py --check
+PYTHONUTF8=1 python3 data/scripts/mcp-server-name-check.py --check
 ```
+
+The last one is why a rename is survivable: every `mcp__<server>__` tool grant in
+`data/**/*.md` must name a server that all three shipped registration templates
+register. Change the server name and it tells you every file still carrying the
+old grant.
 
 `agent-kit doctor` runs all of the above prerequisite checks in one pass, with
 the right encoding, and prints a fix command per failure.

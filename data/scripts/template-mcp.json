@@ -1,27 +1,11 @@
 {
   "mcpServers": {
-    "workspace-platform": {
+    "agent-kit": {
       "type": "stdio",
       "command": "node",
-      "args": [
-        "${PERSONAL_WORKSPACE_ROOT}/GitLab/workspace/platform/tools/claude-mcp-server/dist/index.js"
-      ],
+      "args": ["${AGENT_KIT_ROOT}/dist/index.js"],
       "env": {
-        "PLATFORM_ROOT": "${PERSONAL_WORKSPACE_ROOT}/GitLab/workspace/platform",
-        "WORKSPACE_ROOT": "${PERSONAL_WORKSPACE_ROOT}",
-        "AWS_PROFILE": "YOUR_AWS_PROFILE",
-        "AWS_REGION": "us-east-1"
-      }
-    },
-    "atlassian": {
-      "type": "stdio",
-      "command": "bash",
-      "args": [
-        "-c",
-        "set -a; . \"$HOME/.config/workspace/secrets.env\"; set +a; exec uvx mcp-atlassian"
-      ],
-      "env": {
-        "CONFLUENCE_URL": "https://example.atlassian.net/wiki"
+        "SERVER_PROFILE": "personal"
       }
     }
   }

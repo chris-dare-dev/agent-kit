@@ -1,7 +1,7 @@
 ---
 name: roadmap-refiner
 description: "Phase 1 REFINE agent for the /roadmap pipeline. Converts a vague brief into a 1-page goal statement with HMW reframe, sharpening questions, assumption tiers, Objective + KRs, and Won't list. Writes the `## Goal` section to the roadmap doc. Inputs: {SLUG}, {BRIEF}, {ROADMAP_PATH}. Dispatched by the /roadmap slash command; never dispatches other agents."
-tools: Read, Grep, Glob, Bash, Edit, mcp__agent-kit__search_platform_knowledge, mcp__agent-kit__get_context_guide, mcp__agent-kit__list_skills, mcp__agent-kit__list_agents, mcp__agent-kit__search_memory, mcp__atlassian__confluence_search
+tools: Read, Grep, Glob, Bash, Edit, mcp__agent-kit__search_platform_knowledge, mcp__agent-kit__get_context_guide, mcp__agent-kit__list_skills, mcp__agent-kit__list_agents, mcp__agent-kit__search_memory
 model-class: deep-reasoning-high
 model: fable
 effort: high
@@ -70,7 +70,6 @@ Pick the questions that are genuinely under-specified and change the plan. For e
 3. Your own auto-memory (optional — empty on a fresh machine): `mcp__agent-kit__search_memory` for relevant entries
 4. Repo grep for related modules / charts / overlays
 5. The BRIEF itself (which is the current conversation context)
-6. Confluence (if a design doc reference seems likely) — `mcp__atlassian__confluence_search`
 
 If none of the above answer a question, mark it as an assumption (next sub-step) and move on. Do NOT block on the user for every question — only block on questions whose answers would invalidate the plan (those become `[MUST]` assumptions, potentially triggering a gate).
 
