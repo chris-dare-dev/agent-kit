@@ -25,11 +25,12 @@ from pathlib import Path
 from typing import Any, Iterator, Sequence
 
 import artifact_security as security
+import artifact_runtime
 
 SCHEMA_VERSION = 3
 SUPPORTED_SCHEMA_VERSIONS = (2, 3)
 CATALOG_READ_ATTEMPTS = 3
-DEFAULT_OUTPUT_DIR = Path("~/.local/share/personal-artifacts").expanduser()
+DEFAULT_OUTPUT_DIR = artifact_runtime.derived_root()
 DEFAULT_ROOTS = ("plans", ".claude", "docs", "GitLab")
 DEFAULT_INCLUDE_GLOBS = (
     "plans/**",

@@ -54,7 +54,13 @@ import artifact_security as security
 SCHEMA_VERSION = 2
 DEFAULT_WORKSPACE = Path(__file__).resolve().parents[1]
 CANONICAL_COMPOSE = Path(__file__).parent / "services" / "qdrant" / "compose.yaml"
-SERVICE_ROOT = artifact_runtime.DEFAULT_DERIVED_ROOT / "services" / "qdrant"
+# The socket lives at <derived-root>/services/qdrant/artifact-memory.sock. These
+# segments are named ONCE, here, because the TypeScript adapter has to build the
+# same path independently -- and when both sides hardcoded it separately they
+# diverged, leaving four tools dead on arrival. The cross-language drift test
+# asserts the adapter still contains every segment below.
+SOCKET_RELATIVE_PARTS = ("services", "qdrant", "artifact-memory.sock")
+SERVICE_ROOT = artifact_runtime.derived_root().joinpath(*SOCKET_RELATIVE_PARTS[:-1])
 GENERATION = "p20260721v1"
 COLLECTION = f"personal_artifact_chunks_{GENERATION}"
 # Loopback port for this deployment's Qdrant (6343 main / 6345 restore-test), kept
@@ -209,6 +215,10 @@ def _runtime_payload(
     return {
         "schema_version": artifact_runtime.SCHEMA_VERSION,
         "active_backend": "server",
+        # Written explicitly so the TypeScript adapter READS the root rather
+        # than reconstructing it from its own per-OS guess. Reconstruction is
+        # what let the two sides disagree in the first place.
+        "derived_root": str(artifact_runtime.derived_root()),
         "qdrant": {
             "url": QDRANT_URL,
             "collection": COLLECTION,

@@ -19,8 +19,19 @@ import { dirname, isAbsolute, join, normalize, sep } from "node:path";
 import { Readable } from "node:stream";
 
 export interface ArtifactMemoryConfig {
-  /** Test-only override for the fixed local service socket. */
+  /**
+   * Absolute path to the resident service's Unix socket.
+   *
+   * NOT a test-only knob any more. loadConfig() resolves this in three steps —
+   * ARTIFACT_MEMORY_SOCKET, then service.socket_path in
+   * <derived-root>/artifact-memory-runtime.json, then the default derived from
+   * artifactMemoryDerivedRoot — and passes the result in. When it was
+   * documented as test-only there was no environment variable that reached it,
+   * so a wrong path could not be corrected without editing source.
+   */
   socketPath?: string;
+  /** Which resolution step supplied socketPath; used in error text. */
+  socketPathSource?: string;
 }
 
 export interface ArtifactMemoryRequest {
@@ -42,11 +53,30 @@ export type ArtifactMemoryRequester = (
   request: ArtifactMemoryRequest,
 ) => Promise<ArtifactMemoryResponse>;
 
+/**
+ * Last-resort socket path, used only when loadConfig() did not supply one.
+ *
+ * Mirrors workspace-tooling/artifact_memory_provision.SOCKET_RELATIVE_PARTS
+ * under the same per-OS derived root as artifact_runtime.derived_root(). This
+ * constant previously said "workspace-artifacts" while the provisioner wrote
+ * "personal-artifacts", so the adapter dialled a socket nothing ever bound.
+ */
+function defaultDerivedRoot(): string {
+  const override = process.env.AGENT_KIT_DERIVED_ROOT;
+  if (override) return override;
+  const xdg = process.env.XDG_DATA_HOME;
+  if (xdg) return join(xdg, "agent-kit");
+  if (process.platform === "win32") {
+    return join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "agent-kit");
+  }
+  if (process.platform === "darwin") {
+    return join(homedir(), "Library", "Application Support", "agent-kit");
+  }
+  return join(homedir(), ".local", "share", "agent-kit");
+}
+
 const DEFAULT_SOCKET_PATH = join(
-  homedir(),
-  ".local",
-  "share",
-  "workspace-artifacts",
+  defaultDerivedRoot(),
   "services",
   "qdrant",
   "artifact-memory.sock",

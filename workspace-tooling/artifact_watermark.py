@@ -1021,7 +1021,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--derived-root",
         type=Path,
         default=None,
-        help="derived state root (default: ~/.local/share/personal-artifacts)",
+        help="derived state root (default: the resolved agent-kit derived root)",
     )
     parser.add_argument(
         "--runtime-config",

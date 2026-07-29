@@ -36,12 +36,13 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import artifact_security as security
+import artifact_runtime
 
 
 SCHEMA_VERSION = 1
 PRODUCER = "supervisor"
 DEFAULT_RECEIPT_ROOT = Path(
-    "~/.local/share/personal-artifacts/supervisor-events"
+    str(artifact_runtime.derived_root() / "supervisor-events")
 ).expanduser()
 
 #: Only artifact-memory supervisors are in scope. A typo that would otherwise

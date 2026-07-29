@@ -96,6 +96,11 @@ export interface SearchResult {
 export type ServerProfile = "personal" | "shared";
 
 /** Resolved platform configuration — all paths derived from env vars. */
+export type ArtifactMemorySocketSource =
+  | "ARTIFACT_MEMORY_SOCKET"
+  | "artifact-memory-runtime.json"
+  | "default";
+
 export interface PlatformConfig {
   /** Root of the platform monorepo (PLATFORM_ROOT env var). */
   platformRoot: string;
@@ -117,6 +122,12 @@ export interface PlatformConfig {
   platformClaudeMd: string;
   /** Glob patterns for discovering per-app CLAUDE.md files. */
   claudeMdGlobs: string[];
+  /** Root for derived state; mirrors artifact_runtime.derived_root(). */
+  artifactMemoryDerivedRoot: string;
+  /** Resolved artifact-memory service socket. */
+  artifactMemorySocketPath: string;
+  /** Which resolution step supplied artifactMemorySocketPath. */
+  artifactMemorySocketSource: ArtifactMemorySocketSource;
   /** Bundled data directory root (data/ in MCP server repo). */
   dataDir: string;
   /** Bundled skills directory (data/skills/). */

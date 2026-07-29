@@ -5,6 +5,7 @@ import hashlib
 import http.client
 import json
 import os
+import re
 import sqlite3
 import socket
 import stat
@@ -1831,20 +1832,25 @@ class ArtifactProtocolVersionTests(unittest.TestCase):
         )
 
     def test_typescript_adapter_pins_the_same_protocol_version(self) -> None:
-        """The Node adapter is the other half of this contract; catch drift."""
+        """The Node adapter is the other half of this contract; catch drift.
+
+        This test resolved the adapter through an employer checkout path
+        (`GitLab/SWAT DevOps - SDO/platform/tools/claude-mcp-server/...`) that
+        does not exist in this repository, and called skipTest when it was
+        absent. So the ONLY cross-language contract check in the tree silently
+        skipped on every run -- which is precisely why the socket path was free
+        to diverge between the two halves. It now resolves the real path and
+        FAILS if the adapter is missing.
+        """
         adapter = (
-            SCRIPT_DIR.parent
-            / "GitLab"
-            / "SWAT DevOps - SDO"
-            / "platform"
-            / "tools"
-            / "claude-mcp-server"
-            / "src"
-            / "tools"
-            / "artifact-memory.ts"
+            Path(__file__).resolve().parents[2] / "src" / "tools" / "artifact-memory.ts"
         )
         if not adapter.is_file():
-            self.skipTest("claude-mcp-server checkout is not present")
+            self.fail(
+                f"TypeScript adapter not found at {adapter}. This check is the only "
+                "thing keeping the Python service and the Node adapter in agreement; "
+                "it must never be skipped."
+            )
         source = adapter.read_text(encoding="utf-8")
         self.assertIn(
             f"const PROTOCOL_VERSION = {service.PROTOCOL_VERSION};",
@@ -1854,6 +1860,49 @@ class ArtifactProtocolVersionTests(unittest.TestCase):
             f'const PROTOCOL_HEADER = "{service.PROTOCOL_HEADER.lower()}";',
             source,
         )
+
+    def test_typescript_adapter_agrees_on_the_socket_path(self) -> None:
+        """The third assertion: the two sides must dial the SAME socket.
+
+        Protocol agreement was checked; the path was not, and that is the field
+        that actually diverged (the adapter said `workspace-artifacts`, the
+        provisioner wrote `personal-artifacts`), leaving four tools dead on
+        arrival. Both sides now derive it from artifact_runtime.derived_root(),
+        so this compares the adapter's fallback against what the provisioner
+        would write for the same root.
+        """
+        import artifact_memory_provision as provision
+
+        adapter = (
+            Path(__file__).resolve().parents[2] / "src" / "tools" / "artifact-memory.ts"
+        )
+        source = adapter.read_text(encoding="utf-8")
+        # Assert on CODE, not prose: the comment above DEFAULT_SOCKET_PATH names
+        # both legacy roots to explain the bug, and a check that a comment can
+        # break is a check people learn to work around.
+        code = re.sub(r"/\*[\s\S]*?\*/", "", source)
+        code = re.sub(r"^\s*//.*$", "", code, flags=re.M)
+
+        for legacy in ("workspace-artifacts", "personal-artifacts"):
+            self.assertNotIn(
+                f'"{legacy}"',
+                code,
+                f"the adapter still builds a path segment from the legacy root "
+                f"{legacy!r}; both sides must derive it from derived_root()",
+            )
+        self.assertIn(
+            '"agent-kit"',
+            code,
+            "the adapter must build its default under the shared agent-kit root",
+        )
+
+        for part in provision.SOCKET_RELATIVE_PARTS:
+            self.assertIn(
+                f'"{part}"',
+                code,
+                f"the adapter's default socket path is missing the {part!r} segment "
+                "that the provisioner writes",
+            )
 
 
 class ArtifactUnixSocketLifecycleTests(unittest.TestCase):

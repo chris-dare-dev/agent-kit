@@ -31,7 +31,7 @@ import artifact_service_client as service_client
 
 SCHEMA_VERSION = 1
 DEFAULT_WORKSPACE = Path(__file__).resolve().parents[1]
-DEFAULT_DERIVED_ROOT = Path("~/.local/share/personal-artifacts").expanduser()
+DEFAULT_DERIVED_ROOT = artifact_runtime.derived_root()
 DEFAULT_APPROVALS = DEFAULT_DERIVED_ROOT / "graphiti-approvals.json"
 DEFAULT_RECEIPTS = DEFAULT_DERIVED_ROOT / "skill-events"
 DEFAULT_CONSUMER_STATE = DEFAULT_DERIVED_ROOT / "artifact-event-consumer.sqlite3"

@@ -6,12 +6,16 @@
  * should check for existence before scanning.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_CLAUDE_MD_GLOBS } from "./discovery/claude-md.js";
-import type { PlatformConfig, ServerProfile } from "./types.js";
+import type {
+  ArtifactMemorySocketSource,
+  PlatformConfig,
+  ServerProfile,
+} from "./types.js";
 
 /**
  * Build a PlatformConfig from environment variables.
@@ -129,6 +133,69 @@ export function loadConfig(): PlatformConfig {
     .filter((pattern) => pattern.length > 0);
 
   // ---------------------------------------------------------------------------
+  // Derived-state root and the artifact-memory socket.
+  //
+  // This MIRRORS workspace-tooling/artifact_runtime.derived_root(); the two are
+  // kept honest by the cross-language drift test in the substrate suite. Before
+  // that test was revived it had been silently skipping, and the two halves had
+  // drifted: this adapter dialled ~/.local/share/workspace-artifacts/... while
+  // the provisioner bound ~/.local/share/personal-artifacts/..., so all four
+  // artifact-memory tools were dead on arrival on every clean install.
+  // ---------------------------------------------------------------------------
+  const derivedRoot = (): string => {
+    const override = process.env.AGENT_KIT_DERIVED_ROOT;
+    if (override) return resolve(override);
+    const xdg = process.env.XDG_DATA_HOME;
+    if (xdg) return resolve(xdg, "agent-kit");
+    if (process.platform === "win32") {
+      const local = process.env.LOCALAPPDATA || resolve(homedir(), "AppData", "Local");
+      return resolve(local, "agent-kit");
+    }
+    if (process.platform === "darwin") {
+      return resolve(homedir(), "Library", "Application Support", "agent-kit");
+    }
+    return resolve(homedir(), ".local", "share", "agent-kit");
+  };
+
+  const artifactMemoryDerivedRoot = derivedRoot();
+
+  // Three-step resolution. The SOURCE is carried alongside the path because an
+  // unreachable socket is only diagnosable if the operator can tell which step
+  // supplied the path they are looking at.
+  let artifactMemorySocketPath: string;
+  let artifactMemorySocketSource: ArtifactMemorySocketSource;
+  if (process.env.ARTIFACT_MEMORY_SOCKET) {
+    artifactMemorySocketPath = process.env.ARTIFACT_MEMORY_SOCKET;
+    artifactMemorySocketSource = "ARTIFACT_MEMORY_SOCKET";
+  } else {
+    const runtimeConfig = resolve(artifactMemoryDerivedRoot, "artifact-memory-runtime.json");
+    let fromRuntime: string | undefined;
+    try {
+      const parsed = JSON.parse(readFileSync(runtimeConfig, "utf-8")) as {
+        service?: { socket_path?: unknown };
+      };
+      if (typeof parsed.service?.socket_path === "string" && parsed.service.socket_path) {
+        fromRuntime = parsed.service.socket_path;
+      }
+    } catch {
+      // Absent or unreadable is the normal case before provisioning; fall through.
+    }
+    if (fromRuntime) {
+      artifactMemorySocketPath = fromRuntime;
+      artifactMemorySocketSource = "artifact-memory-runtime.json";
+    } else {
+      // Same segments the provisioner names in SOCKET_RELATIVE_PARTS.
+      artifactMemorySocketPath = resolve(
+        artifactMemoryDerivedRoot,
+        "services",
+        "qdrant",
+        "artifact-memory.sock",
+      );
+      artifactMemorySocketSource = "default";
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Token log path — controls where per-call token estimates are written.
   //
   // Priority:
@@ -210,6 +277,9 @@ export function loadConfig(): PlatformConfig {
     platformRoot,
     workspaceRoot,
     serverProfile,
+    artifactMemoryDerivedRoot,
+    artifactMemorySocketPath,
+    artifactMemorySocketSource,
     skillsDir,
     agentsDir,
     referencesDir,

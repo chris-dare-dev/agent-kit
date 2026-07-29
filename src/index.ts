@@ -211,7 +211,9 @@ if (artifactMemoryProbe.available) {
 } else if (artifactMemoryProbe.reason === "disabled-by-profile") {
   log("  Artifact-memory tools EXCLUDED (shared profile)");
 } else {
-  artifactMemoryUnavailable = `${artifactMemoryProbe.reason}: ${artifactMemoryProbe.detail}`;
+  artifactMemoryUnavailable =
+    `${artifactMemoryProbe.reason}: ${artifactMemoryProbe.detail} ` +
+    `[socket path from: ${config.artifactMemorySocketSource}]`;
   log(`artifact-memory tools unavailable: ${artifactMemoryUnavailable}`);
 }
 

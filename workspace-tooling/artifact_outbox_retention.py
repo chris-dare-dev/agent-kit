@@ -72,10 +72,11 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import artifact_unit_archive as unit_archive  # noqa: E402
+import artifact_runtime
 
 SCHEMA_VERSION = 1
 
-DEFAULT_DERIVED_ROOT = Path("~/.local/share/personal-artifacts").expanduser()
+DEFAULT_DERIVED_ROOT = artifact_runtime.derived_root()
 DEFAULT_OUTBOX_ROOT = DEFAULT_DERIVED_ROOT / "outbox"
 DEFAULT_CATALOG = DEFAULT_DERIVED_ROOT / "artifact-catalog.sqlite3"
 DEFAULT_INGESTION_STATE = DEFAULT_DERIVED_ROOT / "ingestion-state.sqlite3"

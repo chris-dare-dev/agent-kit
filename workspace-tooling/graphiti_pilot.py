@@ -25,17 +25,13 @@ from typing import Any, Iterable, Sequence
 
 import artifact_ingestion as ingestion
 import graphiti_policy
+import artifact_runtime
 
 
 PILOT_SCHEMA_VERSION = 1
 PILOT_VERSION = 3
-DEFAULT_OUTBOX = (
-    Path("~/.local/share/personal-artifacts/outbox/catalog-run-7-chunks-v2")
-    .expanduser()
-)
-DEFAULT_REPORT_ROOT = (
-    Path("~/.local/share/personal-artifacts/graphiti-pilots").expanduser()
-)
+DEFAULT_OUTBOX = artifact_runtime.derived_root() / "outbox" / "catalog-run-7-chunks-v2"
+DEFAULT_REPORT_ROOT = artifact_runtime.derived_root() / "graphiti-pilots"
 DEFAULT_LLM_BASE_URL = "http://127.0.0.1:11434/v1"
 DEFAULT_EMBEDDING_BASE_URL = "http://127.0.0.1:11434/v1"
 DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"

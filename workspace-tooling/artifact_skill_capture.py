@@ -20,10 +20,11 @@ from typing import Any, Iterable, Sequence
 
 import artifact_catalog as catalog
 import artifact_security as security
+import artifact_runtime
 
 
 SCHEMA_VERSION = 1
-DEFAULT_RECEIPT_ROOT = Path("~/.local/share/personal-artifacts/skill-events").expanduser()
+DEFAULT_RECEIPT_ROOT = artifact_runtime.derived_root() / "skill-events"
 GRAPHITI_CANDIDATE_TYPES = {"decision", "handoff", "plan", "roadmap"}
 PRODUCER_TYPES = {
     "handoff": {"handoff"},

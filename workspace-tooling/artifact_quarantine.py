@@ -32,12 +32,13 @@ from typing import Any, Iterator, Sequence
 
 import artifact_catalog as catalog
 import artifact_security as security
+import artifact_runtime
 
 
 SCHEMA_VERSION = 1
 DEFAULT_WORKSPACE = Path(__file__).resolve().parents[1]
-DEFAULT_CATALOG = Path("~/.local/share/personal-artifacts/artifact-catalog.sqlite3").expanduser()
-DEFAULT_QUARANTINE_ROOT = Path("~/.local/share/personal-artifacts/quarantine").expanduser()
+DEFAULT_CATALOG = artifact_runtime.derived_root() / "artifact-catalog.sqlite3"
+DEFAULT_QUARANTINE_ROOT = artifact_runtime.derived_root() / "quarantine"
 DEFAULT_RULES: dict[str, Any] = {
     "candidate_path_globs": ["plans/**", "GitLab/**/plans/**"],
     "eligible_artifact_types": ["decision", "handoff", "plan", "research", "roadmap"],

@@ -13,6 +13,7 @@ import json
 import os
 import re
 import stat
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,8 +23,84 @@ import artifact_security as security
 
 
 SCHEMA_VERSION = 2
-DEFAULT_DERIVED_ROOT = Path("~/.local/share/personal-artifacts").expanduser()
-DEFAULT_CONFIG = DEFAULT_DERIVED_ROOT / "artifact-memory-runtime.json"
+
+# The ONE definition of where derived state lives.
+#
+# This path used to be re-declared as a literal in eleven modules, and the
+# TypeScript adapter spelled it "workspace-artifacts" while every Python module
+# spelled it "personal-artifacts". That was not a coincidence to be patched: with
+# no single definition, there was nothing for the two sides to agree WITH, so the
+# socket the adapter dialled and the socket the provisioner bound were free to
+# drift apart — which is exactly what happened, leaving four tools dead on
+# arrival on every clean install.
+#
+# Legacy names, kept ONLY for the migration branch below. Nothing else may
+# reference them; test_no_module_level_derived_root_literals enforces that.
+_LEGACY_ROOTS = (
+    Path("~/.local/share/personal-artifacts").expanduser(),
+    Path("~/.local/share/workspace-artifacts").expanduser(),
+)
+_APP_DIRNAME = "agent-kit"
+_migration_warned = False
+
+
+def default_derived_root() -> Path:
+    """Per-OS default, with no environment consulted."""
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA")
+        if base:
+            return Path(base) / _APP_DIRNAME
+        return Path.home() / "AppData" / "Local" / _APP_DIRNAME
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / _APP_DIRNAME
+    return Path.home() / ".local" / "share" / _APP_DIRNAME
+
+
+def derived_root() -> Path:
+    """Resolve the derived-state root.
+
+    Order: AGENT_KIT_DERIVED_ROOT, then $XDG_DATA_HOME/agent-kit, then the
+    per-OS default. Every module must call this rather than rebuilding a path,
+    so there is exactly one answer per process and per machine.
+
+    If a legacy installation exists and the resolved root does not, say so once
+    on stderr. Silently starting a second, empty store next to a populated one
+    is the worst available outcome: retrieval would quietly return nothing.
+    """
+    global _migration_warned
+
+    override = os.environ.get("AGENT_KIT_DERIVED_ROOT")
+    if override:
+        return Path(override).expanduser()
+
+    xdg = os.environ.get("XDG_DATA_HOME")
+    root = Path(xdg).expanduser() / _APP_DIRNAME if xdg else default_derived_root()
+
+    if not _migration_warned and not root.exists():
+        for legacy in _LEGACY_ROOTS:
+            if legacy.exists():
+                _migration_warned = True
+                print(
+                    f"[agent-kit] derived state found at the legacy path {legacy}, "
+                    f"but this build reads {root}.\n"
+                    f"[agent-kit] Move it once:  mv {legacy} {root}\n"
+                    f"[agent-kit] Or set AGENT_KIT_DERIVED_ROOT={legacy} to keep using it.",
+                    file=sys.stderr,
+                )
+                break
+    return root
+
+
+def default_config_path() -> Path:
+    return derived_root() / "artifact-memory-runtime.json"
+
+
+# Import-time snapshots, kept so the ~20 existing call sites that read these as
+# argparse defaults keep working. Anything that must honour an environment
+# change made after import should call derived_root() / default_config_path().
+DEFAULT_DERIVED_ROOT = derived_root()
+DEFAULT_CONFIG = default_config_path()
+
 COLLECTION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 GENERATION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 DIGEST = re.compile(r"^[0-9a-f]{64}$")

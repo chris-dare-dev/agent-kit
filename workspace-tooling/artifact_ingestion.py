@@ -41,13 +41,14 @@ from typing import Any, Callable, Iterable, Iterator, Sequence
 
 import graphiti_policy
 import artifact_security as security
+import artifact_runtime
 
 
 SCHEMA_VERSION = 1
 OUTBOX_SCHEMA_VERSION = 2
 SUPPORTED_OUTBOX_SCHEMA_VERSIONS = (1, 2)
 STATE_SCHEMA_VERSION = 1
-DEFAULT_DERIVED_ROOT = Path("~/.local/share/personal-artifacts").expanduser()
+DEFAULT_DERIVED_ROOT = artifact_runtime.derived_root()
 DEFAULT_CATALOG = DEFAULT_DERIVED_ROOT / "artifact-catalog.sqlite3"
 DEFAULT_STATE = DEFAULT_DERIVED_ROOT / "ingestion-state.sqlite3"
 DEFAULT_QDRANT_PATH = DEFAULT_DERIVED_ROOT / "qdrant"
