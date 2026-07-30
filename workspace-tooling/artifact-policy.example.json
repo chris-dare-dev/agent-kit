@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Discovery and presentation policy for the personal vault (Documents/Personal Projects). Catalog scope mirrors the Vault-System.md stamping scope: human notes under Projects/, each Source Code repo's CLAUDE.md / README.md / docs/ / plans/, and root-level notes. Generated hubs, Bases, Canvases, Daily journal, provider surfaces, and dependency trees are excluded. The vault projection block is default-deny and unused here — the vault's own .obsidian glue (add_properties.py + project-linker.py) owns projection.",
+  "description": "EXAMPLE policy. Copy it, or generate one for your tree with `artifact_catalog.py init-policy --workspace <path>`. It is NOT loaded automatically: it used to be the enforced default while naming one engineer's Obsidian vault roots, so scanning any other repository reported both required roots missing.",
   "vault_projection": {
     "default_action": "exclude",
     "candidate_roots": [],
@@ -24,13 +24,12 @@
   },
   "catalog": {
     "canonical_roots": [
-      "Projects",
-      "Source Code"
+      "plans",
+      ".claude",
+      "docs",
+      "repos"
     ],
-    "required_roots": [
-      "Projects",
-      "Source Code"
-    ],
+    "required_roots": [],
     "top_level_globs": [
       "*.md"
     ],
@@ -47,9 +46,7 @@
       "Source Code/**/*HANDOFF*.md",
       "Source Code/**/*roadmap*.md",
       "Source Code/**/*milestone*.md",
-      "Source Code/**/*adversar*.md",
-      "github-governance/**",
-      "local-llm-pipelines/**"
+      "Source Code/**/*adversar*.md"
     ],
     "exclude_roots": [
       "Bases",
@@ -90,6 +87,14 @@
       "**/.aggregate/**",
       "**/*run.failed*/**",
       "**/vendor/**"
+    ],
+    "include_globs": [
+      "plans/**",
+      ".claude/notes/**",
+      ".claude/agent-memory/**",
+      "docs/**",
+      "repos/**/plans/**",
+      "repos/**/docs/**"
     ]
   },
   "quarantine": {

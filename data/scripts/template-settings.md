@@ -84,3 +84,30 @@ a *changed* entry will not propagate on its own: engineers must remove the old e
 from their live `settings.json` once, or delete the file and re-copy
 bootstrap). Commit both files and push to `origin/main` per the sharing rule in the repo
 CLAUDE.md.
+
+
+## Which hooks are on by default, and what each blocks
+
+Registered by `template-settings.json`. Every path is rooted at
+`${CLAUDE_PROJECT_DIR}` — there is no machine-specific fallback, and
+`template-settings-check.py --check` fails if a registered path does not resolve
+to something the installer plants.
+
+| Event | Matcher | Hook | Blocks |
+|---|---|---|---|
+| PreToolUse | `Bash` | `validate-commit-subject.sh` | Commit subjects that violate the repo's subject contract |
+| PreToolUse | `Bash` | `block-plaintext-secret-write.sh` | Shell commands that would write a credential in plaintext |
+| PreToolUse | `Edit\|Write` | `block-deploy-repo-edits.sh` | Direct edits to a deploy repo, which must be generated |
+| PreToolUse | `Edit\|Write` | `block-plaintext-secret-write.sh` | Writing a credential into a tracked file |
+| PostToolUse | `Edit\|Write` | `memory-sync-reminder.sh` | Nothing — it reminds, it does not block |
+
+**Not registered by default:** `block-kubectl-mutations.sh`. It lives in
+`template-settings.k8s.json`, an opt-in overlay, together with the read-only
+`kubectl` grants it guards. Registering a Kubernetes guard in the default
+template — for a kit that ships no Kubernetes anything — would grant permissions
+nobody asked for and imply a capability the kit does not have.
+
+**Fail-open, but never silent.** A hook whose target is missing exits 0, because a
+broken hook must not wedge a session. It first writes one line to stderr naming
+the path it looked for. A guard you believe is running and which is not is worse
+than no guard, and the previous `[ -f "$h" ] || exit 0` said nothing at all.

@@ -16,6 +16,7 @@ import json
 import os
 import sqlite3
 import stat
+import sys
 import tempfile
 from collections import Counter, defaultdict
 from contextlib import contextmanager
@@ -782,14 +783,87 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", default=str(Path(__file__).resolve().parents[1]), help="workspace to scan")
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR), help="derived catalog output directory")
-    parser.add_argument("--policy", default=str(Path(__file__).with_name("artifact-policy.json")), help="artifact policy JSON")
+    parser.add_argument(
+        "--init-policy",
+        metavar="OUT",
+        help="write a starter policy inferred from --workspace, then exit",
+    )
+    parser.add_argument(
+        "--policy",
+        default=None,
+        help="artifact policy JSON (REQUIRED; start from "
+             "artifact-policy.example.json, or use --init-policy)",
+    )
     parser.add_argument("--dry-run", action="store_true", help="scan and report without creating derived output")
     parser.add_argument("--json-summary", action="store_true", help="write the complete summary JSON to stdout")
     return parser
 
 
+
+def _write_starter_policy(workspace: Path, out: Path) -> int:
+    """Write a policy whose canonical_roots were INFERRED from this tree.
+
+    The alternative -- shipping a policy and enforcing it -- is what made the
+    catalog unusable outside one machine. Inferring means the roots describe the
+    repository in front of you, so a following scan reports no missing root.
+    """
+    example = Path(__file__).with_name("artifact-policy.example.json")
+    try:
+        policy = json.loads(example.read_text(encoding="utf-8"))
+    except OSError as exc:
+        print(f"error: cannot read {example}: {exc}", file=sys.stderr)
+        return 2
+
+    if not workspace.is_dir():
+        print(f"error: --workspace {workspace} is not a directory", file=sys.stderr)
+        return 2
+
+    # Top-level directories that plausibly hold durable prose, in a stable order.
+    interesting = ("plans", "docs", ".claude", "repos", "notes", "adr", "spikes")
+    found = [name for name in interesting if (workspace / name).is_dir()]
+    if not found:
+        found = sorted(
+            child.name for child in workspace.iterdir()
+            if child.is_dir() and not child.name.startswith((".", "node_modules"))
+        )[:4]
+
+    catalog = policy.setdefault("catalog", {})
+    catalog["canonical_roots"] = found
+    # Inferred, so they are known to exist -- safe to require.
+    catalog["required_roots"] = found
+    catalog["include_globs"] = [f"{name}/**" for name in found]
+    policy["description"] = (
+        f"Starter policy inferred from {workspace} by --init-policy. "
+        "Review the globs before relying on it."
+    )
+
+    out.write_text(
+        json.dumps(policy, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    print(f"wrote {out} with canonical_roots={found}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    # A policy is REQUIRED. This used to default to a shipped artifact-policy.json
+    # whose required_roots were one engineer's Obsidian vault ("Projects",
+    # "Source Code"), so scanning any other repository silently enforced someone
+    # else's layout and reported both roots missing. Refusing is the honest answer.
+    if args.init_policy:
+        return _write_starter_policy(Path(args.workspace), Path(args.init_policy))
+
+    if not args.policy:
+        example = Path(__file__).with_name("artifact-policy.example.json")
+        for line in (
+            "error: --policy is required.",
+            f"  Start from the shipped example: {example}",
+            "  Or generate one for this tree:",
+            "    python3 workspace-tooling/artifact_catalog.py "
+            "--workspace . --init-policy my-policy.json",
+        ):
+            print(line, file=sys.stderr)
+        return 2
     summary = run_catalog(Path(args.workspace), Path(args.output_dir), Path(args.policy), args.dry_run)
     if args.json_summary:
         print(json.dumps(summary, indent=2, sort_keys=True))

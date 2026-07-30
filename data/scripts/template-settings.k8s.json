@@ -1,0 +1,23 @@
+{
+  "_comment": "OPT-IN. Merge this ON TOP of template-settings.json only if you work with Kubernetes. It grants read-only kubectl verbs and registers block-kubectl-mutations.sh, which refuses the mutating ones. Registering that guard without these grants would be a guard for a tool the kit never mentions.",
+  "permissions": {
+    "allow": [
+      "Bash(kubectl get:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(kubectl logs:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-kubectl-mutations.sh\"; if [ -f \"$h\" ]; then exec bash \"$h\"; fi; printf \"[agent-kit] hook not installed, skipping: %s\n\" \"$h\" >&2; exit 0'"
+          }
+        ]
+      }
+    ]
+  }
+}

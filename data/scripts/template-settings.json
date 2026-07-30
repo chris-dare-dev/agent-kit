@@ -1,14 +1,10 @@
 {
+  "_comment": "Merged into <workspace>/.claude/settings.json. Documented in template-settings.md. Kubernetes/AWS grants live in template-settings.k8s.json (opt-in) -- this kit ships no Kubernetes anything.",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "permissions": {
-    "allow": [
-      "Bash(kubectl get:*)",
-      "Bash(kubectl describe:*)",
-      "Bash(kubectl logs:*)",
-      "Bash(AWS_PROFILE=YOUR_AWS_PROFILE kubectl:*)"
-    ]
+    "allow": []
   },
   "hooks": {
     "PreToolUse": [
@@ -17,15 +13,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-kubectl-mutations.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/block-kubectl-mutations.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/validate-commit-subject.sh\"; if [ -f \"$h\" ]; then exec bash \"$h\"; fi; printf \"[agent-kit] hook not installed, skipping: %s\n\" \"$h\" >&2; exit 0'"
           },
           {
             "type": "command",
-            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/validate-commit-subject.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/validate-commit-subject.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
-          },
-          {
-            "type": "command",
-            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-plaintext-secret-write.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/block-plaintext-secret-write.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-plaintext-secret-write.sh\"; if [ -f \"$h\" ]; then exec bash \"$h\"; fi; printf \"[agent-kit] hook not installed, skipping: %s\n\" \"$h\" >&2; exit 0'"
           }
         ]
       },
@@ -34,11 +26,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-deploy-repo-edits.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/block-deploy-repo-edits.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-deploy-repo-edits.sh\"; if [ -f \"$h\" ]; then exec bash \"$h\"; fi; printf \"[agent-kit] hook not installed, skipping: %s\n\" \"$h\" >&2; exit 0'"
           },
           {
             "type": "command",
-            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-plaintext-secret-write.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/hooks/block-plaintext-secret-write.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/block-plaintext-secret-write.sh\"; if [ -f \"$h\" ]; then exec bash \"$h\"; fi; printf \"[agent-kit] hook not installed, skipping: %s\n\" \"$h\" >&2; exit 0'"
           }
         ]
       }
@@ -49,11 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/scripts/memory-sync-reminder.sh\"; [ -f \"$h\" ] || h=\"${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}/.claude/scripts/memory-sync-reminder.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
-          },
-          {
-            "type": "command",
-            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/scripts/project-linker-hook.sh\"; [ -f \"$h\" ] && exec bash \"$h\"; exit 0'"
+            "command": "bash -c 'h=\"${CLAUDE_PROJECT_DIR:-$PWD}/.claude/scripts/memory-sync-reminder.sh\"; if [ -f \"$h\" ]; then exec bash \"$h\"; fi; printf \"[agent-kit] hook not installed, skipping: %s\n\" \"$h\" >&2; exit 0'"
           }
         ]
       }
