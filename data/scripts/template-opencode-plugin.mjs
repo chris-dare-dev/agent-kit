@@ -46,22 +46,44 @@
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
 
-const GUARD_REL = "tools/claude-mcp-server/data/hooks/block-plaintext-secret-write.sh";
+/** Clone-root-relative path to the guard. */
+const GUARD_REL = "data/hooks/block-plaintext-secret-write.sh";
 
+/**
+ * Locate the guard: AGENT_KIT_ROOT if set, else relative to the project.
+ *
+ * This used to try three candidates, one of which was
+ * a hardcoded pre-fork employer monorepo path — so every plugin this
+ * kit emitted carried a former employer's internal group name into a stranger's
+ * repository, and all three candidates missed on any machine but one. Combined
+ * with the deliberate fail-open below, that meant every non-author install ran
+ * completely unguarded and said nothing about it.
+ */
 function resolveGuard(directory) {
-  const ws = process.env.PERSONAL_WORKSPACE_ROOT || join(homedir(), "Work", "workspace");
-  const candidates = [
-    join(directory || "", GUARD_REL),
-    join(ws, "GitLab", "SWAT DevOps - SDO", "platform", GUARD_REL),
-    join(ws, ".claude", "hooks", "block-plaintext-secret-write.sh"),
-  ];
-  return candidates.find((p) => p && existsSync(p)) || null;
+  const roots = [process.env.AGENT_KIT_ROOT, directory].filter(Boolean);
+  const attempted = roots.map((root) => join(root, GUARD_REL));
+  return {
+    guard: attempted.find((path) => existsSync(path)) || null,
+    attempted,
+  };
 }
 
 export const SecretGuardPlugin = async ({ $, directory }) => {
-  const guard = resolveGuard(directory);
+  const { guard, attempted } = resolveGuard(directory);
+
+  // Still fails open — a broken plugin must never wedge a session, which is the
+  // documented parity with the bash CORE. What changes is the SILENCE: an
+  // operator who thinks they are guarded and is not now finds out at load time.
+  // Warn here, once at plugin load, and never inside denyReason — that runs per
+  // intercepted tool call and would spam until people silence it.
+  if (!guard) {
+    process.stderr.write(
+      "[agent-kit] secret-guard INACTIVE: block-plaintext-secret-write.sh not " +
+        `found. Looked in: ${attempted.join(", ") || "(no root available)"}. ` +
+        "Set AGENT_KIT_ROOT to your agent-kit clone to enable it.\n",
+    );
+  }
 
   const denyReason = async (toolInput) => {
     if (!guard) return null; // fail open: CORE not found on this machine

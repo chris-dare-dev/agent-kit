@@ -214,10 +214,6 @@ def _is_sha256(value: Any) -> bool:
 
 ADAPTER_ROOT_ENV = "PERSONAL_ADAPTER_ROOT"
 ADAPTER_PACKAGE_NAME = "@chris-dare-dev/agent-kit"
-# Legacy offset: valid only while the substrate sits at <workspace>/scripts/.
-_LEGACY_ADAPTER_OFFSET = (
-    "GitLab", "SWAT DevOps - SDO", "platform", "tools", "claude-mcp-server",
-)
 
 
 def _is_adapter_root(candidate: Path) -> bool:
@@ -266,18 +262,14 @@ def _resolve_adapter_root(root: Path) -> Path:
             )
         return candidate
 
-    legacy = root.parent.joinpath(*_LEGACY_ADAPTER_OFFSET)
-    if _is_adapter_root(legacy):
-        return legacy
-
     for ancestor in (root, *root.parents):
         if _is_adapter_root(ancestor):
             return ancestor
 
     raise EvalError(
         f"cannot locate the {ADAPTER_PACKAGE_NAME} checkout from {root}: "
-        f"tried {ADAPTER_ROOT_ENV}, the legacy workspace offset, and every "
-        f"ancestor. Set {ADAPTER_ROOT_ENV} to the checkout path."
+        f"tried {ADAPTER_ROOT_ENV} and every ancestor. "
+        f"Set {ADAPTER_ROOT_ENV} to the checkout path."
     )
 
 

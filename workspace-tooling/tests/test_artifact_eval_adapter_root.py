@@ -65,15 +65,12 @@ class AdapterRootResolutionTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         os.environ.pop(eval_mod.ADAPTER_ROOT_ENV, None)
 
-    def test_legacy_workspace_layout_still_resolves(self) -> None:
-        """substrate at <workspace>/scripts/ — the pre-F-10 layout."""
-        workspace = self.tmp / "workspace"
-        substrate = workspace / "scripts"
-        substrate.mkdir(parents=True)
-        adapter = _make_adapter(
-            workspace.joinpath(*eval_mod._LEGACY_ADAPTER_OFFSET)
-        )
-        self.assertEqual(eval_mod._resolve_adapter_root(substrate), adapter)
+    # test_legacy_workspace_layout_still_resolves is deliberately gone: it
+    # existed only to pin the pre-fork employer offset
+    # (GitLab/SWAT DevOps - SDO/platform/tools/claude-mcp-server), which #36
+    # removes. That layout cannot occur in a public clone. Resolution by
+    # package.json name via the ancestor walk covers the real layouts, and
+    # test_walks_up_when_substrate_lives_inside_the_adapter still proves it.
 
     def test_walks_up_when_substrate_lives_inside_the_adapter(self) -> None:
         """substrate at <adapter>/workspace-tooling/ — the F-10 target layout.
@@ -85,11 +82,14 @@ class AdapterRootResolutionTests(unittest.TestCase):
         substrate.mkdir()
         self.assertEqual(eval_mod._resolve_adapter_root(substrate), adapter)
 
-    def test_environment_override_wins_over_both_heuristics(self) -> None:
+    def test_environment_override_wins_over_the_ancestor_walk(self) -> None:
+        # The decoy must be something the WALK would otherwise find, or this
+        # degenerates into "the override returns the override" and silently
+        # stops asserting precedence.
         workspace = self.tmp / "workspace"
-        substrate = workspace / "scripts"
+        substrate = workspace / "nested"
         substrate.mkdir(parents=True)
-        _make_adapter(workspace.joinpath(*eval_mod._LEGACY_ADAPTER_OFFSET))
+        _make_adapter(workspace)
         explicit = _make_adapter(self.tmp / "explicit-checkout")
 
         os.environ[eval_mod.ADAPTER_ROOT_ENV] = str(explicit)
