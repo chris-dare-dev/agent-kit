@@ -220,7 +220,14 @@ function main() {
   }
 
   // Pass 2 — plant.
+  // Record the .claude/ directory ONLY when we are the ones creating it, so
+  // uninstall can remove it again and not leave an empty shell behind. If it
+  // already existed it is the user's, and must survive an uninstall.
+  const claudeDirExisted = existsSync(claudeDir);
   if (!args.dryRun) mkdirSync(claudeDir, { recursive: true });
+  if (!args.dryRun && !claudeDirExisted) {
+    entries.push({ path: claudeDir, action: "created", at });
+  }
   for (const sub of PLANT_DIRS) {
     const source = join(DATA_DIR, sub);
     if (!existsSync(source)) { warn(`data/${sub} is missing — nothing to plant`); continue; }
@@ -249,7 +256,15 @@ function main() {
     } else {
       cpSync(source, target, { recursive: true });
     }
-    entries.push({ path: target, action, ...(shaBefore ? { sha256_before: shaBefore } : {}), at });
+    // sha256_after is what makes `agent-kit uninstall` able to tell "this is
+    // still what I planted" from "the user has edited it since".
+    entries.push({
+      path: target,
+      action,
+      ...(shaBefore ? { sha256_before: shaBefore } : {}),
+      sha256_after: sha256(target),
+      at,
+    });
     ok(`${action.padEnd(11)} .claude/${sub}`);
   }
 
@@ -285,6 +300,7 @@ function main() {
       path: target,
       action: existed ? "overwritten" : "created",
       ...(shaBefore ? { sha256_before: shaBefore } : {}),
+      sha256_after: sha256(target),
       at,
     });
     ok(`${(existed ? "overwritten" : "created").padEnd(11)} ${target}`);
@@ -318,6 +334,7 @@ function main() {
       path: mcpTarget,
       action: existed ? "overwritten" : "created",
       ...(shaBefore ? { sha256_before: shaBefore } : {}),
+      sha256_after: sha256(mcpTarget),
       at,
     });
     ok(`${(existed ? "overwritten" : "created").padEnd(11)} .mcp.json`);

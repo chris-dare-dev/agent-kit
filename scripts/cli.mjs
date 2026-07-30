@@ -15,6 +15,10 @@ const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)));
 const COMMANDS = {
   init: { file: "init.mjs", blurb: "plant the bundled knowledge into a workspace's .claude/" },
   doctor: { file: "doctor.mjs", blurb: "check every prerequisite and report what is wrong" },
+  uninstall: {
+    file: "uninstall.mjs",
+    blurb: "remove what init recorded (dry-run unless --apply)",
+  },
   "verify-quickstart": {
     file: "verify-quickstart.mjs",
     blurb: "execute the README Quick Start and prove it still works",
