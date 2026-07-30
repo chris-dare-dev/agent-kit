@@ -188,6 +188,11 @@ const ARTIFACT_MEMORY_TOOL_NAMES = new Set([
 // POSIX developer machine and from a Linux CI runner.
 const artifactMemoryProbe = probeArtifactMemory({
   serverProfile: config.serverProfile,
+  // loadConfig() owns the three-step resolution (ARTIFACT_MEMORY_SOCKET, then
+  // service.socket_path from the runtime config, then the profile-aware
+  // default). Without passing it, the adapter falls back to its OWN default and
+  // AGENT_KIT_PROFILE is ignored — every profile dials the same socket.
+  socketPath: config.artifactMemorySocketPath,
   platform: (process.env.AGENT_KIT_PROBE_PLATFORM as NodeJS.Platform) || undefined,
 });
 

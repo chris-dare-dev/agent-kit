@@ -142,19 +142,35 @@ export function loadConfig(): PlatformConfig {
   // the provisioner bound ~/.local/share/personal-artifacts/..., so all four
   // artifact-memory tools were dead on arrival on every clean install.
   // ---------------------------------------------------------------------------
+  // AGENT_KIT_PROFILE isolates a second deployment on one machine: its own
+  // derived root, collection, socket and Qdrant port. This MIRRORS
+  // artifact_runtime.profile_suffix() — if the two disagree, the adapter dials
+  // one profile's socket while the provisioner bound another's, which is the
+  // same class of divergence that left four tools dead on arrival.
+  const rawProfile = process.env.AGENT_KIT_PROFILE;
+  if (rawProfile && !/^[a-z0-9-]{1,32}$/.test(rawProfile)) {
+    throw new Error(
+      `AGENT_KIT_PROFILE was set to "${rawProfile}", which is not a valid ` +
+        "profile name: it must match ^[a-z0-9-]{1,32}$. The name becomes a " +
+        "directory and a collection suffix, so it cannot contain separators.",
+    );
+  }
+  const profileSuffix = rawProfile ? `-${rawProfile}` : "";
+  const appDir = `agent-kit${profileSuffix}`;
+
   const derivedRoot = (): string => {
     const override = process.env.AGENT_KIT_DERIVED_ROOT;
-    if (override) return resolve(override);
+    if (override) return resolve(override) + profileSuffix;
     const xdg = process.env.XDG_DATA_HOME;
-    if (xdg) return resolve(xdg, "agent-kit");
+    if (xdg) return resolve(xdg, appDir);
     if (process.platform === "win32") {
       const local = process.env.LOCALAPPDATA || resolve(homedir(), "AppData", "Local");
-      return resolve(local, "agent-kit");
+      return resolve(local, appDir);
     }
     if (process.platform === "darwin") {
-      return resolve(homedir(), "Library", "Application Support", "agent-kit");
+      return resolve(homedir(), "Library", "Application Support", appDir);
     }
-    return resolve(homedir(), ".local", "share", "agent-kit");
+    return resolve(homedir(), ".local", "share", appDir);
   };
 
   const artifactMemoryDerivedRoot = derivedRoot();

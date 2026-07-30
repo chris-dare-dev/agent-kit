@@ -44,6 +44,55 @@ _APP_DIRNAME = "agent-kit"
 _migration_warned = False
 
 
+PROFILE_RE = re.compile(r"^[a-z0-9-]{1,32}$")
+PROFILE_ENV = "AGENT_KIT_PROFILE"
+#: Loopback base port. A profile shifts off this by a deterministic offset so two
+#: profiles on one machine cannot collide, and the same profile always lands on
+#: the same port across restarts (a random port would break every stored config).
+QDRANT_BASE_PORT = 6343
+
+
+class ProfileError(ValueError):
+    """The profile name is not usable as a path or container-name segment."""
+
+
+def validate_profile(name: str) -> str:
+    if not PROFILE_RE.match(name or ""):
+        raise ProfileError(
+            f"invalid profile {name!r}: must match {PROFILE_RE.pattern} "
+            "(lowercase letters, digits and hyphens, 1-32 characters). "
+            "The name becomes a directory, a Qdrant collection suffix and a "
+            "container name, so it cannot contain separators or spaces."
+        )
+    return name
+
+
+def profile() -> str | None:
+    """The active profile, or None for the unprofiled default."""
+    name = os.environ.get(PROFILE_ENV)
+    return validate_profile(name) if name else None
+
+
+def profile_suffix(name: str | None = None) -> str:
+    resolved = name if name is not None else profile()
+    return f"-{resolved}" if resolved else ""
+
+
+def qdrant_port(name: str | None = None, *, offset: int = 0) -> int:
+    """Deterministic per-profile port: same profile, same port, every time.
+
+    Derived from the name rather than allocated, so a provisioned runtime config
+    stays valid across restarts and two profiles never negotiate for a port.
+    """
+    resolved = name if name is not None else profile()
+    if not resolved:
+        return QDRANT_BASE_PORT + offset
+    validate_profile(resolved)
+    # Small, stable, collision-resistant enough for a handful of local profiles.
+    span = sum(ord(char) * (index + 1) for index, char in enumerate(resolved))
+    return QDRANT_BASE_PORT + offset + 10 + (span % 200) * 2
+
+
 def default_derived_root() -> Path:
     """Per-OS default, with no environment consulted."""
     if sys.platform == "win32":
@@ -56,7 +105,7 @@ def default_derived_root() -> Path:
     return Path.home() / ".local" / "share" / _APP_DIRNAME
 
 
-def derived_root() -> Path:
+def derived_root(name: str | None = None) -> Path:
     """Resolve the derived-state root.
 
     Order: AGENT_KIT_DERIVED_ROOT, then $XDG_DATA_HOME/agent-kit, then the
@@ -69,12 +118,18 @@ def derived_root() -> Path:
     """
     global _migration_warned
 
+    suffix = profile_suffix(name)
+
     override = os.environ.get("AGENT_KIT_DERIVED_ROOT")
     if override:
-        return Path(override).expanduser()
+        # An explicit root is honoured as given; the profile still separates
+        # beneath it, or two profiles pointed at one override would share a store.
+        base = Path(override).expanduser()
+        return base.parent / (base.name + suffix) if suffix else base
 
     xdg = os.environ.get("XDG_DATA_HOME")
-    root = Path(xdg).expanduser() / _APP_DIRNAME if xdg else default_derived_root()
+    base = Path(xdg).expanduser() / _APP_DIRNAME if xdg else default_derived_root()
+    root = base.parent / (base.name + suffix) if suffix else base
 
     if not _migration_warned and not root.exists():
         for legacy in _LEGACY_ROOTS:
@@ -91,8 +146,8 @@ def derived_root() -> Path:
     return root
 
 
-def default_config_path() -> Path:
-    return derived_root() / "artifact-memory-runtime.json"
+def default_config_path(name: str | None = None) -> Path:
+    return derived_root(name) / "artifact-memory-runtime.json"
 
 
 # Import-time snapshots, kept so the ~20 existing call sites that read these as

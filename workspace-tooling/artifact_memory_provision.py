@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import secrets
 import shutil
 import subprocess
@@ -60,13 +61,48 @@ CANONICAL_COMPOSE = Path(__file__).parent / "services" / "qdrant" / "compose.yam
 # diverged, leaving four tools dead on arrival. The cross-language drift test
 # asserts the adapter still contains every segment below.
 SOCKET_RELATIVE_PARTS = ("services", "qdrant", "artifact-memory.sock")
-SERVICE_ROOT = artifact_runtime.derived_root().joinpath(*SOCKET_RELATIVE_PARTS[:-1])
 GENERATION = "p20260721v1"
+
+
+def _active(profile: str | None) -> str | None:
+    return profile if profile is not None else artifact_runtime.profile()
+
+
+def service_root(profile: str | None = None) -> Path:
+    """Where this profile's socket and Qdrant state live.
+
+    With NO profile active this returns the module constant rather than
+    recomputing, so callers and tests that patch SERVICE_ROOT (to redirect a
+    provision run into a temp tree) keep working. Recomputing unconditionally
+    silently ignored those patches and sent test runs at the real derived root.
+    """
+    name = _active(profile)
+    if not name:
+        return SERVICE_ROOT
+    return artifact_runtime.derived_root(name).joinpath(*SOCKET_RELATIVE_PARTS[:-1])
+
+
+def collection(profile: str | None = None) -> str:
+    name = _active(profile)
+    return COLLECTION if not name else ingestion.collection_for(GENERATION, name)
+
+
+def qdrant_url(profile: str | None = None) -> str:
+    """Loopback URL for this profile, on its deterministic port."""
+    name = _active(profile)
+    if not name:
+        return QDRANT_URL
+    return f"http://127.0.0.1:{artifact_runtime.qdrant_port(name)}"
+
+
+# Import-time snapshots for the unprofiled default, so existing call sites and
+# their tests keep working. Anything profile-aware calls the functions above.
+SERVICE_ROOT = artifact_runtime.derived_root().joinpath(*SOCKET_RELATIVE_PARTS[:-1])
 COLLECTION = ingestion.collection_for(GENERATION)
 # Loopback port for this deployment's Qdrant (6343 main / 6345 restore-test), kept
 # clear of the upstream 6333/6335 so a co-resident work stack cannot collide. A
 # module constant so the runtime template and its tests cannot drift apart.
-QDRANT_URL = "http://127.0.0.1:6343"
+QDRANT_URL = f"http://127.0.0.1:{artifact_runtime.QDRANT_BASE_PORT}"
 RETENTION = timedelta(days=30)
 SECRET_FILES = {
     "admin": "admin-api-key",
@@ -220,8 +256,8 @@ def _runtime_payload(
         # what let the two sides disagree in the first place.
         "derived_root": str(artifact_runtime.derived_root()),
         "qdrant": {
-            "url": QDRANT_URL,
-            "collection": COLLECTION,
+            "url": qdrant_url(),
+            "collection": collection(),
             "generation": GENERATION,
             "admin_key_file": str(root / SECRET_FILES["admin"]),
             "read_key_file": str(root / SECRET_FILES["read_only"]),
@@ -306,7 +342,7 @@ def provision(
 ) -> dict[str, Any]:
     workspace = workspace.expanduser().resolve(strict=True)
     config = artifact_runtime.DEFAULT_CONFIG.expanduser().absolute()
-    root = SERVICE_ROOT.expanduser().absolute()
+    root = service_root().expanduser().absolute()
     storage = root / "storage"
     restore_storage = root / "restore-storage"
     snapshots = root / "snapshots"
@@ -382,7 +418,7 @@ def provision(
             "storage": str(storage),
             "restore_storage": str(restore_storage),
             "config": str(config),
-            "collection": COLLECTION,
+            "collection": collection(),
             "generation": GENERATION,
             "directories": directories,
             "files": {
@@ -474,7 +510,7 @@ def provision(
         "storage": str(storage),
         "restore_storage": str(restore_storage),
         "config": str(config),
-        "collection": COLLECTION,
+        "collection": collection(),
         "generation": GENERATION,
         "directories": directories,
         "files": file_status,
@@ -520,6 +556,12 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path, default=DEFAULT_WORKSPACE)
     parser.add_argument(
+        "--profile",
+        default=None,
+        help="isolate this deployment under its own derived root, collection and "
+             "port (pattern: [a-z0-9-]{1,32}); also settable as AGENT_KIT_PROFILE",
+    )
+    parser.add_argument(
         "--apply",
         action="store_true",
         help="perform writes; without it the run is a strictly read-only plan",
@@ -535,6 +577,12 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     try:
         args = _parser().parse_args(argv)
+        # Validate BEFORE anything is created: the name becomes a directory, a
+        # collection suffix and a container name, so a bad one must fail loudly
+        # rather than produce a half-provisioned tree under a mangled path.
+        if args.profile is not None:
+            artifact_runtime.validate_profile(args.profile)
+            os.environ[artifact_runtime.PROFILE_ENV] = args.profile
         print(
             json.dumps(
                 provision(

@@ -162,3 +162,36 @@ test("CONTEXT_GUIDES_DIR overrides the discovered context directory", () => {
   );
   assert.equal(config.contextGuidesDir, explicit);
 });
+
+// ---------------------------------------------------------------------------
+// AGENT_KIT_PROFILE — a second deployment on one machine.
+//
+// One machine used to get exactly one derived root, one collection and one port.
+// The profile suffix here MIRRORS artifact_runtime.profile_suffix(); if the two
+// drift, the adapter dials one profile's socket while the provisioner bound
+// another's — the same class of divergence that left four tools dead on arrival.
+// ---------------------------------------------------------------------------
+
+test("a profile gives its own derived root and socket", () => {
+  const base = { PLATFORM_ROOT: undefined, WORKSPACE_ROOT: undefined };
+  const plain = withEnv({ ...base, AGENT_KIT_PROFILE: undefined }, () => loadConfig());
+  const work = withEnv({ ...base, AGENT_KIT_PROFILE: "work" }, () => loadConfig());
+  const personal = withEnv({ ...base, AGENT_KIT_PROFILE: "personal" }, () => loadConfig());
+
+  for (const [a, b] of [[plain, work], [plain, personal], [work, personal]]) {
+    assert.notEqual(a.artifactMemoryDerivedRoot, b.artifactMemoryDerivedRoot);
+    assert.notEqual(a.artifactMemorySocketPath, b.artifactMemorySocketPath);
+  }
+  assert.ok(work.artifactMemoryDerivedRoot.endsWith("agent-kit-work"));
+  assert.ok(personal.artifactMemoryDerivedRoot.endsWith("agent-kit-personal"));
+});
+
+test("an invalid profile fails loudly, naming the pattern", () => {
+  for (const bad of ["Bad Name", "UPPER", "has/separator", "x".repeat(33)]) {
+    assert.throws(
+      () => withEnv({ AGENT_KIT_PROFILE: bad }, () => loadConfig()),
+      (err: Error) => err.message.includes("^[a-z0-9-]{1,32}$"),
+      `"${bad}" should have been rejected`,
+    );
+  }
+});

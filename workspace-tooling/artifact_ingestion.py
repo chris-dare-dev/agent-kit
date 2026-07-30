@@ -60,7 +60,7 @@ COLLECTION_PREFIX = "personal_artifact_chunks"
 EMBEDDED_GENERATION = "v1"
 
 
-def collection_for(generation: str) -> str:
+def collection_for(generation: str, profile: str | None = None) -> str:
     """Build a collection name from a generation.
 
     THE only way a collection name may be constructed. The embedded default and
@@ -68,7 +68,8 @@ def collection_for(generation: str) -> str:
     (`..._v1` here, `..._p20260721v1` there) and the fallback search path queried
     a collection the provisioner never creates.
     """
-    return f"{COLLECTION_PREFIX}_{generation}"
+    suffix = artifact_runtime.profile_suffix(profile).replace("-", "_")
+    return f"{COLLECTION_PREFIX}_{generation}{suffix}"
 
 
 DEFAULT_COLLECTION = collection_for(EMBEDDED_GENERATION)
