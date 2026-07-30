@@ -120,7 +120,7 @@ A workflow file is a plain `.mjs` module executed by the harness's **Workflow to
 
 ```
 Workflow({
-  scriptPath: "data/scripts/<name>-workflow.mjs",   // relative to the claude-mcp-server checkout
+  scriptPath: "data/scripts/<name>-workflow.mjs",   // relative to the agent-kit checkout
   args: { id: "<ID>", brief: "<BRIEF>", ... }       // pipeline-specific
 })
 // Resume a partial run (completed phases return cached results):
@@ -147,7 +147,7 @@ Hard constraints (stated in every live file's header comments, grep-verified):
 - A workflow **cannot prompt the user** — every gated OFFER/confirm stays in the main session.
 - Paths inside the `.mjs` (e.g. `.claude/notes/<name>s/<id>/…`) are relative strings passed to
   agents in prompts; the agents resolve them from their own CWD. Run the Workflow with the CWD at
-  the claude-mcp-server checkout (see §6).
+  the agent-kit checkout (see §6).
 
 ---
 
@@ -227,11 +227,11 @@ summary (each command body also states its own requirement explicitly):
 
 | Command family | Required CWD | Script-path idiom |
 |---|---|---|
-| Claude `/milestone-pipeline`, `/spike`, `/roadmap` | Inside the **target repo** (one of the ~70 independent clones — the workspace root, `GitLab/`, and `platform/` are NOT git repos, so `git rev-parse` fails there) | `"$WS/.claude/scripts/<name>-*.{sh,py}"` where `WS="${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}"` |
+| Claude `/milestone-pipeline`, `/spike`, `/roadmap` | Inside the **target repo** (one of the ~70 independent clones — the workspace root, `repos/`, and `<project>/` are NOT git repos, so `git rev-parse` fails there) | `"$WS/.claude/scripts/<name>-*.{sh,py}"` where `WS="${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}"` |
 | Codex `$milestone-pipeline` | Start Codex at the **the workspace root** so `.agents/skills` and `.codex/agents` are discovered; pass absolute `--repo-root` and use `git -C` | Same `$WS/.claude/scripts/...` shared runtime. Starting inside a nested target git root can hide workspace adapters. |
 | `/argoops` | The **workspace root** (`$WS`) — `argoops-init.sh` resolves the state dir by walking UP from `$PWD` to the first `.claude/`; run it from `$WS` or the state lands in a nested `.claude/` (e.g. `platform/.claude/`) | `"$WS/.claude/scripts/argoops-*.sh"`, invoked with CWD=`$WS` |
-| Gen-2 discovery pipelines | The **claude-mcp-server checkout** (`$WS/GitLab/workspace/platform/tools/claude-mcp-server/`) — both `data/scripts/…` and the run's `.claude/notes/<name>s/<ID>/` state resolve there | `data/scripts/<name>-*` relative paths |
-| Meta commands | The claude-mcp-server checkout (they write `data/…`) | `data/scripts/…`, `data/references/…` |
+| Gen-2 discovery pipelines | The **agent-kit checkout** (`$WS/<workspace>/<project>/agent-kit/`) — both `data/scripts/…` and the run's `.claude/notes/<name>s/<ID>/` state resolve there | `data/scripts/<name>-*` relative paths |
+| Meta commands | The agent-kit checkout (they write `data/…`) | `data/scripts/…`, `data/references/…` |
 
 Outcome-log emits (all families): invoke with `python3` (never `bash` — a `.py` under bash parses
 the docstring as shell and silently no-ops behind `|| true`), and pin the corpus to the single

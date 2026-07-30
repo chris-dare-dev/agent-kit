@@ -339,7 +339,7 @@ def self_test() -> int:
                 "tags": ["moscow/must"],
                 "rice": 1,
                 "specialist": "general-purpose",
-                "repos": ["tools/claude-mcp-server"],
+                "repos": ["agent-kit"],
                 "external_writes": [],
                 "gitlab": {"epic_iid": None, "story_iids": []},
                 "run": {

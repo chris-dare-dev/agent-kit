@@ -31,16 +31,16 @@ SCHEMA_VERSION = 3
 SUPPORTED_SCHEMA_VERSIONS = (2, 3)
 CATALOG_READ_ATTEMPTS = 3
 DEFAULT_OUTPUT_DIR = artifact_runtime.derived_root()
-DEFAULT_ROOTS = ("plans", ".claude", "docs", "GitLab")
+DEFAULT_ROOTS = ("plans", ".claude", "docs", "repos")
 DEFAULT_INCLUDE_GLOBS = (
     "plans/**",
     ".claude/notes/**",
     ".claude/agent-memory/**",
     "docs/**",
-    "GitLab/**/plans/**",
-    "GitLab/**/.claude/notes/**",
-    "GitLab/**/.claude/agent-memory/**",
-    "GitLab/**/docs/**",
+    "repos/**/plans/**",
+    "repos/**/.claude/notes/**",
+    "repos/**/.claude/agent-memory/**",
+    "repos/**/docs/**",
 )
 DOCUMENT_SUFFIXES = {
     ".md", ".mdx", ".txt", ".rst", ".adoc", ".json", ".yaml", ".yml",
@@ -281,7 +281,7 @@ def source_metadata(relative: str, path: Path, workspace: Path, cache: dict[Path
         scope = "workspace_plans"
     elif parts and parts[0] == "docs":
         scope = "workspace_docs"
-    elif parts and parts[0] == "GitLab":
+    elif parts and parts[0] == "repos":
         scope = "gitlab_workspace"
     else:
         scope = "workspace"

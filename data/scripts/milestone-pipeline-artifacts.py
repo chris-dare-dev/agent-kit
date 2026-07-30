@@ -12179,7 +12179,7 @@ def self_test() -> int:
         ), "secret-revealing output flags are forbidden")
         check("HTTP token userinfo is refused before persistence", lambda: (
             _validated_remote_url(
-                "https://PATSECRET@gitlab.example/team/repo.git", "fixture remote"
+                "https://PATSECRET@git.example.com/team/repo.git", "fixture remote"
             )
         ), "userinfo credentials are forbidden")
         check("URL credential in operation argv is refused", lambda: (
@@ -13020,7 +13020,7 @@ def self_test() -> int:
         # signals (GitLab group path + local clone parent dir) must close that gap.
         opsinfra_remote_repo, opsinfra_remote_base, opsinfra_remote_head = reviewer_repo(
             "ops-infra", "stacks/kargo/main.go",
-            remote="git@gitlab.example.com:example-org/platform/infra/ops-infra.git",
+            remote="git@git.example.com:example-org/platform/infra/ops-infra.git",
         )
         check("ops-infra group-path topology selects infra adversary despite repo-relative diff", lambda: _expect(
             "milestone-infra-safety" in _required_reviewers(
@@ -13037,7 +13037,7 @@ def self_test() -> int:
         ))
         source_repo, source_base, source_head = reviewer_repo(
             "some-app", "cmd/server/main.go",
-            remote="git@gitlab.example.com:example-org/platform/source/some-app.git",
+            remote="git@git.example.com:example-org/platform/source/some-app.git",
         )
         check("non-infra source repo does not over-select infra adversary", lambda: _expect(
             "milestone-infra-safety" not in _required_reviewers(

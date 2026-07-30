@@ -11,7 +11,7 @@
       "id": "agent/context-curator",
       "kind": "agent",
       "name": "context-curator",
-      "description": "Curates the host's durable context — root CLAUDE.md, collection-level CLAUDE.md files under GitLab/workspace/platform/**, and the current engineer's per-user memory tree under ~/.claude/projects/<workspace-slug>/memory/. Use when capturing a non-obvious pattern, a post-incident learning, a behavior correction, or promoting a personal memory into team context. Classifies the learning, finds the right file, de-duplicates against prior coverage, drafts a diff, and waits for explicit user approval before writing. Read-heavy; proposes changes, never runs mutating commands.",
+      "description": "Curates the host's durable context — root CLAUDE.md, collection-level CLAUDE.md files under <workspace>/<project>/**, and the current engineer's per-user memory tree under ~/.claude/projects/<workspace-slug>/memory/. Use when capturing a non-obvious pattern, a post-incident learning, a behavior correction, or promoting a personal memory into team context. Classifies the learning, finds the right file, de-duplicates against prior coverage, drafts a diff, and waits for explicit user approval before writing. Read-heavy; proposes changes, never runs mutating commands.",
       "owner": "platform-tooling",
       "domain": "context",
       "provenance": "data\\agents\\context-curator.md",
@@ -269,7 +269,7 @@
       "owner": "platform-tooling",
       "domain": "milestone",
       "provenance": "data\\agents\\milestone-researcher.md",
-      "freshness": "2026-07-23T23:52:01-04:00",
+      "freshness": "2026-07-29T01:11:10-04:00",
       "sensitivity": "shared-safe",
       "ioSchema": {
         "tools": [
@@ -366,7 +366,7 @@
       "owner": "platform-tooling",
       "domain": "roadmap",
       "provenance": "data\\agents\\roadmap-refiner.md",
-      "freshness": "2026-07-23T23:52:01-04:00",
+      "freshness": "2026-07-29T01:11:10-04:00",
       "sensitivity": "shared-safe",
       "ioSchema": {
         "tools": [

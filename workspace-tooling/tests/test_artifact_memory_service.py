@@ -1835,7 +1835,7 @@ class ArtifactProtocolVersionTests(unittest.TestCase):
         """The Node adapter is the other half of this contract; catch drift.
 
         This test resolved the adapter through an employer checkout path
-        (`GitLab/SWAT DevOps - SDO/platform/tools/claude-mcp-server/...`) that
+        (`<workspace>/<project>/agent-kit/...`) that
         does not exist in this repository, and called skipTest when it was
         absent. So the ONLY cross-language contract check in the tree silently
         skipped on every run -- which is precisely why the socket path was free

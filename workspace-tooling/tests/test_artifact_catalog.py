@@ -24,25 +24,25 @@ class ArtifactCatalogTests(unittest.TestCase):
         self.workspace = self.root / "workspace"
         self.output = self.root / "derived"
         self.workspace.mkdir()
-        for required in ("plans", ".claude", "docs", "GitLab"):
+        for required in ("plans", ".claude", "docs", "repos"):
             (self.workspace / required).mkdir()
         self.policy = self.root / "policy.json"
         self.policy.write_text(json.dumps({"schema_version": 1, "catalog": {
-            "canonical_roots": ["plans", ".claude", "docs", "GitLab"],
+            "canonical_roots": ["plans", ".claude", "docs", "repos"],
             "top_level_globs": ["*.md"],
             "include_path_globs": [
                 "plans/**",
                 ".claude/notes/**",
                 ".claude/agent-memory/**",
                 "docs/**",
-                "GitLab/**/plans/**",
-                "GitLab/**/.claude/notes/**",
-                "GitLab/**/.claude/agent-memory/**",
-                "GitLab/**/docs/**",
+                "repos/**/plans/**",
+                "repos/**/.claude/notes/**",
+                "repos/**/.claude/agent-memory/**",
+                "repos/**/docs/**",
             ],
             "exclude_roots": ["Vault", "Notes", ".worktrees"],
             "prune_directory_names": [".aggregate", ".git", ".venv", "__pycache__", "node_modules"],
-            "prune_path_globs": ["GitLab/**/apps/ai-studio/**", "**/.aggregate/**", "**/*run.failed*/**", "**/cue.mod/pkg/**", "**/vendor/**"],
+            "prune_path_globs": ["repos/**/apps/ai-studio/**", "**/.aggregate/**", "**/*run.failed*/**", "**/cue.mod/pkg/**", "**/vendor/**"],
         }}), encoding="utf-8")
 
     def tearDown(self) -> None:
@@ -58,9 +58,9 @@ class ArtifactCatalogTests(unittest.TestCase):
         roadmap = self.write("plans/alpha-roadmap.md", "# Alpha\n")
         handoff = self.write("plans/handoff-continuation.md", "status: requested\n")
         self.write("docs/architecture/adr-001.md", "# decision\n")
-        self.write("GitLab/thing/docs/README.md", "# Alpha\n")
+        self.write("repos/thing/docs/README.md", "# Alpha\n")
         self.write("Vault/AgentDocs/nope.md")
-        self.write("GitLab/thing/vendor/nope.md")
+        self.write("repos/thing/vendor/nope.md")
         summary = catalog.run_catalog(self.workspace, self.output, self.policy, dry_run=False)
 
         self.assertEqual(summary["counts"]["artifacts"], 4)
@@ -116,14 +116,14 @@ class ArtifactCatalogTests(unittest.TestCase):
 
     def test_default_deny_and_generated_pruning(self) -> None:
         self.write("plans/wanted.md")
-        self.write("GitLab/a/arbitrary.yaml")
-        self.write("GitLab/a/docs/wanted.md")
-        self.write("GitLab/a/.aggregate/run.failed/docs/generated.md")
+        self.write("repos/a/arbitrary.yaml")
+        self.write("repos/a/docs/wanted.md")
+        self.write("repos/a/.aggregate/run.failed/docs/generated.md")
         self.write("Vault/AgentDocs/alias.md")
         self.write("Notes/user-note.md")
-        self.write("GitLab/a/deps/dependency.md")
-        self.write("GitLab/a/cue.mod/pkg/package.md")
-        self.write("GitLab/a/apps/ai-studio/no-touch.md")
+        self.write("repos/a/deps/dependency.md")
+        self.write("repos/a/cue.mod/pkg/package.md")
+        self.write("repos/a/apps/ai-studio/no-touch.md")
         summary = catalog.run_catalog(self.workspace, self.output, self.policy, dry_run=True)
         self.assertEqual(summary["counts"]["artifacts"], 2)
         self.assertEqual(summary["counts"]["outside_artifact_scope"], 1)

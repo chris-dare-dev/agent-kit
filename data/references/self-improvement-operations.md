@@ -40,11 +40,11 @@ n=43, despite every re-run threshold being crossed.
 
 ## 2. Environment contract (read runtime-contract.md first)
 
-All commands below run **from the claude-mcp-server repo root** and resolve the workspace as:
+All commands below run **from the agent-kit repo root** and resolve the workspace as:
 
 ```bash
 WS="${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}"
-cd "$WS/GitLab/workspace/platform/tools/claude-mcp-server"
+cd "$WS/<workspace>/<project>/agent-kit"
 export WORKSPACE_ROOT="$WS"   # makes the agent-memory scripts resolve the unified root
 ```
 

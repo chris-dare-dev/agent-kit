@@ -113,16 +113,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEMPLATE=""
 if [[ -n "${MCP_SERVER_ROOT:-}" && -f "$MCP_SERVER_ROOT/data/references/roadmap-template-roadmap.md" ]]; then
   TEMPLATE="$MCP_SERVER_ROOT/data/references/roadmap-template-roadmap.md"
-elif [[ -f "$REPO_ROOT/tools/claude-mcp-server/data/references/roadmap-template-roadmap.md" ]]; then
-  TEMPLATE="$REPO_ROOT/tools/claude-mcp-server/data/references/roadmap-template-roadmap.md"
-elif [[ -f "$REPO_ROOT/../tools/claude-mcp-server/data/references/roadmap-template-roadmap.md" ]]; then
-  CAND="$REPO_ROOT/../tools/claude-mcp-server/data/references/roadmap-template-roadmap.md"
+elif [[ -f "$REPO_ROOT/agent-kit/data/references/roadmap-template-roadmap.md" ]]; then
+  TEMPLATE="$REPO_ROOT/agent-kit/data/references/roadmap-template-roadmap.md"
+elif [[ -f "$REPO_ROOT/../agent-kit/data/references/roadmap-template-roadmap.md" ]]; then
+  CAND="$REPO_ROOT/../agent-kit/data/references/roadmap-template-roadmap.md"
   TEMPLATE="$(cd "$(dirname "$CAND")" && pwd)/$(basename "$CAND")"
 elif [[ -f "$SCRIPT_DIR/../references/roadmap-template-roadmap.md" ]]; then
   # Script lives at <mcp-server>/data/scripts/; $SCRIPT_DIR/../references resolves to data/references/.
   TEMPLATE="$(cd "$SCRIPT_DIR/../references" && pwd)/roadmap-template-roadmap.md"
 else
-  echo "template not found. Set MCP_SERVER_ROOT to the claude-mcp-server directory, or ensure data/references/roadmap-template-roadmap.md is resolvable from \$0 or REPO_ROOT." >&2
+  echo "template not found. Set MCP_SERVER_ROOT to the agent-kit directory, or ensure data/references/roadmap-template-roadmap.md is resolvable from \$0 or REPO_ROOT." >&2
   exit 1
 fi
 if [[ ! -f "$TEMPLATE" ]]; then

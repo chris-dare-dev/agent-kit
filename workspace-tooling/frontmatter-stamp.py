@@ -31,8 +31,8 @@ VAULT = load_project_manifest(os.path.join(SCRIPT_DIR, "project-map.json"))["vau
 AGENT_REGIONS = [
     "plans",
     "docs",
-    "GitLab/workspace/platform/plans",
-    "GitLab/workspace/platform/docs",
+    "<workspace>/<project>/plans",
+    "<workspace>/<project>/docs",
 ]
 
 

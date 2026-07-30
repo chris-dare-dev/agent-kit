@@ -1,7 +1,7 @@
 """Adapter-root resolution must not depend on where the substrate lives (F-10).
 
 Regression cover for the coupling that blocked versioning this tree: the
-release-evidence manifest binds the claude-mcp-server adapter files, and used to
+release-evidence manifest binds the adapter files, and used to
 locate them by a hardcoded offset from `<workspace>/scripts/`. Moving the
 substrate doubled the path and failed 23 of 433 tests, while the same suite was
 green in place — a failure mode invisible until someone tried to move it.
@@ -35,9 +35,9 @@ class AdapterRootIdentificationTests(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
 
     def test_identifies_by_package_name_not_directory_name(self) -> None:
-        # A directory NAMED claude-mcp-server that is not the package must not
+        # A directory NAMED like the package but WITHOUT the package name in its
         # satisfy the check — a path component is not evidence of identity.
-        impostor = _make_adapter(self.tmp / "claude-mcp-server", name="something-else")
+        impostor = _make_adapter(self.tmp / "agent-kit", name="something-else")
         self.assertFalse(eval_mod._is_adapter_root(impostor))
 
         genuine = _make_adapter(self.tmp / "renamed-checkout")
@@ -67,7 +67,7 @@ class AdapterRootResolutionTests(unittest.TestCase):
 
     # test_legacy_workspace_layout_still_resolves is deliberately gone: it
     # existed only to pin the pre-fork employer offset
-    # (GitLab/SWAT DevOps - SDO/platform/tools/claude-mcp-server), which #36
+    # (a pre-fork employer monorepo offset), which #36
     # removes. That layout cannot occur in a public clone. Resolution by
     # package.json name via the ancestor walk covers the real layouts, and
     # test_walks_up_when_substrate_lives_inside_the_adapter still proves it.
@@ -77,7 +77,7 @@ class AdapterRootResolutionTests(unittest.TestCase):
 
         This is the case that used to double the path and fail 23 tests.
         """
-        adapter = _make_adapter(self.tmp / "claude-mcp-server")
+        adapter = _make_adapter(self.tmp / "agent-kit")
         substrate = adapter / "workspace-tooling"
         substrate.mkdir()
         self.assertEqual(eval_mod._resolve_adapter_root(substrate), adapter)

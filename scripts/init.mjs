@@ -4,7 +4,7 @@
  *
  * Replaces setup-local.sh, which could not run here at all: it walked parent
  * directories for one containing both `charts/` and `tools/`, then for one
- * containing `GitLab/`, and called fatal otherwise. Neither exists in this
+ * containing a pre-fork VCS-root directory, and called fatal otherwise. Neither exists in this
  * repository or in any ordinary clone, so even `--build-only` exited before
  * npm ci. Its `while [[ "$dir" != "/" ]]` walk also never terminates on a
  * Windows path root.

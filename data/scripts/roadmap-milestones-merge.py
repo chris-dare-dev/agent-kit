@@ -210,7 +210,7 @@ def self_test() -> int:
             "tags": ["moscow/must"],
             "rice": 1,
             "specialist": "general-purpose",
-            "repos": ["tools/claude-mcp-server"],
+            "repos": ["agent-kit"],
             "external_writes": [],
             "gitlab": dict(GITLAB_SKELETON),
             "run": dict(RUN_SKELETON),

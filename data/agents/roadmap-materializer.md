@@ -40,7 +40,7 @@ cat ".claude/agent-memory/roadmap-materializer/lessons.md" 2>/dev/null || echo "
 
 ## Step 1 — Read the phase-materialize reference + entire roadmap doc (REQUIRED)
 
-Read in order (paths resolve from ANY CWD — the target repo is usually NOT the claude-mcp-server checkout, so never use relative `data/...` paths):
+Read in order (paths resolve from ANY CWD — the target repo is usually NOT the agent-kit checkout, so never use relative `data/...` paths):
 
 1. `$WS/.claude/references/roadmap-phase-materialize.md` (where `WS="${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}"`; equivalently MCP `get_reference("roadmap-phase-materialize")`) — canonical Phase 4 detail: cross-references format, lint rules, register field mapping, GitLab artifact construction, `/issue-create` handoff, `/milestone-pipeline` kick-off.
 2. The entire `{ROADMAP_PATH}` doc — all sections.

@@ -12,7 +12,7 @@
 # script turns the honor system into an enforced gate.
 #
 # Run manually, or wire as a git pre-commit hook in the WORKSPACE (where both copies
-# exist). It cannot run in the claude-mcp-server repo's own CI — the active copies
+# exist). It cannot run in the agent-kit repo's own CI — the active copies
 # live outside this repo (workspace root / sibling repos), so only a full-workspace
 # checkout can compare them.
 #
@@ -45,10 +45,10 @@ strip_frontmatter() {
 
 # --- Resolve roots --------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# data/scripts/ -> claude-mcp-server -> tools -> platform
+# data/scripts/ -> agent-kit -> tools -> platform
 DEFAULT_PLATFORM_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 PLATFORM_ROOT="${PLATFORM_ROOT:-${DEFAULT_PLATFORM_ROOT}}"
-# platform -> SWAT DevOps - SDO -> GitLab -> workspace root
+# platform -> <group> -> GitLab -> workspace root
 DEFAULT_WORKSPACE_ROOT="$(cd "${PLATFORM_ROOT}/../../.." && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-${DEFAULT_WORKSPACE_ROOT}}"
 
@@ -57,7 +57,7 @@ DATA_CLAUDE_MD="${SCRIPT_DIR}/../claude-md"
 # --- The four copy pairs: "<data/ copy>|<active workspace path>" -----------------
 PAIRS=(
   "${DATA_CLAUDE_MD}/workspace-root.md|${WORKSPACE_ROOT}/CLAUDE.md"
-  "${DATA_CLAUDE_MD}/gitlab-domain.md|${WORKSPACE_ROOT}/GitLab/CLAUDE.md"
+  "${DATA_CLAUDE_MD}/gitlab-domain.md|${WORKSPACE_ROOT}/repos/CLAUDE.md"
   "${DATA_CLAUDE_MD}/platform-monorepo.md|${PLATFORM_ROOT}/CLAUDE.md"
   "${DATA_CLAUDE_MD}/AGENTS.md|${WORKSPACE_ROOT}/AGENTS.md"
   "${DATA_CLAUDE_MD}/CONTEXT.md|${WORKSPACE_ROOT}/CONTEXT.md"

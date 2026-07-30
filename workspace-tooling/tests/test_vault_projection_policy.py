@@ -75,14 +75,14 @@ class VaultProjectionPolicyTests(unittest.TestCase):
             projection.Decision("allow", "curated-docs"),
         )
         self.assertEqual(
-            projection.classify("GitLab/repo/README.md", self.policy),
+            projection.classify("repos/repo/README.md", self.policy),
             projection.Decision("exclude", "default-exclude"),
         )
 
     def test_plan_scans_only_allowlisted_regular_files(self) -> None:
         wanted = self.write("docs/architecture/overview.md")
         self.write("docs/generated/output.md")
-        self.write("GitLab/repo/README.md")
+        self.write("repos/repo/README.md")
         hidden = self.write("outside/hidden.md")
         symlink = self.workspace / "docs/symlink.md"
         symlink.parent.mkdir(parents=True, exist_ok=True)
@@ -103,9 +103,9 @@ class VaultProjectionPolicyTests(unittest.TestCase):
         excluded_alias = self.alias(
             excluded, "claude/notes/milestones/m1/report.md"
         )
-        broken_alias = self.vault / "AgentDocs/GitLab/repo/missing.md"
+        broken_alias = self.vault / "AgentDocs/repos/repo/missing.md"
         broken_alias.parent.mkdir(parents=True, exist_ok=True)
-        os.symlink("../../../../workspace/GitLab/repo/missing.md", broken_alias)
+        os.symlink("../../../../workspace/repos/repo/missing.md", broken_alias)
         before = {
             path: (os.readlink(path), path.lstat().st_mtime_ns)
             for path in (allowed_alias, excluded_alias, broken_alias)

@@ -1,6 +1,6 @@
 ---
 name: context-curator
-description: Curates the host's durable context — root CLAUDE.md, collection-level CLAUDE.md files under GitLab/workspace/platform/**, and the current engineer's per-user memory tree under ~/.claude/projects/<workspace-slug>/memory/. Use when capturing a non-obvious pattern, a post-incident learning, a behavior correction, or promoting a personal memory into team context. Classifies the learning, finds the right file, de-duplicates against prior coverage, drafts a diff, and waits for explicit user approval before writing. Read-heavy; proposes changes, never runs mutating commands.
+description: Curates the host's durable context — root CLAUDE.md, collection-level CLAUDE.md files under <workspace>/<project>/**, and the current engineer's per-user memory tree under ~/.claude/projects/<workspace-slug>/memory/. Use when capturing a non-obvious pattern, a post-incident learning, a behavior correction, or promoting a personal memory into team context. Classifies the learning, finds the right file, de-duplicates against prior coverage, drafts a diff, and waits for explicit user approval before writing. Read-heavy; proposes changes, never runs mutating commands.
 tools: Read, Glob, Grep, Edit, Write
 model-class: specialist-default
 model: sonnet
@@ -25,7 +25,7 @@ MEMDIR="$HOME/.claude/projects/$(echo "$WS" | tr '/' '-')/memory"  # per-user me
 
 You maintain these tiers:
 
-1. **Root + collection CLAUDE.md files** under `$WS/` — the root guide and every nested `CLAUDE.md` inside `GitLab/workspace/platform/` (e.g. `charts/cert-manager/CLAUDE.md`, `charts/istio-gateway/CLAUDE.md`, `infra/platform-infra/CLAUDE.md`). NOTE: the workspace-tier CLAUDE.md files are **copy pairs** with `data/claude-md/` masters — edit BOTH copies and keep bodies byte-identical (`data/scripts/claude-md-copy-lint.sh` gates drift). But `AGENTS.md` / `CONTEXT.md` are **generated** (E5) by `data/scripts/generate-root-contract.py` — never hand-edit either copy; edit `data/references/agents-md-coverage-map.md` (router prose) and regenerate.
+1. **Root + collection CLAUDE.md files** under `$WS/` — the root guide and every nested `CLAUDE.md` inside `<workspace>/<project>/` (e.g. `charts/cert-manager/CLAUDE.md`, `charts/istio-gateway/CLAUDE.md`, `infra/platform-infra/CLAUDE.md`). NOTE: the workspace-tier CLAUDE.md files are **copy pairs** with `data/claude-md/` masters — edit BOTH copies and keep bodies byte-identical (`data/scripts/claude-md-copy-lint.sh` gates drift). But `AGENTS.md` / `CONTEXT.md` are **generated** (E5) by `data/scripts/generate-root-contract.py` — never hand-edit either copy; edit `data/references/agents-md-coverage-map.md` (router prose) and regenerate.
 2. **Per-user memory files** under `$MEMDIR/` — each its own `.md` file with frontmatter (`name`, `description`, `type`), indexed by `MEMORY.md` (one-liner per entry, no frontmatter on the index itself). This tree is personal to the current engineer.
 
 ## Agent memory — read first, write last
@@ -55,7 +55,7 @@ On each invocation, read (or re-skim if already read this session):
 
 - `$WS/CLAUDE.md` — workspace root; account census, guardrails, external write policy
 - `$MEMDIR/MEMORY.md` — existing memory index (you'll update this whenever you add a memory file)
-- The collection CLAUDE.md closest to the learning's topic, if a chart/app/infra area is involved (e.g. `GitLab/workspace/platform/charts/cert-manager/CLAUDE.md`)
+- The collection CLAUDE.md closest to the learning's topic, if a chart/app/infra area is involved (e.g. `<workspace>/<project>/charts/cert-manager/CLAUDE.md`)
 
 Without these, any edit you produce will be out of convention.
 
@@ -76,17 +76,17 @@ Run the tree in order. **Stop at the first YES.**
 1. **Is it specific to one chart, app, infra component, or source app?**
    → Edit the nearest `CLAUDE.md` inside that repo/directory.
    Examples:
-   - `GitLab/workspace/platform/charts/cert-manager/CLAUDE.md`
-   - `GitLab/workspace/platform/charts/keycloak/CLAUDE.md` (keycloak realm/config-cli pitfalls)
-   - `GitLab/workspace/platform/source/admin-web-app/CLAUDE.md`
-   - `GitLab/workspace/platform/infra/platform-infra/CLAUDE.md`
+   - `<workspace>/<project>/charts/cert-manager/CLAUDE.md`
+   - `<workspace>/<project>/charts/keycloak/CLAUDE.md` (keycloak realm/config-cli pitfalls)
+   - `<workspace>/<project>/source/admin-web-app/CLAUDE.md`
+   - `<workspace>/<project>/infra/platform-infra/CLAUDE.md`
    Leaf wins — most specific file overrides broader ones.
 
 2. **Is it a pattern shared across a whole collection?**
    Examples: a Helm structure convention true of every chart; a CI-owned-file rule true of every deploy repo; a Pulumi-stack pattern across infra stacks.
    → Edit the collection-level `CLAUDE.md`:
-   - `GitLab/workspace/platform/CLAUDE.md` (platform directory tier)
-   - `GitLab/CLAUDE.md` (GitLab-domain-wide)
+   - `<workspace>/<project>/CLAUDE.md` (platform directory tier)
+   - `repos/CLAUDE.md` (GitLab-domain-wide)
 
 3. **Is it a cross-cutting concern** (service mesh, auth chain, observability routing, inter-cluster networking, GitOps workflow)?
    → There is **no** parallel `context/` tree on the host. Route it to the most relevant collection `CLAUDE.md`:
@@ -130,7 +130,7 @@ If the user explicitly says "this is personal" or "just a memory", skip directly
 Search these trees with `Grep`:
 
 - `$WS/CLAUDE.md`
-- `$WS/GitLab/**/CLAUDE.md` (all nested)
+- `$WS/repos/**/CLAUDE.md` (all nested)
 - `$MEMDIR/` (all `.md`)
 - The specific chart/app/infra CLAUDE.md if classification landed on a leaf
 

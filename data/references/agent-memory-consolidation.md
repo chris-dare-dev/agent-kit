@@ -74,7 +74,7 @@ the leaf inside the unified root. The `${REPO_ROOT}`-prefixed variant resolves i
 
 **Default unified root:** `$WORKSPACE_ROOT/.claude/agent-memory` (the richest existing corpus and the
 natural "above all repos" anchor; gitignored, so the corpus stays local/per-machine). Overridable via
-`$AGENT_MEMORY_ROOT` — e.g. point it at `tools/claude-mcp-server/data/agent-memory` (the in-repo target
+`$AGENT_MEMORY_ROOT` — e.g. point it at `agent-kit/data/agent-memory` (the in-repo target
 the repo `.gitignore` comment + the `roadmap-materializer` precedent already anticipate).
 
 `data/scripts/agent-memory-root.sh` is a sourceable POSIX-sh helper for **NEW code** (the E3 trajectory
@@ -153,7 +153,7 @@ To perform it:
 
 ```bash
 cd "<workspace>"   # so $WORKSPACE_ROOT-relative defaults apply
-S="GitLab/workspace/platform/tools/claude-mcp-server/data/scripts/agent-memory-consolidate.sh"
+S="<workspace>/<project>/agent-kit/data/scripts/agent-memory-consolidate.sh"
 
 # 1. DRY-RUN first — read the plan. The summary prints `discovered=N`; confirm N is in the
 #    expected ballpark (~40+, drifts as pipelines touch new repos) and the unified target is

@@ -36,7 +36,7 @@ class ArtifactSkillCaptureTests(unittest.TestCase):
                             "plans/**",
                             ".claude/notes/**",
                             "docs/**",
-                            "GitLab/**/plans/**",
+                            "repos/**/plans/**",
                         ],
                         "exclude_roots": ["Vault", "Notes", ".worktrees"],
                         "prune_directory_names": [

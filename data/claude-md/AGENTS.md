@@ -28,7 +28,7 @@ The workspace agent registry, generated as a thin provider-neutral router: the f
 
 ## Cross-agent coordination
 
-- Specialist agents (gitlab-workflow, release-manager, the K8s-ops agents) carry only Read/Glob/Grep/Bash — they CANNOT call `mcp__GitLab__*` or other MCP tools. GitLab/MCP reads and writes happen in the MAIN session or via skills.
+- Specialist agents (gitlab-workflow, release-manager, the K8s-ops agents) carry only Read/Glob/Grep/Bash — they CANNOT call `mcp__GitLab__*` or other MCP tools. GitLab and MCP reads and writes happen in the MAIN session or via skills.
 - After editing a platform repo, push routine commits to `main` after authorization; use no feature branch/MR unless Chris asks. `dev` is retired. CI renders to `deploy:dev`; Kargo promotes `deploy:stage`+`deploy:main`.
 - **Agent-artifact finalization** — use canonical skills; after terminal validation, refresh Obsidian and emit the append-only receipt. Qdrant is derived search; Graphiti stays candidate-only/write-disabled pending explicit approval. Preserve sources and report capture failures; never write sinks.
 - **New-tenant provisioning** — gitlab-workflow (linked issues per repo) -> tenant-onboarding (changes across repos) -> release-manager (dev->stage->prod).

@@ -92,7 +92,7 @@ data/skills/milestone-pipeline-deprecated/SKILL.md  # the deprecated-stub patter
 
 ```bash
 # Repo-specific layout + conventions.
-cat tools/claude-mcp-server/CLAUDE.md 2>/dev/null || cat CLAUDE.md  # discovery rules, flat-naming convention
+cat agent-kit/CLAUDE.md 2>/dev/null || cat CLAUDE.md  # discovery rules, flat-naming convention
 cat data/claude-md/workspace-root.md   # workspace-tier CLAUDE.md (canonical source)
 git log --oneline -10 | head           # commit conventions, scope catalog
 gpg --list-secret-keys | grep -E "^(uid|sec)" | head -5  # GPG key for signing
@@ -136,7 +136,7 @@ Agent B is migrating scripts + updating CLAUDE.md + writing the deprecated
 stub in the SAME assistant turn. **Disjoint write surfaces — do NOT touch
 anything outside your assigned paths.**
 
-REPO ROOT: <absolute path to claude-mcp-server>
+REPO ROOT: <absolute path to agent-kit>
 
 ## Your assigned writes
 
@@ -184,7 +184,7 @@ NEVER spawn subagents.
 
 ## External-write boundary (LOAD-BEARING if applicable)
 
-If any phase touches GitLab/Confluence/AWS/etc., that agent's scope-bounds
+If any phase touches GitLab, Confluence, AWS/etc., that agent's scope-bounds
 MUST explicitly forbid the relevant write tools (mcp__GitLab__create_issue,
 gh issue create, glab issue create, /issue-create, etc.). The agent DRAFTS
 to local files; the orchestrator handles the external write only after
@@ -334,7 +334,7 @@ Agent A is writing the command + N subagents + migrating references in the
 SAME assistant turn. **Disjoint write surfaces — do NOT touch anything
 outside your assigned paths.**
 
-REPO ROOT: <absolute path to claude-mcp-server>
+REPO ROOT: <absolute path to agent-kit>
 
 ## Your assigned writes
 
@@ -893,7 +893,7 @@ After conversion:
 
 The pipeline is self-contained. You should not need to intervene mid-build except (a) when an agent gates on an architecturally divergent fork (the agent will surface it and wait), and (b) at the final push-authorization gate.
 
-If the target repo doesn't have prior conversions (no `/milestone-pipeline` or `/spike` to use as canonical examples), the build still works but the receiving Claude will fall back to inferring the pattern from the prompt alone — quality is lower. Consider seeding the target repo with one of the canonical commands first (copy from `tools/claude-mcp-server/data/commands/spike.md` or `milestone-pipeline.md` as a reference) before running the conversion.
+If the target repo doesn't have prior conversions (no `/milestone-pipeline` or `/spike` to use as canonical examples), the build still works but the receiving Claude will fall back to inferring the pattern from the prompt alone — quality is lower. Consider seeding the target repo with one of the canonical commands first (copy from `agent-kit/data/commands/spike.md` or `milestone-pipeline.md` as a reference) before running the conversion.
 
 ## Prior conversions
 

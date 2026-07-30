@@ -350,8 +350,8 @@ def _fixture(slug: str = "demo-slug") -> dict:
             "tags": ["moscow/must"],
             "rice": 100,
             "specialist": "general-purpose",
-            "repos": ["tools/claude-mcp-server"],
-            "external_writes": ["git push origin HEAD:main (tools/claude-mcp-server)"],
+            "repos": ["agent-kit"],
+            "external_writes": ["git push origin HEAD:main (agent-kit)"],
             "gitlab": {"epic_iid": None, "story_iids": []},
             "run": {
                 "state_path": None,

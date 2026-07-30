@@ -40,7 +40,7 @@ DEFAULT_WORKSPACE = Path(__file__).resolve().parents[1]
 DEFAULT_CATALOG = artifact_runtime.derived_root() / "artifact-catalog.sqlite3"
 DEFAULT_QUARANTINE_ROOT = artifact_runtime.derived_root() / "quarantine"
 DEFAULT_RULES: dict[str, Any] = {
-    "candidate_path_globs": ["plans/**", "GitLab/**/plans/**"],
+    "candidate_path_globs": ["plans/**", "repos/**/plans/**"],
     "eligible_artifact_types": ["decision", "handoff", "plan", "research", "roadmap"],
     "terminal_states": ["archived", "cancelled", "obsolete", "superseded"],
     "review_only_states": ["closed"],

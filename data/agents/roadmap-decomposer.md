@@ -37,7 +37,7 @@ cat ".claude/agent-memory/roadmap-decomposer/lessons.md" 2>/dev/null || echo "(n
 
 ## Step 1 — Read the phase-decompose reference + Goal section (REQUIRED before reasoning)
 
-Read these in order (paths resolve from ANY CWD — the target repo is usually NOT the claude-mcp-server checkout, so never use relative `data/...` paths):
+Read these in order (paths resolve from ANY CWD — the target repo is usually NOT the agent-kit checkout, so never use relative `data/...` paths):
 
 1. `$WS/.claude/references/roadmap-phase-decompose.md` (where `WS="${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}"`; equivalently MCP `get_reference("roadmap-phase-decompose")`) — canonical decomposition technique decision table, INVEST rules, enabler vs value definitions, specialist agent map.
 2. The `## Goal` section from `{ROADMAP_PATH}` — this is the sole input to decomposition.

@@ -228,7 +228,7 @@ mid, local_reg, repo_root, ws_env = sys.argv[1], sys.argv[2], sys.argv[3], sys.a
 # "walk up for charts/" idiom of keycloak-live-drift.py:96) so the gate does not
 # depend on platform directory names and the self-test fixtures need no
 # synthetic charts/ tree. Bounded at 6 ancestors: from the deepest real clone
-# (platform/tools/claude-mcp-server) that reaches the workspace root and stops.
+# (platform/agent-kit) that reaches the workspace root and stops.
 roots, cur = [], os.path.abspath(repo_root)
 for _ in range(6):
     roots.append(cur)

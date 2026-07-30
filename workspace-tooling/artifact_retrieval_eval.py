@@ -58,18 +58,18 @@ MATERIAL_SOURCE_FILES = (
     "artifact_span_generation.py",
 )
 MATERIAL_ADAPTER_FILES = (
-    ("claude-mcp-server/package.json", "package.json"),
-    ("claude-mcp-server/package-lock.json", "package-lock.json"),
-    ("claude-mcp-server/src/config.ts", "src/config.ts"),
-    ("claude-mcp-server/src/index.ts", "src/index.ts"),
+    ("agent-kit/package.json", "package.json"),
+    ("agent-kit/package-lock.json", "package-lock.json"),
+    ("agent-kit/src/config.ts", "src/config.ts"),
+    ("agent-kit/src/index.ts", "src/index.ts"),
     (
-        "claude-mcp-server/src/tools/artifact-memory.ts",
+        "agent-kit/src/tools/artifact-memory.ts",
         "src/tools/artifact-memory.ts",
     ),
-    ("claude-mcp-server/dist/config.js", "dist/config.js"),
-    ("claude-mcp-server/dist/index.js", "dist/index.js"),
+    ("agent-kit/dist/config.js", "dist/config.js"),
+    ("agent-kit/dist/index.js", "dist/index.js"),
     (
-        "claude-mcp-server/dist/tools/artifact-memory.js",
+        "agent-kit/dist/tools/artifact-memory.js",
         "dist/tools/artifact-memory.js",
     ),
 )
@@ -217,7 +217,7 @@ ADAPTER_PACKAGE_NAME = "@chris-dare-dev/agent-kit"
 
 
 def _is_adapter_root(candidate: Path) -> bool:
-    """True if `candidate` is the claude-mcp-server checkout.
+    """True if `candidate` is the agent-kit checkout.
 
     Identified by its package.json `name`, not by directory name — a path
     component is not evidence, and binding the wrong tree's files into a
@@ -234,11 +234,11 @@ def _is_adapter_root(candidate: Path) -> bool:
 def _resolve_adapter_root(root: Path) -> Path:
     """Locate the adapter checkout without assuming where the substrate lives.
 
-    The manifest binds this substrate's modules AND the claude-mcp-server
+    The manifest binds this substrate's modules AND the agent-kit
     adapter files, so it needs both trees. Until 2026-07-18 the adapter was
     found by a hardcoded offset from `<workspace>/scripts/`, which made the
     substrate unmovable: relocating it doubled the path
-    (`…/claude-mcp-server/GitLab/…/claude-mcp-server/package.json`) and failed
+    (`…/agent-kit/repos/…/agent-kit/package.json`) and failed
     23 of 433 tests. Resolution order — explicit, legacy, discovered:
 
       1. $PERSONAL_ADAPTER_ROOT — explicit override for packaging or air-gapped

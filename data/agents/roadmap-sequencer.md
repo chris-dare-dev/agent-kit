@@ -37,7 +37,7 @@ cat ".claude/agent-memory/roadmap-sequencer/lessons.md" 2>/dev/null || echo "(no
 
 ## Step 1 — Read the phase-sequence reference + Goal + Epics sections (REQUIRED)
 
-Read in order (paths resolve from ANY CWD — the target repo is usually NOT the claude-mcp-server checkout, so never use relative `data/...` paths):
+Read in order (paths resolve from ANY CWD — the target repo is usually NOT the agent-kit checkout, so never use relative `data/...` paths):
 
 1. `$WS/.claude/references/roadmap-phase-sequence.md` (where `WS="${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}"`; equivalently MCP `get_reference("roadmap-phase-sequence")`) — canonical MoSCoW rules, RICE formula, Now/Next/Later mechanics, story-sizing rules, milestone ID format, spike lane rules.
 2. The `## Goal` section from `{ROADMAP_PATH}`.

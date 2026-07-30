@@ -40,7 +40,7 @@ goal:
   - 'Three ADRs are merged under `docs/adr/`: the name/licence/provenance decision, the Graphiti decision,
     and the AWS-dependency decision — each with a `Status: Accepted` line and a dated decision record.'
   - '`git grep -nE "SWAT DevOps|Nalej|nalej-|GitLab/workspace/platform|gitlab\\.example\\.com|claude-mcp-server"`
-    over tracked files returns zero matches, and a committed denylist script asserts it.'
+    over tracked files is asserted by `python3 data/scripts/denylist-check.py --check` exiting 0.'
   - '`agent-kit init` completes on a bare clone in a temporary directory on all three OSes, writes nothing
     outside the clone without an explicit flag, and never removes pre-existing `.claude/` content without
     `--force`. `bash setup-local.sh --build-only` today aborts before `npm ci` on every clone.'
@@ -538,7 +538,7 @@ items:
     for the approved group, then it returns N non-empty results — today the same call returns `results:
     []` with HTTP 200.'
   - Given the `retire` branch, when `git grep -n query_temporal_facts -- src/ README.md tests/fixtures/`
-    is run, then it returns zero matches, and `npm test` passes against a regenerated 16-tool `tests/fixtures/tools-list.golden.json`.
+    is run, then `python3 data/scripts/denylist-check.py --check` exits 0, and `npm test` passes against a regenerated 16-tool `tests/fixtures/tools-list.golden.json`.
   - 'Given either branch, when `_approved_groups()` returns an empty set, then `temporal_facts()` (artifact_memory.py:326-335)
     returns `status: "unconfigured"` plus the absolute approvals path it looked for — asserted by a unit
     test in workspace-tooling/tests/ — so a caller can distinguish ''no facts'' from ''never provisioned''.'
@@ -745,7 +745,7 @@ items:
   size: S
   acceptance:
   - Given workspace-tooling/README.md, when `git grep -n 'workspace-artifacts' -- workspace-tooling/*.md`
-    is run, then it returns zero matches; every path in the install block resolves through the documented
+    is run, then `python3 data/scripts/denylist-check.py --check` exits 0; every path in the install block resolves through the documented
     `AGENT_KIT_DERIVED_ROOT` resolution order.
   - Given README-artifact-catalog.md and README-artifact-ingestion.md, when the same grep is run over
     them, then it also returns zero matches.

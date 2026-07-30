@@ -738,7 +738,7 @@ def _under_notes(m, path):
 
 
 def mirror_handoff_into_vault(m, project, src_abs, allow_delete=False):
-    """Obsidian excludes GitLab/ + plans/ + docs/ + scripts/ (see .obsidian/app.json
+    """Obsidian excludes repos/ + plans/ + docs/ + scripts/ (see .obsidian/app.json
     userIgnoreFilters), so a relative markdown link into those trees never resolves/opens. To make
     the Home 'Workstreams' link clickable, COPY the latest handoff into the INDEXED project folder
     (Notes/Projects/<project>/handoffs/) and return the copy's abs path. A symlink does NOT work here:

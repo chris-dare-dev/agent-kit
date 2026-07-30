@@ -187,7 +187,7 @@ def _workspace_root() -> Path | None:
     if env:
         candidates.append(Path(env))
     if len(ROOT.parents) > 4:  # guard shallow/standalone checkouts (adversary L2)
-        candidates.append(ROOT.parents[4])  # .../workspace/repos/SWAT.../platform/tools/claude-mcp-server
+        candidates.append(ROOT.parents[4])  # .../workspace/repos/SWAT.../platform/agent-kit
     for c in candidates:
         if c.is_dir() and (c / "CLAUDE.md").exists():
             return c

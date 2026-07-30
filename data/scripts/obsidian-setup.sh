@@ -2,7 +2,7 @@
 # obsidian-setup.sh — Register the Obsidian git clean filter for this platform repo clone.
 #
 # Run once after cloning (or whenever the repo moves on disk):
-#   bash tools/claude-mcp-server/data/scripts/obsidian-setup.sh
+#   bash agent-kit/data/scripts/obsidian-setup.sh
 #
 # What this does:
 #   • Registers filter.obsidian-clean in THIS repo's local .git/config

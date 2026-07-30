@@ -130,7 +130,7 @@ def cmd_seal(args) -> int:
         "corpus_path": str(corpus_path),
         "corpus_sha256": sha,
         "record_count": len(records),
-        "provenance": "committed-v0, claude-mcp-server data/scripts/",
+        "provenance": "committed-v0, agent-kit data/scripts/",
         "immutability_note": (
             "Tamper-EVIDENCE (detectable change), not write-prevention. Re-verify with: "
             "python3 sealed-eval.py verify data/scripts/sealed-eval-v0-manifest.json "

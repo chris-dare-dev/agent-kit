@@ -64,7 +64,7 @@ without the vault tooling.
    WS="${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}"
    [ -d "$WS/plans" ] || { echo "Set PERSONAL_WORKSPACE_ROOT to your the workspace" >&2; exit 1; }
    S="$WS/.claude/scripts"
-   [ -f "$S/handoff-validate.py" ] || S="$WS/GitLab/workspace/platform/tools/claude-mcp-server/data/scripts"
+   [ -f "$S/handoff-validate.py" ] || S="$WS/<workspace>/<project>/agent-kit/data/scripts"
    ```
 
 3. **Inventory the session** (this is the substance — be thorough and honest):

@@ -19,7 +19,7 @@ Roadmap-run artifacts are per-machine state, not repo content. The register live
 pipeline init) excludes that tier in the target repo — via `.git/info/exclude` since
 2026-07-09 (round-4 proc-9; never by mutating the tracked `.gitignore`). Do not commit
 it, do not move it into a tracked path, do not "back it up" into `plans/`. CI in
-claude-mcp-server FAILS if a register is ever found tracked. Cross-machine sharing
+agent-kit FAILS if a register is ever found tracked. Cross-machine sharing
 happens through the gated GitLab projection (`--gitlab`), never through git.
 
 **Who writes what (single-writer rule — this is the anti-drift discipline):**
@@ -53,8 +53,8 @@ No other writer is sanctioned. Hand-edits must pass
       "tags": ["moscow/must"],
       "rice": 512,
       "specialist": "general-purpose",
-      "repos": ["tools/claude-mcp-server"],
-      "external_writes": ["git push origin HEAD:main (tools/claude-mcp-server)"],
+      "repos": ["agent-kit"],
+      "external_writes": ["git push origin HEAD:main (agent-kit)"],
       "gitlab": {"epic_iid": null, "story_iids": []},
       "run": {
         "state_path": null,

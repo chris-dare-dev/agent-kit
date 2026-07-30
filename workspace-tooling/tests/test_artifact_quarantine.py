@@ -41,7 +41,7 @@ class ArtifactQuarantineTests(unittest.TestCase):
                         "top_level_globs": ["*.md"],
                         "include_path_globs": [
                             "plans/**",
-                            "GitLab/**/plans/**",
+                            "repos/**/plans/**",
                             "docs/**",
                         ],
                         "exclude_roots": ["Vault", "Notes", ".worktrees"],
@@ -55,7 +55,7 @@ class ArtifactQuarantineTests(unittest.TestCase):
                     "quarantine": {
                         "candidate_path_globs": [
                             "plans/**",
-                            "GitLab/**/plans/**",
+                            "repos/**/plans/**",
                         ],
                         "eligible_artifact_types": [
                             "decision",

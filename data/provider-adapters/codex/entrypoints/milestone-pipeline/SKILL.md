@@ -24,7 +24,7 @@ target repo may hide the workspace skill/agent pack. Every git command must use
 `$WS/.claude/scripts/...`. Do not rely on the process CWD.
 
 Set `AGENT_KIT_ROOT` to
-`$WS/GitLab/workspace/platform/tools/claude-mcp-server`. Read these
+`$WS/<workspace>/<project>/agent-kit`. Read these
 canonical contracts completely before acting (references may be loaded by their
 MCP names when available):
 

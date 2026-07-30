@@ -32,8 +32,8 @@ fi
 Derived anchors (the ONLY sanctioned ways to address library files):
 
 ```bash
-PLATFORM="$WS/GitLab/workspace/platform"          # note the spaces — always quote
-MCP_REPO="$PLATFORM/tools/claude-mcp-server"              # the library's git repo
+PLATFORM="$WS/<workspace>/<project>"          # note the spaces — always quote
+MCP_REPO="$PLATFORM/agent-kit"              # the library's git repo
 # Library-internal references:
 #   "$WS/.claude/scripts/<name>"     (symlink)  ≡  "$MCP_REPO/data/scripts/<name>"
 #   "$WS/.claude/references/<name>"  (symlink)  ≡  "$MCP_REPO/data/references/<name>"
@@ -50,8 +50,8 @@ against `data/commands/*.md` (2026-07-02):
 | Command family | Script paths used | Required cwd |
 |---|---|---|
 | Gen-1 pipelines: `/milestone-pipeline`, `/argoops`, `/spike`, `/roadmap` (init step) | `"$WS/.claude/scripts/..."` — **$WS-anchored, cwd-independent** | Run **inside the TARGET repo** (pipeline-pattern-v2.md §6); the `.claude/` symlink farm must resolve |
-| `/roadmap` internal lint/scoring (`roadmap-validate.py`, `roadmap-score-*.py`), `/pipeline-builder`, `/skill-to-command` | `data/scripts/...` (relative) | **The claude-mcp-server checkout** (`$MCP_REPO`) |
-| Gen-2 discovery pipelines (`/capability-scout`, `/cicd-uplift`, `/frontend-uplift`, `/interop-discovery`, `/mesh-as-code`, `/zerotrust-scout`) | `data/scripts/...` for init/status + `Workflow({scriptPath: "data/scripts/<x>-workflow.mjs"})` | **The claude-mcp-server checkout** (`$MCP_REPO`) |
+| `/roadmap` internal lint/scoring (`roadmap-validate.py`, `roadmap-score-*.py`), `/pipeline-builder`, `/skill-to-command` | `data/scripts/...` (relative) | **The agent-kit checkout** (`$MCP_REPO`) |
+| Gen-2 discovery pipelines (`/capability-scout`, `/cicd-uplift`, `/frontend-uplift`, `/interop-discovery`, `/mesh-as-code`, `/zerotrust-scout`) | `data/scripts/...` for init/status + `Workflow({scriptPath: "data/scripts/<x>-workflow.mjs"})` | **The agent-kit checkout** (`$MCP_REPO`) |
 | Outcome-log emits (several commands) | `.claude/scripts/pipeline-outcome-log.py` | Workspace root — note some commands MIX both forms |
 
 Because some command files mix both forms, the robust move when a relative invocation fails is

@@ -32,7 +32,7 @@ Resolution order (first match wins):
 `.claude/notes/` is excluded in every target repo by `ensure-claude-gitignore.sh` (via
 `.git/info/exclude` since 2026-07-09), so the
 log is **local-only by construction** (KR1: "per-machine, never pushed"). The only external
-write in M1 is the `git push origin main (claude-mcp-server)` of the *script + this doc + the
+write in M1 is the `git push origin main (agent-kit)` of the *script + this doc + the
 wiring* — never the log itself. Repo-root detection mirrors `milestone-pipeline-checkpoint.py`
 (`$REPO_ROOT` → `$PLATFORM_ROOT` → `git rev-parse --show-toplevel` → walk-up to `.git/`).
 

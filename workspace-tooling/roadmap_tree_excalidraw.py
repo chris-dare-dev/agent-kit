@@ -150,7 +150,7 @@ def build_scene(project, parent, children, proj_folder, sig):
     def link_for(path):
         # Obsidian deep-link by ABSOLUTE filesystem path. A relative md-path or a [[wikilink]]
         # resolves through Obsidian's LINK INDEX, which EXCLUDES the ignore-filtered plans/ +
-        # GitLab/ trees the roadmaps live in → broken element links. `obsidian://open?path=`
+        # repos/ trees the roadmaps live in → broken element links. `obsidian://open?path=`
         # opens by filesystem path, bypassing the index, so it works for ignore-filtered files.
         return "obsidian://open?path=" + urllib.parse.quote(os.path.abspath(path), safe="")
 

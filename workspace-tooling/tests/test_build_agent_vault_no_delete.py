@@ -21,7 +21,7 @@ class BuildAgentVaultNoDeleteTests(unittest.TestCase):
         self.workspace.mkdir()
         self.vault.mkdir()
         (self.workspace / "docs/_curated").mkdir(parents=True)
-        (self.workspace / "GitLab/repo").mkdir(parents=True)
+        (self.workspace / "repos/repo").mkdir(parents=True)
         (self.workspace / ".claude/notes/milestones/m1").mkdir(parents=True)
         (self.vault / "AgentDocs").mkdir()
         self.policy = self.root / "policy.json"
@@ -36,7 +36,7 @@ class BuildAgentVaultNoDeleteTests(unittest.TestCase):
                         "exclude_rules": [
                             {
                                 "id": "runtime",
-                                "globs": [".claude/notes/**", "GitLab/**"],
+                                "globs": [".claude/notes/**", "repos/**"],
                             }
                         ],
                         "allow_rules": [
@@ -99,23 +99,23 @@ class BuildAgentVaultNoDeleteTests(unittest.TestCase):
 
     def test_default_run_creates_allowed_and_preserves_every_existing_alias(self) -> None:
         curated = self.write("docs/_curated/architecture.md")
-        excluded_new = self.write("GitLab/repo/README.md")
+        excluded_new = self.write("repos/repo/README.md")
         runtime = self.write(".claude/notes/milestones/m1/report.md")
         existing_excluded = self.alias(runtime, "claude/notes/milestones/m1/report.md")
         wrong_target_source = self.write("docs/wrong.md")
         wrong_target = self.alias(
             wrong_target_source, "docs/_curated/architecture.md"
         )
-        broken = self.vault / "AgentDocs/GitLab/repo/missing.md"
+        broken = self.vault / "AgentDocs/repos/repo/missing.md"
         broken.parent.mkdir(parents=True, exist_ok=True)
-        os.symlink("../../../../workspace/GitLab/repo/missing.md", broken)
+        os.symlink("../../../../workspace/repos/repo/missing.md", broken)
         before = self.snapshot(existing_excluded, wrong_target, broken)
 
         result = self.run_builder()
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(
-            (self.vault / "AgentDocs/GitLab/repo/README.md").is_symlink()
+            (self.vault / "AgentDocs/repos/repo/README.md").is_symlink()
         )
         self.assertEqual(before, self.snapshot(existing_excluded, wrong_target, broken))
         self.assertNotEqual(wrong_target.resolve(), curated.resolve())

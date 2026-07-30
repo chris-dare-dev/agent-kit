@@ -41,7 +41,7 @@ Read memory only if lessons are relevant to this brief's domain. Do not load mem
 ## Step 1 — Read the phase-refine reference (REQUIRED before any reasoning)
 
 ```bash
-# Resolves from ANY CWD (the target repo is usually NOT the claude-mcp-server checkout).
+# Resolves from ANY CWD (the target repo is usually NOT the agent-kit checkout).
 WS="${PERSONAL_WORKSPACE_ROOT:-$HOME/Work/workspace}"
 cat "$WS/.claude/references/roadmap-phase-refine.md"
 ```

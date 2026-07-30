@@ -3,7 +3,7 @@
 #
 # This was a 400-line installer that could not run in this repository: it walked
 # parent directories for one containing both charts/ and tools/, then for one
-# containing GitLab/, and exited otherwise — so on any ordinary clone it failed
+# containing a pre-fork VCS-root directory, and exited otherwise — so on any ordinary clone it failed
 # before npm ci, and even --build-only was unreachable. Its `while [[ "$dir" !=
 # "/" ]]` walk also never terminated on a Windows path root.
 #

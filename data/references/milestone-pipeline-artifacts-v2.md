@@ -327,8 +327,8 @@ live-delivery proof to operations.
 ```json
 {
   "schema_version": 1,
-  "source_remote": "git@gitlab.example:group/source.git",
-  "render_remote_prefixes": ["git@gitlab.example:deploy/"],
+  "source_remote": "git@git.example.com:group/source.git",
+  "render_remote_prefixes": ["git@git.example.com:deploy/"],
   "artifact_registry_prefixes": ["registry.example/workspace/"],
   "artifact_resolver": {
     "path": "/opt/homebrew/bin/crane",

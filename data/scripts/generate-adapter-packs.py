@@ -56,7 +56,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]          # data/scripts/x.py -> repo root
-PLATFORM_ROOT = ROOT.parents[1]                     # platform/tools/claude-mcp-server -> platform/
+PLATFORM_ROOT = ROOT.parents[1]                     # platform/agent-kit -> platform/
 DATA = ROOT / "data"
 SKILLS_DIR = DATA / "skills"
 AGENTS_DIR = DATA / "agents"
@@ -176,7 +176,7 @@ def strip_skill_tools(text: str) -> str:
 def transform_skill(text: str, provider: str) -> tuple[str, list[Path]]:
     """SKILL.md -> (provider mirror text, verifiable ref targets). Strip Claude-only
     tools, CLAUDE.md->AGENTS.md, provider-specific ref rewrite. NO blind Claude->Codex
-    substitution (that was the bug — it mangled `claude-mcp-server`, `.claude/scripts`)."""
+    substitution (that was the bug — it mangled `agent-kit`, `.claude/scripts`)."""
     s = strip_skill_tools(text)
     s = s.replace("CLAUDE.md", "AGENTS.md")
     return rewrite_refs(s, provider)
@@ -648,10 +648,10 @@ def self_test() -> int:
     # skill tool strip + CLAUDE.md rewrite, no blind claude->Codex
     sk, _ = transform_skill(
         "---\nname: d\nallowed-tools: Read, Agent, AskUserQuestion, Bash\n---\n"
-        "Read the root CLAUDE.md. Uses claude-mcp-server. See .claude/scripts/environment-facts-lint.py\n", "codex")
+        "Read the root CLAUDE.md. Uses agent-kit. See .claude/scripts/environment-facts-lint.py\n", "codex")
     ck("strips Agent+AskUserQuestion", "allowed-tools: Read, Bash\n" in sk)
     ck("CLAUDE.md->AGENTS.md", "root AGENTS.md" in sk and "CLAUDE.md" not in sk)
-    ck("claude-mcp-server preserved (NOT mangled)", "claude-mcp-server" in sk)
+    ck("agent-kit preserved (NOT mangled)", "agent-kit" in sk)
     ck("script ref keeps workspace symlink", ".claude/scripts/environment-facts-lint.py" in sk)
 
     # TOML escaping

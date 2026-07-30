@@ -39,11 +39,11 @@ class AgentDocsAliasDedupeTests(unittest.TestCase):
         return path
 
     def aliases(self, *, create_farm: bool = True) -> tuple[Path, Path, Path]:
-        source = self.write(self.workspace, "GitLab/repo/plans/alpha.md")
+        source = self.write(self.workspace, "repos/repo/plans/alpha.md")
         canonical = self.vault / "Notes/Projects/Alpha/_sources/plans/alpha.md"
         canonical.parent.mkdir(parents=True, exist_ok=True)
         os.symlink(source, canonical)
-        farm = self.vault / "AgentDocs/GitLab/repo/plans/alpha.md"
+        farm = self.vault / "AgentDocs/repos/repo/plans/alpha.md"
         if create_farm:
             farm.parent.mkdir(parents=True, exist_ok=True)
             os.symlink(source, farm)
@@ -65,7 +65,7 @@ class AgentDocsAliasDedupeTests(unittest.TestCase):
         self.write(
             self.vault,
             "Notes/Dashboard.md",
-            "[legacy](../agentdocs/GitLab/repo/plans/alpha.md)\n",
+            "[legacy](../agentdocs/repos/repo/plans/alpha.md)\n",
         )
 
         report = dedupe.build_report(self.config)
@@ -82,7 +82,7 @@ class AgentDocsAliasDedupeTests(unittest.TestCase):
         self.write(
             self.vault,
             ".obsidian/workspace.json",
-            '{"recentFiles":["AgentDocs/GitLab/repo/plans/alpha.md"]}\n',
+            '{"recentFiles":["AgentDocs/repos/repo/plans/alpha.md"]}\n',
         )
 
         report = dedupe.build_report(self.config)

@@ -55,7 +55,7 @@ If `$ARGUMENTS` is empty, check whether the current conversation contains a prob
 
 **Runtime contract (CWD + paths — full model: `data/references/runtime-contract.md`):**
 - **Required CWD: inside the TARGET repo** — the clone whose `plans/<slug>-roadmap.md` will hold
-  the roadmap. The workspace root, `GitLab/`, and `platform/` are plain directories, NOT git
+  the roadmap. The workspace root, `repos/`, and `<project>/` are plain directories, NOT git
   repos — `git rev-parse` FAILS there (that is why the fallback below must never silently walk up).
 - Scripts are invoked via the workspace symlink `"$WS/.claude/scripts/roadmap-<file>"`
   (→ `data/scripts/`, flat naming), which resolves from any CWD. `.py` scripts always run under

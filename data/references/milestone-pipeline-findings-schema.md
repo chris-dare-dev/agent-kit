@@ -23,7 +23,7 @@ The register lives inside the milestone state dir (`.claude/notes/` tier), which
 target repo — via `.git/info/exclude` since 2026-07-09 (round-4 proc-9; never by
 mutating the tracked `.gitignore`; repos with a previously-committed block keep
 it). Do not commit it, do not move it into a tracked path. CI in
-claude-mcp-server runs the tooling self-tests only.
+agent-kit runs the tooling self-tests only.
 
 **Who writes what (single-writer rule — the anti-drift discipline):**
 

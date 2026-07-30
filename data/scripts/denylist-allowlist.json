@@ -1,0 +1,48 @@
+{
+  "_comment": "Narrow exemptions for denylist-check.py. Every entry needs a reason. history-file entries are legal ONLY under docs/** and plans/** -- the gate hard-fails otherwise, so widening that surface is a visible change to the gate itself.",
+  "entries": [
+    {
+      "kind": "history-file",
+      "path": "docs/audit-2026-07.md",
+      "reason": "The canonical findings document. It must be able to quote the identifiers it reports (F008, F039, F172); redacting the findings would make the audit unreadable."
+    },
+    {
+      "kind": "history-file",
+      "path": "docs/spikes/**",
+      "reason": "Spike memos quote what they found. Pre-emptive: currently clean."
+    },
+    {
+      "kind": "history-file",
+      "path": "docs/adr/**",
+      "reason": "ADRs must be able to name the pre-fork package to record the naming decision (issue #6)."
+    },
+    {
+      "kind": "history-file",
+      "path": "plans/*/roadmap.yaml",
+      "reason": "Roadmap acceptance criteria quote the literals they require removed. Segment-strict on purpose: NOT plans/**, so plans/README.md and plans/*/issue-map.json stay gated."
+    },
+    {
+      "kind": "snippet",
+      "path": "data/scripts/sealed-eval-v0-manifest.json",
+      "snippet": "committed-v0",
+      "reason": "FROZEN v0 seal. Re-running `sealed-eval.py seal` would rewrite seal_date (2026-06-19) and destroy the frozen-v0 provenance claim, so this file must stay byte-identical. The GENERATOR constant was corrected; the sealed artifact deliberately was not."
+    },
+    {
+      "kind": "history-file",
+      "path": "plans/native-everywhere/roadmap.yaml",
+      "reason": "Duplicate of the plans/*/roadmap.yaml rule, kept explicit because this file also carries the project-map.json replacement criterion."
+    },
+    {
+      "kind": "snippet",
+      "path": "workspace-tooling/project-map.json",
+      "snippet": "platform",
+      "reason": "Out of scope for issue #37 by agreement: this file is untracked and replaced by a tracked project-map.example.json under issue #38, together with the consumer fallbacks in frontmatter-stamp.py, project-linker.py and handoff-validate.py. Remove this entry when #38 lands."
+    },
+    {
+      "kind": "snippet",
+      "path": "workspace-tooling/artifact_catalog.py",
+      "snippet": "hashlib.sha256",
+      "reason": "The employer product key on this line was 'left at its original value deliberately when the kit was genericized' (see the comment immediately above it), and it is hashed into stored catalog digests, so changing it may invalidate existing rows. That is an OWNER DECISION tracked as issue #267, not a sweep. Remove this entry when #267 is decided."
+    }
+  ]
+}

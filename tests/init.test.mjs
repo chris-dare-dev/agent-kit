@@ -2,7 +2,7 @@
  * `agent-kit init` on a clone with no matching ancestors.
  *
  * setup-local.sh walked parent directories for one containing both `charts/`
- * and `tools/`, then for one containing `GitLab/`, and exited non-zero
+ * and `tools/`, then for a pre-fork VCS-root directory, and exited non-zero
  * otherwise — so on any ordinary clone it failed before doing anything, and
  * even `--build-only` was unreachable. These cases pin the replacement's two
  * promises: it works with no special ancestry, and it does not destroy content
