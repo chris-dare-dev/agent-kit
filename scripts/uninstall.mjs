@@ -162,7 +162,11 @@ const failures = [];
 const kept = [];
 // Deepest path first, so a recorded parent directory is removed only after
 // everything recorded inside it has gone.
-plan.remove.sort((a, b) => b.path.split(/[\/]/).length - a.path.split(/[\/]/).length);
+// Split on BOTH separators. Matching only "/" makes every Windows path a single
+// segment, which silently turns this sort into a no-op and lets a parent
+// directory be removed before the children recorded inside it.
+const depth = (p) => p.split(/[\\/]/).length;
+plan.remove.sort((a, b) => depth(b.path) - depth(a.path));
 for (const entry of plan.remove) {
   try {
     // A directory we merely CREATED (e.g. .claude/) may since have acquired the

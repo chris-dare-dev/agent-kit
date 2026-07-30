@@ -27,7 +27,8 @@
     "verify:quickstart": "node scripts/verify-quickstart.mjs",
     "init": "node scripts/init.mjs",
     "doctor": "node scripts/doctor.mjs",
-    "test:init": "node --test tests/init.test.mjs"
+    "test:init": "node --test tests/init.test.mjs",
+    "test:uninstall": "node --test tests/uninstall.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.750.0",
