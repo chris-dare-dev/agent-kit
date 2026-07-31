@@ -2031,6 +2031,41 @@ def _required_project_checks(repo: Path) -> set[str]:
     return required
 
 
+def _trusted_executable_roots() -> tuple[Path, ...]:
+    """System locations an unprivileged user cannot write to.
+
+    On Windows the POSIX list was not merely wrong, it was VACUOUS:
+    `Path("/usr")` resolves to `C:\\usr`, which does not exist, so the
+    `if root.exists()` filter emptied the tuple and `any(())` refused every
+    executable. The control looked strict and was in fact inoperable.
+
+    A per-user Python install — the Windows default, under %LOCALAPPDATA% — is
+    deliberately NOT trusted: it is user-writable, which is exactly what this
+    check exists to exclude. Widening it is a trust-model decision, not a
+    portability fix.
+    """
+    if os.name == "nt":
+        values = (
+            os.environ.get("SystemRoot", r"C:\Windows"),
+            os.environ.get("ProgramFiles", r"C:\Program Files"),
+            os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+        )
+    else:
+        values = (
+            "/bin", "/usr", "/opt/homebrew", "/Applications/Xcode.app",
+            "/Library/Frameworks",
+        )
+    return tuple(Path(v).resolve() for v in values if v)
+
+
+def _executable_is_trusted(resolved_executable: Path) -> bool:
+    """Whether an executable sits under a trusted system root."""
+    return any(
+        resolved_executable == root or root in resolved_executable.parents
+        for root in _trusted_executable_roots() if root.exists()
+    )
+
+
 def _check_command_inputs(
     repo: Path, argv: list[str], executable_path: str
 ) -> tuple[dict[str, str], str | None]:
@@ -2041,33 +2076,10 @@ def _check_command_inputs(
     try:
         repo_executable = resolved_executable.relative_to(repo_resolved).as_posix()
     except ValueError:
-        # System locations an unprivileged user cannot write to. On Windows the
-        # POSIX list was not merely wrong, it was VACUOUS: `Path("/usr")`
-        # resolves to `C:\usr`, which does not exist, so the `if root.exists()`
-        # filter emptied the tuple and `any(())` refused every executable. The
-        # control looked strict and was in fact inoperable.
-        #
-        # A per-user Python install (the Windows default, under %LOCALAPPDATA%)
-        # is deliberately NOT trusted: it is user-writable, which is exactly
-        # what this check exists to exclude. On such a host the check refuses,
-        # correctly — widening it is a trust-model decision, not a portability
-        # fix.
-        if os.name == "nt":
-            trusted_values = (
-                os.environ.get("SystemRoot", r"C:\Windows"),
-                os.environ.get("ProgramFiles", r"C:\Program Files"),
-                os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
-            )
-        else:
-            trusted_values = (
-                "/bin", "/usr", "/opt/homebrew", "/Applications/Xcode.app",
-                "/Library/Frameworks",
-            )
-        trusted_roots = tuple(Path(value).resolve() for value in trusted_values)
-        _expect(any(
-            resolved_executable == root or root in resolved_executable.parents
-            for root in trusted_roots if root.exists()
-        ), f"check executable is outside trusted system roots and reviewed source: {resolved_executable}")
+        _expect(
+            _executable_is_trusted(resolved_executable),
+            f"check executable is outside trusted system roots and reviewed source: {resolved_executable}",
+        )
 
     tracked_inputs: dict[str, str] = {}
 
@@ -10474,11 +10486,24 @@ def self_test() -> int:
         skipped += 1
         print(f"  {name}: SKIP {reason}")
 
+    # Every check-run case drives a real subprocess through `sys.executable`. If
+    # THIS interpreter is one the trust control refuses — a per-user Python
+    # under %LOCALAPPDATA%, the Windows default, is user-writable and correctly
+    # refused — the control fires before the behaviour under test is reached.
+    # The case cannot run here; that is a property of the host, not of the code.
+    # Recognised once, centrally, so every call site is covered and the control
+    # itself is untouched: in production the same refusal is still a hard error.
+    _UNTRUSTED_INTERPRETER = "check executable is outside trusted system roots"
+    _interpreter_trusted = _executable_is_trusted(Path(sys.executable).resolve())
+
     def check(name: str, fn, contains: str | None = None) -> None:
         nonlocal failures
         try:
             fn()
         except ValidationError as exc:
+            if not _interpreter_trusted and _UNTRUSTED_INTERPRETER in str(exc):
+                skip(name, f"REQUIRES:trusted-interpreter-path ({sys.executable})")
+                return
             ok = contains is not None and contains in str(exc)
             print(f"  {name}: {'ok' if ok else 'FAIL ' + str(exc)[:160]}")
             failures += 0 if ok else 1
