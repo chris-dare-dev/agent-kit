@@ -68,8 +68,18 @@ if [ -n "$APPLY" ] && [ -x "$VENV/bin/python" ]; then
   echo "  installing   $LOCKFILE"
   "$VENV/bin/python" -m pip install --quiet --upgrade pip \
     || fail "pip self-upgrade failed"
-  "$VENV/bin/python" -m pip install --quiet --require-hashes -r "$LOCKFILE" \
-    || fail "dependency install failed. The lockfile is hash-pinned; a mirror that rewrites artifacts will fail here by design."
+  # Version-pinned, NOT hash-pinned -- and that is the lockfile's own documented
+  # design, not an oversight: onnxruntime, numpy, tokenizers and pillow ship
+  # per-platform wheels, so a hash-pinned lock captured on one platform will not
+  # install on another. Per-platform hash locks are the F-10 follow-up the
+  # lockfile header names. Passing --require-hashes here fails outright (pip
+  # demands hashes for EVERY requirement once any one has them), and claiming
+  # supply-chain integrity this file does not provide would be worse than not
+  # claiming it.
+  "$VENV/bin/python" -m pip install --quiet -r "$LOCKFILE" \
+    || fail "dependency install failed. The lock was captured on darwin/arm64 under
+  Python 3.12; a different platform or interpreter may not resolve every pin.
+  Check the pip output above, and see the lockfile header."
   echo "  installed"
 fi
 
@@ -87,6 +97,39 @@ PYTHONPATH="$REPO_ROOT/workspace-tooling" \
   "$PROVISION_PY" workspace-tooling/artifact_memory_provision.py $APPLY \
   || fail "provisioning failed"
 
+step "corpus bootstrap"
+# Provisioning creates the runtime CONFIG. It does not create the derived state
+# that config points at, and the resident service refuses to start until every
+# referenced path exists (fail-closed, by design). The chain below was
+# established empirically -- the repository documents no fresh-install path --
+# so this reports status per step rather than guessing on your behalf. The
+# catalog step in particular needs a POLICY, which is a real choice.
+D="$(PYTHONPATH="$REPO_ROOT/workspace-tooling" python3 -c \
+  'import artifact_runtime; print(artifact_runtime.derived_root())' 2>/dev/null)"
+VP="$VENV/bin/python"
+
+report() {  # report <path> <what-creates-it>
+  if [ -e "$1" ]; then
+    echo "  present   $(basename "$1")"
+  else
+    echo "  MISSING   $(basename "$1")"
+    echo "            $2"
+  fi
+}
+
+if [ -n "$D" ]; then
+  report "$D/artifact-catalog.sqlite3" \
+    "PYTHONPATH=\$PWD/workspace-tooling $VP workspace-tooling/artifact_catalog.py --workspace \"\$PWD\" --policy workspace-tooling/artifact-policy.example.json"
+  report "$D/outbox" \
+    "PYTHONPATH=\$PWD/workspace-tooling $VP workspace-tooling/artifact_ingestion.py prepare --catalog $D/artifact-catalog.sqlite3 --output-root $D/outbox"
+  report "$D/ingestion-state.sqlite3" \
+    "artifact_ingestion.py qdrant --outbox <run-dir> --state $D/ingestion-state.sqlite3 --qdrant-url <url> --collection <name> --apply   (needs QDRANT_API_KEY)"
+  report "$D/artifact-event-consumer.sqlite3" \
+    "artifact_event_consumer.py consume --state $D/artifact-event-consumer.sqlite3 --no-runtime-config --qdrant-path $D/qdrant --apply"
+  report "$D/services/qdrant/build-manifest.json" \
+    "NO KNOWN FRESH-INSTALL COMMAND. Only artifact_qdrant_migrate.py backfill writes it, and that is a migration tool that requires completed checkpoints on the embedded backend. See docs/platforms/windows-wsl.md."
+fi
+
 step "next"
 if [ -z "$APPLY" ]; then
   cat <<EOF
@@ -99,13 +142,15 @@ if [ -z "$APPLY" ]; then
 EOF
 else
   cat <<EOF
-  Provisioned. Verify the whole path end to end:
+  The venv, the Qdrant container and the runtime config are in place.
 
-      scripts/wsl/smoke.sh
+  If every line under "corpus bootstrap" says present, verify end to end:
 
-  From the Windows host instead:
+      scripts/wsl/smoke.sh          # or, from Windows: node scripts/wsl-smoke.mjs
 
-      node scripts/wsl-smoke.mjs
+  If any says MISSING, run the command shown beneath it. The build-manifest step
+  currently has no known fresh-install command -- that gap is documented in
+  docs/platforms/windows-wsl.md and is not something this script can paper over.
 
 EOF
 fi

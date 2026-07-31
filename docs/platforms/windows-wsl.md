@@ -105,11 +105,61 @@ scripts/wsl/setup.sh --apply    # create the venv, install pinned deps, start Qd
 
 The plan run writes nothing. `--apply` creates
 `~/.local/share/agent-kit/venv`, installs
-`workspace-tooling/requirements-artifact-ingestion.lock.txt` **with
-`--require-hashes`**, and provisions the Qdrant container.
+`workspace-tooling/requirements-artifact-ingestion.lock.txt`, and provisions the
+Qdrant container.
 
-The lockfile is hash-pinned by design: a mirror that rewrites artifacts fails
-here rather than silently installing something else.
+That lockfile is **version-pinned, not hash-pinned**, which is its documented
+design rather than an oversight: `onnxruntime`, `numpy`, `tokenizers` and
+`pillow` ship per-platform wheels, so a hash-pinned lock captured on one platform
+does not install on another. Per-platform hash locks are a tracked follow-up
+(F-10). So the lock protects you from silent dependency *drift* — the transitive
+closure cannot change without a diffable commit — but not from a mirror that
+rewrites artifacts. Do not assume the stronger property.
+
+It was captured on **darwin/arm64 under Python 3.12.13**. On a different
+platform or interpreter some pins may not resolve; the pip output will say which.
+
+### 4b. Bootstrap the corpus — INCOMPLETE, read this
+
+> **`setup.sh --apply` does not get you to a running service, and this document
+> will not pretend otherwise.** Provisioning creates the runtime *config*; it
+> does not create the derived state that config points at, and the resident
+> service refuses to start until every referenced path exists (fail-closed, by
+> design — see the design rules in the root README).
+>
+> The repository documents no fresh-install bootstrap. The chain below was
+> established empirically by running it, and the last step has no known command.
+
+Steps that work, in order (`VP=~/.local/share/agent-kit/venv/bin/python`,
+`D=~/.local/share/agent-kit`, `PYTHONPATH=$PWD/workspace-tooling`):
+
+1. **Catalog** — needs a policy; the shipped example is a starting point, not a
+   recommendation for your tree.
+   `$VP workspace-tooling/artifact_catalog.py --workspace "$PWD" --policy workspace-tooling/artifact-policy.example.json`
+2. **Outbox** —
+   `$VP workspace-tooling/artifact_ingestion.py prepare --catalog $D/artifact-catalog.sqlite3 --output-root $D/outbox`
+3. **Embed + index** (needs `QDRANT_API_KEY` from
+   `$D/services/qdrant/admin-api-key`) —
+   `$VP workspace-tooling/artifact_ingestion.py qdrant --catalog $D/artifact-catalog.sqlite3 --outbox <run-dir> --state $D/ingestion-state.sqlite3 --qdrant-url <url> --collection <name> --apply`
+4. **Consumer state** — circular on a fresh install: the consumer needs the
+   runtime config, which validates a file only the consumer creates. Break it
+   once with the offline flag —
+   `$VP workspace-tooling/artifact_event_consumer.py consume --state $D/artifact-event-consumer.sqlite3 --no-runtime-config --qdrant-path $D/qdrant --apply`
+5. **Private directories** the config names but nothing creates
+   (`$D/outbox`, `$D/skill-events`, `$D/qdrant`) — use
+   `artifact_security.ensure_private_directory`, not `mkdir`, so the modes are right.
+
+**Where it stops.** The service then requires
+`$D/services/qdrant/build-manifest.json`. The only writer of that file is
+`artifact_qdrant_migrate.py backfill` — a *migration* tool, which refuses with
+`no completed checkpoints for target local:…` because it resolves the embedded
+backend and generation `v1`, not the server backend and generation the runtime
+config actually uses. There is no fresh-install command that produces it.
+
+So on a clean machine the resident service cannot currently be started. That is
+a substrate bootstrap gap, not a WSL2 gap — it would block a fresh Linux or
+macOS install identically. Everything up to it works; `scripts/wsl/setup.sh`
+reports which of these artifacts are present and which are missing.
 
 ### 5. Verify end to end
 
