@@ -44,9 +44,18 @@ function pythonCommand() {
 }
 
 const PY = pythonCommand();
+/**
+ * The bash to run harnesses with, as [command, ...leadingArgs].
+ *
+ * AGENT_KIT_BASH overrides it and MAY carry arguments ("wsl.exe -e bash"),
+ * which is how the regression test drives a second, differently-rooted bash on
+ * one machine — the situation that produced three phantom gate failures
+ * depending only on PATH order.
+ */
 const BASH = (() => {
-  const probe = spawnSync("bash", ["--version"], { encoding: "utf-8" });
-  return probe.error || probe.status !== 0 ? null : "bash";
+  const parts = (process.env.AGENT_KIT_BASH ?? "bash").split(" ").filter(Boolean);
+  const probe = spawnSync(parts[0], [...parts.slice(1), "--version"], { encoding: "utf-8" });
+  return probe.error || probe.status !== 0 ? null : parts;
 })();
 
 /** Generator/consistency gates — the ones that guard committed artifacts. */
@@ -193,7 +202,17 @@ function runShell(relPath) {
   if (!BASH) return record(name, "SKIP", "bash unavailable on this host");
   const full = join(REPO_ROOT, relPath);
   if (!existsSync(full)) return record(name, "FAIL", `missing: ${relPath}`);
-  const run = spawnSync(BASH, [full], { cwd: REPO_ROOT, encoding: "utf-8" });
+  // Hand bash the REPO-RELATIVE path and let `cwd` place it.
+  //
+  // A Windows absolute path (`C:\Users\...`) is not a path any bash can open.
+  // Git Bash happens to translate it, so this looked fine here; WSL's bash does
+  // not, and the same command on the same machine failed three gates depending
+  // only on which bash came first on PATH. A relative path needs no translation
+  // by either, because `cwd` is passed natively and Node resolves it.
+  const run = spawnSync(BASH[0], [...BASH.slice(1), relPath.split("\\").join("/")], {
+    cwd: REPO_ROOT,
+    encoding: "utf-8",
+  });
   if (run.status === 0) return record(name, "PASS");
   const last = `${run.stdout ?? ""}${run.stderr ?? ""}`.trim().split("\n").filter(Boolean).pop();
   record(name, "FAIL", (last ?? `exit ${run.status}`).slice(0, 110));

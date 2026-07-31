@@ -96,30 +96,91 @@ def load_allowlist() -> tuple[list[dict], list[str]]:
     return entries, problems
 
 
-def exempt(entries: list[dict], path: str, line: str) -> bool:
+def entry_key(entry: dict) -> str:
+    """Stable identity for an exemption, for usage reporting."""
+    kind = entry.get("kind", "?")
+    path = entry.get("path", "?")
+    snippet = entry.get("snippet")
+    return f"{kind} {path}" + (f" [{snippet}]" if snippet else "")
+
+
+def exempt(entries: list[dict], path: str, line: str, used: set[str] | None = None) -> bool:
+    """Does any entry cover this line? Records which one fired in `used`.
+
+    Usage tracking is the point. An exemption that suppresses nothing is stale,
+    and a stale one is invisible: it neither fails nor announces itself, so it
+    outlives the issue it was filed against and silently widens the gate the day
+    a matching violation appears. `workspace-tooling/project-map.json` is the
+    live example -- its reason says "remove when #38 lands", and it also asserts
+    the file is untracked, which it no longer is.
+    """
+    covered = False
+    # Every matching entry is marked, not just the first. Short-circuiting made
+    # usage order-dependent: a deliberately explicit duplicate could never fire,
+    # because a broader rule above it always answered first, so the staleness
+    # check demanded the deletion of a rule that was doing its job.
     for entry in entries:
         kind = entry.get("kind")
+        hit = False
         if kind == "history-file":
             pattern = entry.get("path", "")
             if pattern.endswith("/**"):
-                if path.startswith(pattern[:-2]):
-                    return True
-            elif pattern == path or Path(path).match(pattern):
-                return True
+                hit = path.startswith(pattern[:-2])
+            else:
+                hit = pattern == path or Path(path).match(pattern)
         elif kind == "snippet":
-            if entry.get("path") == path and entry.get("snippet", "\0") in line:
-                return True
-    return False
+            hit = entry.get("path") == path and entry.get("snippet", "\0") in line
+        if hit:
+            covered = True
+            if used is None:
+                return True  # no usage tracking wanted: first match is enough
+            used.add(entry_key(entry))
+    return covered
+
+
+def _self_test() -> int:
+    history = {"kind": "history-file", "path": "docs/x.md", "reason": "r"}
+    broad = {"kind": "history-file", "path": "plans/*/roadmap.yaml", "reason": "r"}
+    exact = {"kind": "history-file", "path": "plans/a/roadmap.yaml", "reason": "r"}
+    snippet = {"kind": "snippet", "path": "a.py", "snippet": "tok", "reason": "r"}
+
+    used: set[str] = set()
+    assert exempt([history], "docs/x.md", "any", used)
+    assert entry_key(history) in used
+
+    # Order independence: a broader rule listed first must not starve the
+    # explicit duplicate below it, or staleness reporting punishes redundancy.
+    used = set()
+    assert exempt([broad, exact], "plans/a/roadmap.yaml", "any", used)
+    assert used == {entry_key(broad), entry_key(exact)}, used
+
+    # Snippet entries match on path AND content.
+    used = set()
+    assert exempt([snippet], "a.py", "has tok here", used)
+    assert not exempt([snippet], "a.py", "no match", set())
+    assert not exempt([snippet], "b.py", "has tok here", set())
+
+    # Without a usage set the first match short-circuits, as before.
+    assert exempt([broad, exact], "plans/a/roadmap.yaml", "any") is True
+    assert exempt([], "anything", "any") is False
+
+    print("denylist-check self-test: OK")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="exit 2 on any violation")
     ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--self-test", action="store_true", help="self-check the exemption logic")
     args = ap.parse_args(argv)
+
+    if args.self_test:
+        return _self_test()
 
     entries, problems = load_allowlist()
     violations: list[str] = []
+    used: set[str] = set()
     scanned = 0
 
     for path in tracked_files():
@@ -133,14 +194,33 @@ def main(argv: list[str] | None = None) -> int:
         scanned += 1
         for number, line in enumerate(text.splitlines(), 1):
             for name, pattern, why in PATTERNS:
-                if pattern.search(line) and not exempt(entries, path, line):
+                if pattern.search(line) and not exempt(entries, path, line, used):
                     violations.append(
                         f"{path}:{number}: [{name}] {why}\n      {line.strip()[:120]}"
                     )
 
+    # An exemption that suppressed nothing has outlived whatever it was filed
+    # for. Reported as a failure, not a note: the whole hazard is that a stale
+    # exemption is silent right up until it starts hiding a real violation.
+    #
+    # Entries marked "pre-emptive" are exempt from this, because covering a
+    # currently-clean surface is their stated purpose -- but the exemption has
+    # to SAY so, in the reason, where a reviewer sees it.
+    for entry in entries:
+        key = entry_key(entry)
+        if key in used:
+            continue
+        if "pre-emptive" in (entry.get("reason") or "").lower():
+            continue
+        problems.append(
+            f"allowlist: exemption '{key}' matched nothing. Either it is stale "
+            f"and should be deleted, or its reason should say 'pre-emptive'. "
+            f"Reason on file: {(entry.get('reason') or '')[:120]}"
+        )
+
     if args.verbose:
         print(f"scanned {scanned} tracked files against {len(PATTERNS)} patterns")
-        print(f"allowlist entries: {len(entries)}")
+        print(f"allowlist entries: {len(entries)}, of which {len(used)} fired")
 
     for problem in problems:
         print(f"FAIL: {problem}", file=sys.stderr)

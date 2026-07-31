@@ -14,7 +14,7 @@
     {
       "kind": "history-file",
       "path": "docs/adr/**",
-      "reason": "ADRs must be able to name the pre-fork package to record the naming decision (issue #6)."
+      "reason": "ADRs must be able to name the pre-fork package to record the naming decision (issue #6). Pre-emptive: docs/adr/ does not exist yet, so this suppresses nothing today and is kept so the first ADR that needs it is not ambushed by the gate."
     },
     {
       "kind": "history-file",
