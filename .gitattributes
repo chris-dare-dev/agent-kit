@@ -19,7 +19,14 @@
 *.yml   text eol=lf
 *.toml  text eol=lf
 *.plist text eol=lf
-*.jsonl text eol=lf
+
+# .jsonl is digest-sealed, not merely line-ending-sensitive: sealed-eval.py
+# hashes the corpus bytes and compares against the sha256 recorded in the
+# manifest. `text eol=lf` would still round-trip those bytes through git's
+# normalisation filter, so a stray CR inside a record would be silently eaten
+# on commit and the seal would verify against content the tree never held.
+# `-text` disables conversion entirely: what is committed is what was hashed.
+*.jsonl -text
 
 # PowerShell is the one thing that genuinely wants CRLF.
 *.ps1   text eol=crlf

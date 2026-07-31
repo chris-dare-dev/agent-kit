@@ -13,7 +13,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Agent name (e.g., argocd-ops, gitops, cluster-health)"
+          "description": "Agent name (e.g., context-curator, milestone-adversary, milestone-closure-verifier)"
         },
         "section": {
           "type": "string",
@@ -85,7 +85,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Reference name (e.g., cluster-contexts)"
+          "description": "Reference name (e.g., agent-memory, agent-memory-consolidation)"
         }
       },
       "required": [
@@ -100,7 +100,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "description": "Skill name (e.g., argocd-debug)"
+          "description": "Skill name (e.g., handoff)"
         },
         "section": {
           "type": "string",

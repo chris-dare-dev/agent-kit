@@ -152,6 +152,37 @@ const searchDocuments: SearchDocument[] = [
 const searchIndex = buildIndex(searchDocuments);
 log(`  Search index: ${searchDocuments.length} documents indexed`);
 
+/**
+ * Render the `(e.g., …)` fragment of a tool's argument description from names
+ * this server actually discovered.
+ *
+ * The examples used to be hardcoded: one Kubernetes-tooling skill name for
+ * get_skill and three platform agent names for get_agent. None of the four
+ * survived the genericization fork, and because argument descriptions live
+ * inside `inputSchema`, `tests/fixtures/tools-list.golden.json` froze the stale
+ * text into a *passing* contract test — the gate certified the drift instead of
+ * catching it. Deriving from `skills` / `agents` / `references` means the
+ * examples cannot outlive the content again (M2, gates-green-t-tool-example-names).
+ *
+ * Only the bundled `data/` tiers are used. Context guides and personal memory
+ * resolve from host-dependent directories, so deriving examples from those
+ * would make the golden fixture differ per machine.
+ */
+function derivedExamples(names: readonly string[], limit: number): string {
+  const picked = [...names].sort((a, b) => a.localeCompare(b)).slice(0, limit);
+  return picked.length === 0 ? "" : ` (e.g., ${picked.join(", ")})`;
+}
+
+const SKILL_NAME_EXAMPLES = derivedExamples(skills.map((s) => s.name), 1);
+const AGENT_NAME_EXAMPLES = derivedExamples(agents.map((a) => a.name), 3);
+// A reference's `name` is its filename stem with hyphens turned into spaces for
+// display. get_reference canonicalizes both, but the hyphenated stem is the form
+// a caller reads off `ls data/references/`, so show that.
+const REFERENCE_NAME_EXAMPLES = derivedExamples(
+  references.map((r) => path.basename(r.path, ".md")),
+  2,
+);
+
 // ---------------------------------------------------------------------------
 // Create tool handlers
 // ---------------------------------------------------------------------------
@@ -464,7 +495,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           name: {
             type: "string",
-            description: "Skill name (e.g., argocd-debug)",
+            description: `Skill name${SKILL_NAME_EXAMPLES}`,
           },
           section: {
             type: "string",
@@ -477,7 +508,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "list_references",
       description:
-        "List all shared reference files (cluster contexts, environment map, port conventions, etc.)",
+        "List all shared reference files (name + description). Use this first, then get_reference for the full content of one.",
       inputSchema: { type: "object" as const, properties: {} },
     },
     {
@@ -488,7 +519,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           name: {
             type: "string",
-            description: "Reference name (e.g., cluster-contexts)",
+            description: `Reference name${REFERENCE_NAME_EXAMPLES}`,
           },
         },
         required: ["name"],
@@ -503,7 +534,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "get_memory",
       description:
-        "Get the full content of one personal-memory file by name (the on-disk filename stem, e.g. reference_pqc_envoyfilter_constraints). Accepts a unique substring. LOCAL/PRIVATE tier.",
+        "Get the full content of one personal-memory file by name (the on-disk filename stem). Accepts a unique substring. Call list_memory for the available stems. LOCAL/PRIVATE tier.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -541,7 +572,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "get_context_guide",
       description:
-        'Get a topical context guide. Topic supports partial matching (e.g., \'mesh\' -> \'service-mesh\'). Large guides default to a chunked summary (intro + TOC); pass `section: "<slug>"` for one section, `section: "list"` for TOC only, or `section: "all"` for full content. Use chunking to save tokens when you only need part of the guide.',
+        'Get a topical context guide. Topic supports partial matching, so a substring of the topic resolves it; call list_context_guides for the available topics. Large guides default to a chunked summary (intro + TOC); pass `section: "<slug>"` for one section, `section: "list"` for TOC only, or `section: "all"` for full content. Use chunking to save tokens when you only need part of the guide.',
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -585,8 +616,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           name: {
             type: "string",
-            description:
-              "Agent name (e.g., argocd-ops, gitops, cluster-health)",
+            description: `Agent name${AGENT_NAME_EXAMPLES}`,
           },
           section: {
             type: "string",

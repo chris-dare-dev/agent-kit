@@ -23,7 +23,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -200,6 +200,105 @@ test("MCP contract (tools/list golden + representative calls)", async (t) => {
       })) as CallResult;
       assert.doesNotMatch(textOf(agent), MISS, "get_agent('Milestone Researcher') should resolve");
     });
+  } finally {
+    await close();
+  }
+});
+
+/**
+ * Referential integrity of the advertised tool surface (M2,
+ * gates-green-t-referential-integrity).
+ *
+ * `get_skill`'s argument description named `argocd-debug` and `get_agent`'s named
+ * `argocd-ops, gitops, cluster-health` — four identifiers that stopped existing at
+ * the genericization fork. Because argument descriptions live inside `inputSchema`,
+ * the golden snapshot froze the stale text and the contract test *certified* it.
+ * This test closes that hole from the other side: every identifier a tool
+ * description advertises must resolve against content discovered on disk, so
+ * reverting the derivation in src/index.ts fails here rather than passing.
+ */
+function discoveredNames(dir: string, kind: "dir" | "md"): Set<string> {
+  const entries = readdirSync(resolve(REPO_ROOT, "data", dir), {
+    withFileTypes: true,
+  });
+  const names = new Set<string>();
+  for (const e of entries) {
+    if (kind === "dir" && e.isDirectory()) names.add(e.name);
+    if (kind === "md" && e.isFile() && e.name.endsWith(".md")) {
+      const stem = e.name.slice(0, -3);
+      names.add(stem);
+      names.add(stem.replace(/-/g, " ")); // the display form get_reference also accepts
+    }
+  }
+  return names;
+}
+
+/** Every `(e.g., a, b)` identifier list in a description string. */
+function advertisedIdentifiers(description: string): string[] {
+  const out: string[] = [];
+  for (const [, list] of description.matchAll(/\(e\.g\.,?\s+([^)]+)\)/g)) {
+    for (const raw of list.split(",")) {
+      const name = raw.trim();
+      // Identifiers only: prose inside an e.g. clause is not a route.
+      if (/^[a-z0-9][a-z0-9._-]*$/i.test(name)) out.push(name);
+    }
+  }
+  return out;
+}
+
+test("every identifier a tool description advertises resolves on disk", async () => {
+  const sets: Record<string, Set<string>> = {
+    skill: discoveredNames("skills", "dir"),
+    agent: discoveredNames("agents", "md"),
+    reference: discoveredNames("references", "md"),
+  };
+  const byTool: Record<string, keyof typeof sets> = {
+    get_skill: "skill",
+    list_skills: "skill",
+    get_agent: "agent",
+    list_agents: "agent",
+    get_reference: "reference",
+    list_references: "reference",
+  };
+
+  const { client, close } = await startServer();
+  try {
+    const tools = (await client.listTools()).tools;
+    let checked = 0;
+
+    for (const tool of tools) {
+      const schema = tool.inputSchema as {
+        properties?: Record<string, { description?: string }>;
+      };
+      const descriptions = [
+        tool.description ?? "",
+        ...Object.values(schema.properties ?? {}).map((p) => p.description ?? ""),
+      ];
+      for (const description of descriptions) {
+        for (const name of advertisedIdentifiers(description)) {
+          const kind = byTool[tool.name];
+          const universe = kind
+            ? sets[kind]
+            : new Set([...sets.skill, ...sets.agent, ...sets.reference]);
+          assert.ok(
+            universe.has(name),
+            `${tool.name} advertises ${kind ?? "content"} "${name}", which does not ` +
+              `exist on disk (${universe.size} discovered). Tool descriptions must ` +
+              `derive their examples from discovered names — see derivedExamples() ` +
+              `in src/index.ts.`,
+          );
+          checked += 1;
+        }
+      }
+    }
+
+    // Guard against the test passing because nothing advertises anything: the
+    // three derived example sets must actually have rendered.
+    assert.ok(
+      checked >= 4,
+      `expected the derived examples to advertise at least 4 identifiers, saw ${checked} — ` +
+        "did derivedExamples() stop rendering?",
+    );
   } finally {
     await close();
   }
