@@ -201,8 +201,9 @@ class TestNonBlocking(unittest.TestCase):
             log = Path(d) / "out.jsonl"
             sp = Path(d) / "state.json"
             sp.write_text(
-                '{"id": "m1", "critique_finding_counts": {trunc'
-            , encoding="utf-8")  # broken JSON
+                '{"id": "m1", "critique_finding_counts": {trunc',
+                encoding="utf-8",
+            )  # broken JSON
             res = run_emit_subprocess(
                 ["--pipeline", "milestone", "--id", "m1", "--state", str(sp)], log
             )
@@ -216,7 +217,7 @@ class TestNonBlocking(unittest.TestCase):
             log = Path(d) / "out.jsonl"
             sp = Path(d) / "state.json"
             # Valid JSON, but missing critique_finding_counts AND rectification_commit.
-            sp.write_text(json.dumps({"id": "m1", "phase": "complete"}, encoding="utf-8"))
+            sp.write_text(json.dumps({"id": "m1", "phase": "complete"}), encoding="utf-8")
             res = run_emit_subprocess(
                 ["--pipeline", "milestone", "--id", "m1", "--state", str(sp)], log
             )
@@ -256,7 +257,8 @@ class TestRectificationCount(unittest.TestCase):
             log = Path(d) / "out.jsonl"
             sp = Path(d) / "state.json"
             sp.write_text(
-                json.dumps({"id": "m1", "fixed_findings": ["C1", "H1", "H2", "M1"]}, encoding="utf-8")
+                json.dumps({"id": "m1", "fixed_findings": ["C1", "H1", "H2", "M1"]}),
+                encoding="utf-8",
             )
             mod.emit("milestone", "m1", str(sp), {}, str(log))
             records, _ = mod.read_records(log)
@@ -340,7 +342,8 @@ class TestPerPipelineEmitSmoke(unittest.TestCase):
                         "updated_at": "2026-06-17T15:00:00Z",
                         "phase": "complete",
                     }
-                , encoding="utf-8")
+                ),
+                encoding="utf-8",
             )
             # --field values arrive as STRINGS from the CLI (key=value); the writer JSON-coerces
             # them. Pass strings here to faithfully exercise the live `--field` invocation shape.
@@ -379,7 +382,8 @@ class TestPerPipelineEmitSmoke(unittest.TestCase):
                             "low": 0,
                         },
                     }
-                , encoding="utf-8")
+                ),
+                encoding="utf-8",
             )
             for fam in [
                 "capability-scout",

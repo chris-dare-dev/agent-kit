@@ -113,8 +113,9 @@ class TestConsolidate(unittest.TestCase):
         (unified / "milestone-researcher").mkdir()
         (unified / "milestone-researcher" / "lessons.md").write_text(
             "# milestone-researcher lessons\nSHARED-LINE common to every copy\n"
-            "unified-seed lesson A\n"
-        , encoding="utf-8")
+            "unified-seed lesson A\n",
+            encoding="utf-8",
+        )
 
         # Several legacy roots at nested paths, mimicking charts/velero, source/foo, plans, poc.
         legacy_specs = {
@@ -275,8 +276,9 @@ class TestConsolidate(unittest.TestCase):
             missed = ws / "escaped-repo" / ".claude" / "agent-memory"
             (missed / "milestone-researcher").mkdir(parents=True)
             (missed / "milestone-researcher" / "lessons.md").write_text(
-                "escaped lesson\n"
-            , encoding="utf-8")
+                "escaped lesson\n",
+                encoding="utf-8",
+            )
 
             # FALLBACK branch: AGENT_MEMORY_ROOT unset AND WORKSPACE_ROOT points at a dir
             # with NO new root present -> resolver must return the LEGACY path, never empty,

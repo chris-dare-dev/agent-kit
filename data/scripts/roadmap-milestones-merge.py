@@ -110,7 +110,7 @@ def _check_skeleton(incoming: dict) -> list[str]:
 
 def _save_atomic(path: Path, doc: dict) -> None:
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(doc, indent=2, encoding="utf-8") + "\n")
+    tmp.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     os.replace(tmp, path)
 
 
@@ -232,7 +232,7 @@ def self_test() -> int:
         reg = Path(td) / ".claude" / "notes" / "roadmaps" / "demo-slug" / "milestones.json"
         inc = Path(td) / "incoming.json"
 
-        inc.write_text(json.dumps(doc(milestone(1, encoding="utf-8"), milestone(2, deps=["demo-slug-m1"]))))
+        inc.write_text(json.dumps(doc(milestone(1), milestone(2, deps=["demo-slug-m1"]))), encoding="utf-8")
         expect("create-on-absent", merge(reg, inc), 0)
 
         # Simulate execution state, then re-materialize with a title change + new m3.
@@ -243,10 +243,11 @@ def self_test() -> int:
             {"at": "t", "from": "pending", "to": "in_progress", "reason": None},
             {"at": "t", "from": "in_progress", "to": "complete", "reason": None},
         ]
-        reg.write_text(json.dumps(live, encoding="utf-8"))
+        reg.write_text(json.dumps(live), encoding="utf-8")
 
         inc.write_text(
-            json.dumps(doc(milestone(1, title="Retitled", encoding="utf-8"), milestone(2, deps=["demo-slug-m1"]), milestone(3)))
+            json.dumps(doc(milestone(1, title="Retitled"), milestone(2, deps=["demo-slug-m1"]), milestone(3))),
+            encoding="utf-8",
         )
         expect("merge preserves + adopts", merge(reg, inc), 0)
         merged = json.loads(reg.read_text(encoding="utf-8"))
@@ -262,9 +263,9 @@ def self_test() -> int:
         failures += 0 if ok else 1
 
         # Dropping the completed m1 must refuse; dropping pending m3 is fine.
-        inc.write_text(json.dumps(doc(milestone(2, deps=[], encoding="utf-8"))))
+        inc.write_text(json.dumps(doc(milestone(2, deps=[]))), encoding="utf-8")
         expect("refuses dropping non-pending", merge(reg, inc), 3)
-        inc.write_text(json.dumps(doc(milestone(1, encoding="utf-8"), milestone(2, deps=["demo-slug-m1"]))))
+        inc.write_text(json.dumps(doc(milestone(1), milestone(2, deps=["demo-slug-m1"]))), encoding="utf-8")
         expect("drops pending silently", merge(reg, inc), 0)
         ok = len(json.loads(reg.read_text(encoding="utf-8"))["milestones"]) == 2
         print(f"  pending m3 dropped: {'ok' if ok else 'FAIL'}")
@@ -273,12 +274,12 @@ def self_test() -> int:
         # Contract violations.
         bad = doc(milestone(1))
         bad["milestones"][0]["status"] = "in_progress"
-        inc.write_text(json.dumps(bad, encoding="utf-8"))
+        inc.write_text(json.dumps(bad), encoding="utf-8")
         expect("refuses stateful draft", merge(reg, inc), 2)
 
         bad = doc(milestone(1))
         bad["slug"] = "other-slug"
-        inc.write_text(json.dumps(bad, encoding="utf-8"))
+        inc.write_text(json.dumps(bad), encoding="utf-8")
         expect("refuses slug mismatch", merge(reg, inc), 2)
 
     print(f"self-test: {'PASS' if failures == 0 else f'{failures} FAILURE(S)'}")

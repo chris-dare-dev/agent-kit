@@ -104,7 +104,7 @@ def self_test() -> int:
         artifacts.write_text(json.dumps([{
             "uri": f"registry.example/app@{digest}", "digest": digest,
             "target_ids": ["dev/app"],
-        }], encoding="utf-8"), encoding="utf-8")
+        }]), encoding="utf-8")
         value = build("repo", "b" * 40, ["dev/app"], artifacts)
         output = root / ".workspace/source-revision.json"
         write_atomic(output, value)

@@ -83,7 +83,7 @@ def _sha256_file(p: Path) -> str:
 
 def _save_atomic(path: Path, obj: dict) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(obj, indent=2, encoding="utf-8"))
+    tmp.write_text(json.dumps(obj, indent=2), encoding="utf-8")
     os.replace(tmp, path)
 
 

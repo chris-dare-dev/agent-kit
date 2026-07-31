@@ -23,7 +23,7 @@
  *   failure mode this file exists to end.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -62,10 +62,19 @@ const PY_GATES = [
 
 /** Previously orphaned: reachable from nothing until this runner existed. */
 const PY_CHECKS = [
+  "python-callsite-check.py",
   "skill-ref-check.py",
   "artifact-memory-eval-manifest-check.py",
   "pipeline-outcome-log-test.py",
 ];
+
+/**
+ * Imports that simply do not exist on this platform. A self-test that dies on
+ * one of these verified nothing, but it is not a regression either — reporting
+ * it as SKIP with the reason is the honest answer, and the static
+ * `python-callsite-check.py` gate covers this same code on every host.
+ */
+const PLATFORM_ONLY_MODULES = ["fcntl", "termios", "pwd", "grp", "posix", "msvcrt", "winreg"];
 
 const SHELL_HARNESSES = [
   "data/scripts/sealed-eval-test.sh",
@@ -89,6 +98,25 @@ const QUARANTINED = new Map([
    "fails at HEAD: outcome-log locking + cwd resolution — issues #69, #60"],
   ["data/scripts/sealed-eval-test.sh",
    "fails at HEAD: the committed corpus no longer matches its own seal — issue #59"],
+  // These three reference *.schema.json documents that exist nowhere in the
+  // repository: `data/schemas/` was never committed, so it is not a registration
+  // gap. Verified failing identically at e6a221f, the parent of the UTF-8 sweep,
+  // so this is inherited debt and not sweep damage.
+  //
+  // They are ALSO the sharpest example of the failure this runner exists to
+  // stop. Schema validation is guarded by `except ImportError: return None`, so
+  // on a host without `jsonschema` installed all three report success while
+  // validating nothing — which is exactly why a WSL baseline called them green
+  // and this Windows host, where jsonschema 4.26 is present, calls them red.
+  // Quarantine, do not "fix" by uninstalling the dependency.
+  //
+  // NO ISSUE FILED YET: file one and name it here.
+  ["milestone-pipeline-schema-check.py --self-test",
+   "fails at HEAD (pre-existing): milestone-trust-policy-v2.schema.json absent — needs an issue"],
+  ["milestone-pipeline-review-manifest.py --self-test",
+   "fails at HEAD (pre-existing): milestone-review-manifest-v2.schema.json absent — needs an issue"],
+  ["milestone-pipeline-migrate.py --self-test",
+   "fails at HEAD (pre-existing): milestone-pipeline-state-v2.schema.json absent — needs an issue"],
 ]);
 
 const results = [];
@@ -122,6 +150,44 @@ function runPython(relPath, args, name) {
   record(name, "FAIL", (last ?? `exit ${run.status}`).slice(0, 110));
 }
 
+/**
+ * Every data/scripts/*.py that advertises `--self-test`, discovered by reading
+ * the files rather than by list.
+ *
+ * A hand-maintained list is how eight self-tests stayed red without anyone
+ * noticing: they were not on one. Discovery means a script that grows a
+ * self-test is covered the moment it is committed, and a script that has one
+ * cannot quietly fall out of the sweep.
+ */
+function selfTestScripts() {
+  const dir = join(REPO_ROOT, "data/scripts");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".py"))
+    .filter((f) => readFileSync(join(dir, f), "utf-8").includes("--self-test"))
+    .sort();
+}
+
+function runSelfTest(file) {
+  const name = `${file} --self-test`;
+  if (!PY) return record(name, "SKIP", "no python interpreter on PATH");
+  const run = spawnSync(PY.cmd, [...PY.pre, join(REPO_ROOT, `data/scripts/${file}`), "--self-test"], {
+    cwd: REPO_ROOT,
+    encoding: "utf-8",
+    env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
+  });
+  if (run.status === 0) return record(name, "PASS");
+  const output = `${run.stdout ?? ""}${run.stderr ?? ""}`;
+  const missing = PLATFORM_ONLY_MODULES.find((m) =>
+    output.includes(`No module named '${m}'`),
+  );
+  if (missing) {
+    return record(name, "SKIP", `needs '${missing}', absent on ${process.platform}`);
+  }
+  const last = output.trim().split("\n").filter(Boolean).pop();
+  record(name, "FAIL", (last ?? `exit ${run.status}`).slice(0, 110));
+}
+
 function runShell(relPath) {
   const name = relPath;
   if (!BASH) return record(name, "SKIP", "bash unavailable on this host");
@@ -145,6 +211,11 @@ if (!only || only === "generators") {
 if (!only || only === "checks") {
   console.log(`\n  ${C.d}— consistency checks —${C.x}`);
   for (const check of PY_CHECKS) runPython(`data/scripts/${check}`, [], check);
+}
+
+if (!only || only === "selftests") {
+  console.log(`\n  ${C.d}— script self-tests —${C.x}`);
+  for (const file of selfTestScripts()) runSelfTest(file);
 }
 
 if (!only || only === "shell") {

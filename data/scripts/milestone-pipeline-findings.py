@@ -446,7 +446,7 @@ def _load_register(path: Path) -> dict:
 
 def _save_atomic(path: Path, doc: dict) -> None:
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(doc, indent=2, encoding="utf-8") + "\n")
+    tmp.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     os.replace(tmp, path)
 
 
@@ -1107,7 +1107,7 @@ def self_test() -> int:
                           "file": "x", "line": 1, "title": "t",
                           "regression_guard": None, "critique_file": "f",
                           "status": "opened", "resolution": None, "history": []}],
-        }, encoding="utf-8"))
+        }), encoding="utf-8")
         rc, out, err = run_main(["gate", "demo-m1", "--register", str(bad_reg)])
         expect("gate: hand-edited status refuses, never fail-open (F2)",
                rc == 1 and "opened" in err and "fail-open" in err, f"rc={rc} {err[:120]}")

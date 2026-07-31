@@ -544,7 +544,7 @@ def self_test() -> int:
         oversized = directory_path / "private-eval-oversized"
         oversized.touch()
         oversized.chmod(0o600)
-        with oversized.open("r+b", encoding="utf-8") as handle:
+        with oversized.open("r+b") as handle:
             handle.write(b" ")
             handle.truncate(MAX_TRACKED_JSON_BYTES + 1)
         oversized_errors = validate_tracked_json_content(

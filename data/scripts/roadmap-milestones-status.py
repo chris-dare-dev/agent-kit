@@ -137,7 +137,7 @@ def _load(path: Path) -> dict:
 
 def _save_atomic(path: Path, doc: dict) -> None:
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(doc, indent=2, encoding="utf-8") + "\n")
+    tmp.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
     os.replace(tmp, path)
 
 
@@ -365,7 +365,7 @@ def self_test() -> int:
                 milestone(4, ["demo-slug-spike-2"]),  # spike prerequisite (absent, for override)
             ],
         }
-        path.write_text(json.dumps(doc, indent=2, encoding="utf-8"))
+        path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
 
         expect("check-only blocks m2 (no write)", transition(path, "demo-slug-m2", "in_progress", None, [], check_only=True), 3)
         d = json.loads(path.read_text(encoding="utf-8"))
@@ -403,7 +403,7 @@ def self_test() -> int:
             sd.mkdir(parents=True, exist_ok=True)
             (sd / "state.json").write_text(json.dumps(
                 {"schema_version": 1, "spike_id": sid, "terminal_status": terminal, "verdict": verdict}
-            , encoding="utf-8"))
+            ), encoding="utf-8")
 
         expect("m3 blocked: spike not run", transition(path, "demo-slug-m3", "in_progress", None, []), 3)
         write_spike("demo-slug-spike-1", "skip-review", "YES")
@@ -441,7 +441,7 @@ def self_test() -> int:
         # Ambiguity: a second register claiming the same id.
         dup_dir = Path(td) / ".claude" / "notes" / "roadmaps" / "other-slug"
         dup_dir.mkdir(parents=True)
-        (dup_dir / "milestones.json").write_text(json.dumps(doc, encoding="utf-8"))
+        (dup_dir / "milestones.json").write_text(json.dumps(doc), encoding="utf-8")
         found = find_file(Path(td), "demo-slug-m1")
         print(f"  --find flags ambiguous id: {'ok' if found == 'AMBIGUOUS' else 'FAIL'}")
         failures += 0 if found == "AMBIGUOUS" else 1
@@ -449,7 +449,7 @@ def self_test() -> int:
         # Version guard.
         bad = dict(doc)
         bad["schema_version"] = 2
-        (dup_dir / "milestones.json").write_text(json.dumps(bad, encoding="utf-8"))
+        (dup_dir / "milestones.json").write_text(json.dumps(bad), encoding="utf-8")
         try:
             _load(dup_dir / "milestones.json")
             print("  v2 register refused by writer: FAIL (no exit)")

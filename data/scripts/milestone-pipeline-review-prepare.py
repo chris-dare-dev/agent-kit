@@ -623,7 +623,7 @@ def _fixture_repo(root: Path, kit_commit: str, milestone_id: str) -> tuple[Path,
         "schema_version": 2, "id": milestone_id, "phase": "critique-running",
         "agent_kit_commit": kit_commit,
         "implementation_base": base, "implementation_commits": [head],
-    }, encoding="utf-8"), encoding="utf-8")
+    }), encoding="utf-8")
     return repo, base, head
 
 
@@ -742,7 +742,7 @@ def self_test() -> int:
         # 5. Body snapshot comes from the kit COMMIT, not the working tree.
         (kit / "data" / "agents" / "milestone-adversary.md").write_text(
             "# TAMPERED\n", encoding="utf-8"
-        , encoding="utf-8")
+        )
         result2 = prepare_wave(
             milestone_id=mid, repo_root=repo, stage="assessment",
             roles_override=["milestone-adversary"], artifacts=artifacts,

@@ -276,7 +276,7 @@ def _write_atomic(path: Path, content: bytes) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     os.replace(tmp, path)
-    directory = os.open(path.parent, os.O_RDONLY, encoding="utf-8")
+    directory = os.open(path.parent, os.O_RDONLY)
     try:
         os.fsync(directory)
     finally:
@@ -485,7 +485,7 @@ def self_test() -> int:
             "external_writes_completed": ["git push origin HEAD:main"], "external_writes_authorized": True,
         }
         state_path = state_dir / "state.json"
-        state_path.write_text(json.dumps(old, encoding="utf-8"))
+        state_path.write_text(json.dumps(old), encoding="utf-8")
         preview = migrate("m1", root, apply=False)
         expect("preview is read-only", json.loads(state_path.read_text(encoding="utf-8")).get("schema_version") is None)
         expect("legacy complete preview returns to review", preview["mapped_phase"] == "critique-running")

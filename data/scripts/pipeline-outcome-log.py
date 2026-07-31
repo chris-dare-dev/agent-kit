@@ -300,7 +300,7 @@ def _append_line(log_path, line_bytes):
     atomicity guarantee never silently lapses (a torn line would corrupt the dataset).
     """
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(log_path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644, encoding="utf-8")
+    fd = os.open(str(log_path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
     try:
         if len(line_bytes) < PIPE_BUF:
             os.write(fd, line_bytes)  # single atomic append (no buffering, one syscall)

@@ -166,7 +166,7 @@ def _load(sp: Path) -> dict:
 
 def _save_atomic(sp: Path, state: dict) -> None:
     tmp = sp.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(state, indent=2, encoding="utf-8"))
+    tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
     os.replace(tmp, sp)
 
 
@@ -643,7 +643,7 @@ def self_test() -> int:
                           {"confound": "c", "control": "z"}],
             "measurement_fields": ["p95_ms"],
             "poc_constraints": {"language": "python3-stdlib", "max_loc": 200, "dependencies": []},
-        }, encoding="utf-8"))
+        }), encoding="utf-8")
         (sd / "design.md").write_text("# Design\nassumption etc.\n", encoding="utf-8")
 
     def write_measurements(sd: Path, design_hash: str, val: float = 14.2) -> None:
@@ -651,7 +651,7 @@ def self_test() -> int:
             "schema_version": 1, "spike_id": SID, "design_hash": design_hash,
             "executed_at": "2026-07-10T00:00:00Z", "poc_command": "python3 poc/b.py",
             "iterations": 1, "sample_count": 1000, "values": {"p95_ms": val},
-        }, encoding="utf-8"))
+        }), encoding="utf-8")
 
     def write_decision(sd: Path, dh: str, mh: str, verdict: str, result: str) -> None:
         (sd / "decision.json").write_text(json.dumps({
@@ -659,7 +659,7 @@ def self_test() -> int:
             "verdict": verdict, "derived_at": "t",
             "per_criterion": [{"name": "p95", "field": "p95_ms", "operator": "<=",
                                "threshold": 20, "unit": "ms", "measured": 14.2, "result": result}],
-        }, encoding="utf-8"))
+        }), encoding="utf-8")
 
     def write_review(sd: Path, dh: str, nh: str, verdict: str) -> None:
         (sd / "review.json").write_text(json.dumps({
@@ -668,7 +668,7 @@ def self_test() -> int:
             "axes": {"design_validity": "sound", "sample_size": "sound", "confound": "sound",
                      "methodology": "sound", "decision_validity": "sound", "implications": "sound"},
             "verdict": verdict, "reviewed_at": "t",
-        }, encoding="utf-8"))
+        }), encoding="utf-8")
 
     print("self-test: spike-checkpoint.py")
     with tempfile.TemporaryDirectory() as td:
@@ -768,7 +768,7 @@ def self_test() -> int:
                               {"confound": "c", "control": "z"}],
                 "measurement_fields": ["p95_ms"],
                 "poc_constraints": {"language": "python3-stdlib", "max_loc": 200},
-            }, encoding="utf-8"))
+            }), encoding="utf-8")
             (sd / "design.md").write_text("# d\n", encoding="utf-8")
 
         # rewrite fixtures for SID2
@@ -776,14 +776,14 @@ def self_test() -> int:
         run([SID2, "--init"]); wd(sd2, SID2); run([SID2, "designed"]); dh2 = sha(sd2 / "design.json")
         (sd2 / "measurements.json").write_text(json.dumps({
             "schema_version": 1, "spike_id": SID2, "design_hash": dh2, "executed_at": "t",
-            "values": {"p95_ms": 14.0}}, encoding="utf-8"))
+            "values": {"p95_ms": 14.0}}), encoding="utf-8")
         run([SID2, "executed"]); mh2 = sha(sd2 / "measurements.json")
         # hand-crafted decision with a tampered non-canonical verdict must fail validation at 'decided'
         (sd2 / "decision.json").write_text(json.dumps({
             "schema_version": 1, "spike_id": SID2, "design_hash": dh2, "measurements_hash": mh2,
             "verdict": "GO-ephemeral", "derived_at": "t",
             "per_criterion": [{"name": "p95", "field": "p95_ms", "operator": "<=", "threshold": 20,
-                               "unit": "ms", "measured": 14.0, "result": "pass"}]}, encoding="utf-8"))
+                               "unit": "ms", "measured": 14.0, "result": "pass"}]}), encoding="utf-8")
         rc, out = run([SID2, "decided"])
         expect("decided refuses non-canonical decision verdict (GO-ephemeral)",
                rc != 0 and "invalid" in out)
@@ -795,13 +795,13 @@ def self_test() -> int:
         run([SID3, "--init"]); wd(sd3, SID3); run([SID3, "designed"]); dh3 = sha(sd3 / "design.json")
         (sd3 / "measurements.json").write_text(json.dumps({
             "schema_version": 1, "spike_id": SID3, "design_hash": dh3, "executed_at": "t",
-            "values": {"p95_ms": 14.0}}, encoding="utf-8"))
+            "values": {"p95_ms": 14.0}}), encoding="utf-8")
         run([SID3, "executed"]); mh3 = sha(sd3 / "measurements.json")
         (sd3 / "decision.json").write_text(json.dumps({
             "schema_version": 1, "spike_id": SID3, "design_hash": dh3, "measurements_hash": mh3,
             "verdict": "YES", "derived_at": "t",
             "per_criterion": [{"name": "p95", "field": "p95_ms", "operator": "<=", "threshold": 20,
-                               "unit": "ms", "measured": 14.0, "result": "pass"}]}, encoding="utf-8"))
+                               "unit": "ms", "measured": 14.0, "result": "pass"}]}), encoding="utf-8")
         run([SID3, "decided"])
         rc, o1 = run([SID3, "--reconsider"]); rc, o2 = run([SID3, "--reconsider"])
         rc, o3 = run([SID3, "--reconsider"])
