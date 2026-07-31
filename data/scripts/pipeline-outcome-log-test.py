@@ -68,6 +68,49 @@ def run_emit_subprocess(args, log_path):
 class TestConcurrency(unittest.TestCase):
     """4.1 — concurrent appenders must produce intact, non-interleaved lines."""
 
+    def test_append_serialises_through_the_lock_on_every_platform(self):
+        """Pin the mechanism, not just the outcome.
+
+        Both platforms serialise through a lock file so `seq` is globally
+        ordered; the DATA write stays a single os.write() to an O_APPEND fd,
+        which is what makes a line un-tearable. Windows is the reason the lock
+        exists at all — it promises no O_APPEND atomicity and silently lost
+        15-18% of records without one.
+        """
+        with tempfile.TemporaryDirectory() as d:
+            log = Path(d) / "branch.jsonl"
+            mod.emit("milestone", "run-branch", None, {}, str(log))
+            self.assertTrue(
+                mod._lock_path(log).exists(),
+                "the append must serialise through a lock file on %s" % sys.platform,
+            )
+            self.assertNotIn(
+                "lock", log.read_text(encoding="utf-8"),
+                "the lock must live in its own file, never in the data",
+            )
+
+    def test_seq_is_monotonic_and_verify_finds_a_deleted_line(self):
+        """An append-only log with no ordering key cannot be checked for loss.
+
+        `seq` gives it one: delete a line and `verify` must name the number that
+        went missing, rather than reporting a shorter file as healthy.
+        """
+        with tempfile.TemporaryDirectory() as d:
+            log = Path(d) / "seq.jsonl"
+            for n in range(6):
+                mod.emit("milestone", "run-%d" % n, None, {}, str(log))
+
+            seqs = [json.loads(l)["seq"] for l in log.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(seqs, list(range(6)), "seq must be monotonic from 0")
+            self.assertEqual(mod.verify(str(log)), 0, "an intact log must verify clean")
+
+            lines = log.read_text(encoding="utf-8").splitlines(True)
+            del lines[3]
+            log.write_text("".join(lines), encoding="utf-8")
+            self.assertEqual(
+                mod.verify(str(log)), 1, "a deleted line must fail verification"
+            )
+
     def test_concurrent_writes_no_torn_lines(self):
         with tempfile.TemporaryDirectory() as d:
             log = Path(d) / "out.jsonl"

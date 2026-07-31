@@ -9,9 +9,12 @@ E5 sealed-eval) read.
 
 Hard guarantees (each test-asserted in pipeline-outcome-log-test.py):
   (a) CONCURRENCY  — two runs reaching `complete` at once produce two intact lines, never
-                     torn/interleaved. Mechanism: O_APPEND + a single os.write() of one
-                     compact (< PIPE_BUF) line. POSIX guarantees a <= PIPE_BUF write to an
-                     O_APPEND fd is atomic w.r.t. concurrent appenders.
+                     torn/interleaved, and neither is LOST. Mechanism: a single os.write()
+                     of one compact (< PIPE_BUF) line to an O_APPEND fd, inside an exclusive
+                     lock. POSIX guarantees a <= PIPE_BUF write to an O_APPEND fd is atomic
+                     w.r.t. concurrent appenders; Windows guarantees nothing of the sort,
+                     which is what the lock is for (it silently lost 15-18% of records
+                     without one). The lock also orders the `seq` counter.
   (b) NON-BLOCKING — a malformed/partial/absent state.json emits a record with missing
                      fields nulled and NEVER aborts the host pipeline's terminal transition.
                      The entire emit body is wrapped: ANY internal error is swallowed, logged
@@ -31,6 +34,9 @@ Usage:
 
   # Read/summary entrypoint (the surface E3/E5 read later):
   pipeline-outcome-log.py summary [--pipeline <fam>] [--last N] [--json] [--log <path>]
+
+  # Loss detection: report any gap in the seq column (exit 1 on a gap).
+  pipeline-outcome-log.py verify [--log <path>]
 
 Log-path resolution (first match wins):
   1. --log <path>
@@ -97,6 +103,11 @@ RECORD_FIELDS = [
     "completed_at",
     "emitted_at",
     "source_state_path",
+    # Per-writer monotonic counter, stamped under the same lock that orders the
+    # append. Loss used to be undetectable: the file is append-only with no
+    # ordering key, so a dropped line left no hole to find. `verify` reports the
+    # gap (M2, gates-green-t-outcome-log-lock).
+    "seq",
 ]
 
 # Identifier/string-typed columns that must NEVER be numerically coerced from a --field.
@@ -303,37 +314,74 @@ def build_record(pipeline, mid, state_path, overrides):
 # --------------------------------------------------------------------------- #
 
 
-def _append_line(log_path, line_bytes):
-    # type: (Path, bytes) -> None
-    """Append one line via O_APPEND single write(). Atomic for lines < PIPE_BUF.
+def _lock_path(log_path):
+    # type: (Path) -> Path
+    """The permanent lock file beside a log. Never unlinked: dropping it would
+    split a live lock across two inodes for concurrent writers."""
+    return log_path.with_name("." + log_path.name + ".lock")
 
-    Fallback for a pathological oversized record: an advisory flock around the write so the
-    atomicity guarantee never silently lapses (a torn line would corrupt the dataset).
+
+def _next_seq(log_path):
+    # type: (Path) -> int
+    """The next sequence number for this log. Called with the lock already held.
+
+    Counting existing lines is O(file), which is fine at this volume (one record
+    per pipeline RUN) and needs no second piece of state that could itself be
+    lost. Read errors yield 0 rather than raising -- capture is best-effort and
+    a wrong seq must never abort a host pipeline.
+    """
+    try:
+        with open(str(log_path), "rb") as handle:
+            return sum(1 for line in handle if line.strip())
+    except OSError:
+        return 0
+
+
+def _append_line(log_path, render_line):
+    # type: (Path, "callable") -> None
+    """Append one record, without ever losing one, and stamp its sequence number.
+
+    `render_line` is called with the assigned seq and returns the bytes to write,
+    so the number is decided and the line written inside one critical section.
+
+    The DATA write stays a single `os.write()` to an `O_APPEND` fd on every
+    platform -- that syscall is what makes a line un-tearable, and POSIX
+    guarantees it below PIPE_BUF. What changed is that the counter is ordered
+    under a lock file on POSIX too.
+
+    That is a deliberate deviation from the task's literal wording ("keeps the
+    O_APPEND fast path on POSIX"): a monotonic seq and a lockless append are
+    mutually exclusive, because two concurrent lockless writers would compute
+    the same seq and `verify` would then report phantom gaps -- a loss detector
+    that cries wolf is worse than none. The lock covers a line count and a
+    write, not I/O of any size, and this file takes one record per pipeline RUN.
+
+    The Windows half is the original defect: Windows promises no O_APPEND
+    atomicity, so 817 of 1000 threaded and 371 of 400 multiprocess records
+    survived, and because the emit path swallows exceptions by design the loss
+    was silent -- biasing the corpus toward runs that happened not to collide.
     """
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(log_path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    lock_path = _lock_path(log_path)
+    lock_fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT, 0o644)
     try:
-        if len(line_bytes) < PIPE_BUF:
-            os.write(fd, line_bytes)  # single atomic append (no buffering, one syscall)
-        else:
-            # Oversized line: O_APPEND atomicity is not guaranteed above PIPE_BUF. Take an
-            # advisory exclusive lock so concurrent writers can't interleave the chunks.
-            sys.stderr.write(
-                "pipeline-outcome-log: record >= PIPE_BUF (%d bytes); using flock fallback\n"
-                % len(line_bytes)
-            )
+        platform_compat.lock_file_exclusive(lock_fd)
+        try:
+            line_bytes = render_line(_next_seq(log_path))
+            if len(line_bytes) >= PIPE_BUF:
+                sys.stderr.write(
+                    "pipeline-outcome-log: record >= PIPE_BUF (%d bytes); the lock, "
+                    "not O_APPEND, is carrying atomicity\n" % len(line_bytes)
+                )
+            fd = os.open(str(log_path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
             try:
-
-                platform_compat.lock_file_exclusive(fd)
-                try:
-                    os.write(fd, line_bytes)
-                finally:
-                    platform_compat.unlock_file(fd)
-            except (ImportError, OSError):
-                # No flock available (rare): best-effort single write; still one syscall.
-                os.write(fd, line_bytes)
+                os.write(fd, line_bytes)  # one syscall, one line
+            finally:
+                os.close(fd)
+        finally:
+            platform_compat.unlock_file(lock_fd)
     finally:
-        os.close(fd)
+        os.close(lock_fd)
 
 
 # --------------------------------------------------------------------------- #
@@ -358,10 +406,15 @@ def emit(pipeline, mid, state_path, overrides, log_path):
     """
     try:
         record = build_record(pipeline, mid, state_path, overrides)
-        line = json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n"
-        data = line.encode("utf-8")
         path = _resolve_log_path(log_path)
-        _append_line(path, data)
+
+        def render(seq):
+            # type: (int) -> bytes
+            record["seq"] = seq
+            line = json.dumps(record, separators=(",", ":"), ensure_ascii=False) + "\n"
+            return line.encode("utf-8")
+
+        _append_line(path, render)
         return 0
     except Exception as exc:  # noqa: BLE001 — capture is best-effort; never abort the host
         sys.stderr.write("pipeline-outcome-log: emit failed (swallowed): %s\n" % exc)
@@ -475,6 +528,57 @@ def _parse_overrides(field_args):
     return overrides
 
 
+def verify(log_path):
+    # type: (str | None) -> int
+    """Report gaps in the seq column. Exit 0 clean, 1 on a gap or a bad log.
+
+    An append-only log with no ordering key cannot be checked for loss: a
+    dropped line leaves no hole to find. `seq` gives it one. Records predating
+    the column (seq is null) are counted and reported, not treated as gaps --
+    they were written before there was anything to check.
+    """
+    path = _resolve_log_path(log_path)
+    if not path.exists():
+        sys.stderr.write("verify: no log at %s\n" % path)
+        return 1
+
+    records, malformed = read_records(path)
+    seqs = []
+    unstamped = 0
+    for rec in records:
+        value = rec.get("seq")
+        if isinstance(value, int):
+            seqs.append(value)
+        else:
+            unstamped += 1
+
+    problems = []
+    if malformed:
+        problems.append("%d malformed line(s)" % malformed)
+
+    seen = sorted(seqs)
+    duplicates = sorted({s for s in seqs if seqs.count(s) > 1})
+    if duplicates:
+        problems.append("duplicate seq: %s" % ", ".join(str(d) for d in duplicates))
+    if seen:
+        missing = [n for n in range(seen[0], seen[-1] + 1) if n not in set(seen)]
+        if missing:
+            problems.append(
+                "missing seq: %s" % ", ".join(str(n) for n in missing[:20])
+            )
+
+    print(
+        "verify: %s — %d record(s), %d stamped, %d pre-seq"
+        % (path, len(records), len(seqs), unstamped)
+    )
+    if problems:
+        for p in problems:
+            sys.stderr.write("verify: FAIL %s\n" % p)
+        return 1
+    print("verify: no gaps")
+    return 0
+
+
 def main(argv):
     # type: (list[str]) -> int
     parser = argparse.ArgumentParser(prog="pipeline-outcome-log", add_help=True)
@@ -492,6 +596,11 @@ def main(argv):
         "--field", action="append", default=[], help="key=value override"
     )
     p_emit.add_argument("--log", default=None, help="override log path")
+
+    p_ver = sub.add_parser(
+        "verify", help="report gaps in the seq column (loss detection)"
+    )
+    p_ver.add_argument("--log", default=None)
 
     p_sum = sub.add_parser("summary", help="read/summarize the outcome log")
     p_sum.add_argument("--pipeline", default=None)
@@ -519,6 +628,8 @@ def main(argv):
             _parse_overrides(args.field),
             args.log,
         )
+    if args.command == "verify":
+        return verify(args.log)
     if args.command == "summary":
         return summary(args.pipeline, args.last, args.as_json, args.log)
 

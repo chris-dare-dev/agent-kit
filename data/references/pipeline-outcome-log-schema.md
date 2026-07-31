@@ -17,7 +17,7 @@ emit is **additive + best-effort**: a writer failure can never abort the host pi
 terminal transition.
 
 - **Writer/reader:** `data/scripts/pipeline-outcome-log.py` (Python stdlib only, no deps)
-- **Tests:** `data/scripts/pipeline-outcome-log-test.py` (`python3 …` — 13 tests, all stdlib)
+- **Tests:** `data/scripts/pipeline-outcome-log-test.py` (`python3 …` — 19 tests, all stdlib)
 
 ---
 
@@ -88,6 +88,7 @@ stable column set.
 | `completed_at` | iso\|null | `state.updated_at` | `state.updated_at` (seed-time) | `null` | `null` | `null` |
 | `emitted_at` | iso | writer `now()` | `now()` | `now()` | `now()` | `now()` |
 | `source_state_path` | str\|null | state.json path | state.json path | `null` (or `--field`) | `plans/<slug>-roadmap.md` (`--field`) | `null` |
+| `seq` | int | monotonic per-log counter, assigned under the append lock; `null` on records written before the column existed. Read by `verify` to detect a deleted line. | ← | ← | ← | ← |
 
 **Severity-counts source — `--field`, NOT `state.json`, on the live path.** The writer *can*
 map a `critique_finding_counts` (milestone) / `challenge_finding_counts` (discovery) sub-dict
@@ -203,15 +204,36 @@ bad args. `summary` may exit non-zero on bad args (diagnostic, off the critical 
 
 ## Concurrency mechanism (guarantee a)
 
-**`O_APPEND` + one `os.write()` of a single compact (`< PIPE_BUF`) line** — NOT `flock` for the
-common case. POSIX guarantees a `write()` ≤ `PIPE_BUF` (4096 on Linux/macOS) to an `O_APPEND`
-fd is atomic w.r.t. concurrent appenders, so two simultaneous emitters produce two intact,
-non-interleaved lines. The record is compact-serialized (`json.dumps(separators=(",",":"))`,
-~350–450 bytes), well under `PIPE_BUF`. **Guard:** a pathological oversized line (≥ `PIPE_BUF`)
-falls back to an advisory `flock` around the write so the atomicity guarantee never silently
-lapses. Proven by `TestConcurrency`: the thread test (50 writers × 20 iterations) **plus a
-`multiprocessing` fork-pool test** (true OS-level parallelism, no GIL — the realistic case
-since `/spike`, `/argoops`, `/milestone` are separate processes) + the oversized-line test.
+**One `os.write()` of a single compact line to an `O_APPEND` fd, inside an exclusive
+lock.** The record is compact-serialized (`json.dumps(separators=(",",":"))`, ~350–450 bytes),
+well under `PIPE_BUF`.
+
+Two mechanisms, doing two different jobs:
+
+- **The single `write()` to an `O_APPEND` fd** is what makes a line un-tearable.
+  **POSIX precondition:** POSIX guarantees a `write()` ≤ `PIPE_BUF` (4096 on Linux/macOS) to an
+  `O_APPEND` fd is atomic with respect to concurrent appenders. **Windows makes no such
+  promise**, which is why the lock below is not optional there.
+- **The lock** (`platform_compat.exclusive_file_lock` over a sibling `.<name>.lock` file —
+  `fcntl.flock` on POSIX, `msvcrt.locking` on Windows) orders writers and, with them, the
+  `seq` counter.
+
+The Windows path was measured losing records before this: **817 of 1000** threaded and
+**371 of 400** multiprocess emits survived. Because `emit` swallows every exception by design,
+the loss was silent, and it biased the corpus toward the runs that happened not to collide —
+which is worse than a corpus that is merely short, since every downstream metric
+(`sealed-eval`'s `n_baseline`/`n_post`, trajectory confidence tags) is computed from this file.
+
+**Cost, stated plainly:** POSIX no longer takes the lockless fast path. A monotonic `seq` and a
+lockless append are mutually exclusive — two concurrent lockless writers would compute the same
+number and `verify` would report phantom gaps. The lock covers a line count and one `write()`,
+on a file that takes one record per pipeline *run*.
+
+Proven by `TestConcurrency`: the thread test (50 writers × 20 iterations) **plus a
+`multiprocessing` test** (true OS-level parallelism, no GIL — the realistic case since `/spike`,
+`/argoops`, `/milestone` are separate processes), the oversized-line test, a test that pins the
+lock file is created and never written into the data, and a test that deletes a line and
+requires `verify` to fail.
 
 ---
 
