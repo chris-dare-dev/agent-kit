@@ -122,22 +122,55 @@ The substrate is separate and optional — see
 
 ## Supported platforms
 
-The MCP server runs everywhere. The substrate does not yet — it imports `fcntl`
-and `os.geteuid` at module scope and binds an AF_UNIX socket, so on Windows it
-cannot even be imported. That work is scheduled, and this table is what is true
-today rather than what is intended.
+This table is what is **measured** today, not what is intended. Every entry was
+run on Windows 11 and on Linux; macOS entries are marked as inferred where no
+host was available to check them.
+
+**native** — runs here, no workaround. **WSL2** — Windows users run it inside a
+WSL2 guest. **partial** — runs and reports, with known residue that is tracked.
+**unsupported** — declines by name; see the linked milestone.
 
 | Component | macOS | Linux | Windows |
 |---|---|---|---|
-| MCP server (`dist/index.js`, 13 tools) | ✅ | ✅ | ✅ |
-| Artifact-memory tools (4, over a Unix socket) | ✅ | ✅ | ❌ — no AF_UNIX ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) |
-| Python substrate + its test suite | ✅ | ✅ | ❌ WSL2 only ([M2](https://github.com/chris-dare-dev/agent-kit/milestone/2)) |
-| Shell hooks (`data/hooks/*.sh`, bash + jq) | ✅ | ✅ | ❌ — fail open, do not run ([M3](https://github.com/chris-dare-dev/agent-kit/milestone/3)) |
-| Obsidian vault projection (symlinks, `dir_fd`) | ✅ | ✅ | ❌ ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) |
-| Service supervision (launchd `.plist` only) | ✅ | ❌ ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) | ❌ ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) |
+| MCP server (`dist/index.js`) | native (17 tools) | native (17 tools) | native (13 tools) |
+| Artifact-memory tool group (4 tools, Unix socket) | native | native | unsupported — no AF_UNIX ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)); WSL2 meanwhile |
+| Generators + the seven gates | native | native | native |
+| TypeScript suite (`npm test`) | native | native | native |
+| Python substrate — **imports and collects** | native | native | native |
+| Python substrate — **passes** | partial | partial | partial ([#70](https://github.com/chris-dare-dev/agent-kit/issues/70)) |
+| Resident memory service (`artifact_memory_service.py`) | native | native | unsupported ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)); WSL2 meanwhile |
+| Shell hooks (`data/hooks/*.sh`, bash + jq) | native | native | unsupported — fail open ([M3](https://github.com/chris-dare-dev/agent-kit/milestone/3)) |
+| Obsidian vault projection (symlinks, `dir_fd`) | native | native | unsupported ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) |
+| Service supervision (launchd `.plist` only) | native | unsupported ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) | unsupported ([M5](https://github.com/chris-dare-dev/agent-kit/milestone/5)) |
 
-On Windows the server starts and serves the 13 non-substrate tools, and says on
-stderr exactly which group is unavailable and why.
+**Substrate suite, measured.** The suite used to be un-importable off POSIX;
+M2 routed `fcntl`, `os.geteuid` and the `resource`/AF_UNIX dependencies through
+`workspace-tooling/platform_compat.py`, so it now collects everywhere. It does
+not yet *pass* everywhere:
+
+| | collected | failures | errors |
+|---|---|---|---|
+| Linux (no venv) | 627 | 1 | 30 |
+| Windows 11 | 625 | 31 | 337 |
+
+`workspace-tooling/run-substrate-tests.py` records these as baselines and tells
+you whether a run is at, above or below them — so "did I break something" is
+answerable without a clean tree to diff against. On POSIX, ~30 of the errors are
+cases that import `qdrant_client` at call time and clear once the provisioned
+venv is used. The Windows residue (SQLite handles held across tempdir teardown,
+macOS-only launchd fixtures) is [#70](https://github.com/chris-dare-dev/agent-kit/issues/70).
+
+**macOS is inferred, not measured.** No macOS host was available. Its rows
+assume POSIX parity with Linux, which is what the code implies but not something
+anyone has run.
+
+**Unsupported means it says so.** `artifact_memory_service.py` on Windows exits
+2 in under a second naming the platform, the missing AF_UNIX support, and the
+WSL2 alternative — rather than emitting a cascade of import errors that read like
+substrate defects.
+
+On Windows the MCP server starts and serves the 13 non-substrate tools, and says
+on stderr exactly which group is unavailable and why.
 
 ## Testing
 
@@ -148,11 +181,14 @@ npm run test:unit       # all 10 TypeScript suites (globbed) + init + uninstall
 npm run gates           # every generator gate, consistency check and shell harness
 npm run verify:quickstart
 
-# substrate suite (593 tests) — POSIX only; declines with a banner on Windows.
+# substrate suite — runs on every OS and reports against a recorded baseline
+# (Linux 627 collected / 1 fail / 30 error; Windows 625 / 31 / 337). Exits
+# non-zero whenever anything failed, matching baseline or not.
 npm run test:substrate
 
-# The substrate suite needs the provisioned venv: ~30 cases import qdrant_client
-# at call time. It is NOT part of test:all for that reason.
+# The substrate suite needs the provisioned venv to clear ~30 of those errors:
+# they are cases that import qdrant_client at call time. It is NOT part of
+# test:all for that reason. Windows residue is tracked as #70.
 
 # `npm run gates` above runs all of these and prints one named line per gate;
 # reach for them individually only when you want one gate's own diagnostics.
@@ -204,6 +240,8 @@ attribution and the one deliberate deviation.
 
 **Server:** Node ≥ 20. Nothing else — macOS, Linux and Windows alike.
 
-**Substrate (optional):** Python 3.12 · Docker (Qdrant) · macOS or Linux, or
-Windows via WSL2. See [Supported platforms](#supported-platforms); the substrate
-does not run natively on Windows today.
+**Substrate (optional):** Python 3.12 · Docker (Qdrant). The Python modules and
+their test suite import and run on macOS, Linux and Windows; the **resident
+memory service** needs a Unix-domain socket, so on Windows it runs inside WSL2 —
+see [Supported platforms](#supported-platforms) and
+[`docs/platforms/windows-wsl.md`](./docs/platforms/windows-wsl.md).

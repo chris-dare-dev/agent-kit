@@ -1,20 +1,29 @@
 #!/usr/bin/env python3
-"""Run the artifact-memory substrate suite, or decline loudly.
+"""Run the artifact-memory substrate suite and report honestly on every platform.
 
-The substrate is POSIX-only today: ``fcntl`` and ``os.geteuid`` are imported
-unconditionally at module scope, and the memory service binds an AF_UNIX socket.
-Running the documented ``unittest discover`` command on Windows therefore
-collects a fraction of the suite and reports a wall of ``ModuleNotFoundError``
-and ``AttributeError`` — noise that looks like the substrate is broken when the
-real answer is "this platform is not supported yet".
+History, because the previous version of this file is the reason it exists: the
+substrate used to import ``fcntl`` and ``os.geteuid`` at module scope, so on
+Windows it could not be imported at all and the documented ``unittest discover``
+command produced a wall of ModuleNotFoundError and AttributeError. This entry
+point printed a banner and returned 0 instead.
 
-This entry point states that in one line instead. It does NOT fix the modules;
-that port is tracked separately (see the milestones named below).
+That banner is now WRONG on both counts. M2 routed those imports through
+``platform_compat``, and the suite collects on Windows -- 260 tests before,
+625 after. And returning 0 for a suite that ran nothing is the skip-to-green
+pattern the same milestone exists to remove, however loudly the banner said
+"NOT RUN".
+
+So this runs the suite everywhere and reports what actually happened. Windows is
+KNOWN RED pending the teardown and fixture work in M2/#70; the header says so and
+the exit code still tells the truth, because a known-red platform that reports
+green is how a real regression hides.
 
 Exit codes:
-    0  the suite ran and passed, OR the platform is unsupported and it declined
-       (the banner says NOT RUN — this is never reported as a pass)
-    1  the suite ran and failed
+    0  the suite ran and passed
+    1  the suite ran and something failed or errored
+
+What still does NOT run on Windows is the resident service (AF_UNIX) -- see
+``docs/platforms/windows-wsl.md`` and the support matrix in the root README.
 """
 from __future__ import annotations
 
@@ -24,32 +33,56 @@ from pathlib import Path
 
 TESTS_DIR = Path(__file__).resolve().parent / "tests"
 
-SUPPORTED = ("linux", "darwin")
-BANNER = """
-================================================================================
-  SUBSTRATE SUITE NOT RUN - unsupported platform: {platform}
-================================================================================
-  The artifact-memory substrate is POSIX-only today. It imports fcntl and
-  os.geteuid at module scope and binds an AF_UNIX socket, none of which exist
-  on Windows, so this suite cannot even be collected here.
+#: Measured residue per platform, so "did I break something" is answerable
+#: without a clean tree to compare against. Update these when an issue closes.
+#:
+#: Do NOT read a matching count as a pass -- it is a match against a known-bad
+#: baseline. The exit code stays non-zero whenever anything failed, because a
+#: known-red platform reporting green is how a real regression hides.
+BASELINES = {
+    "linux": {
+        "failures": 1,
+        "errors": 30,
+        "note": (
+            "without the provisioned venv. ~30 errors are cases that import "
+            "qdrant_client at call time; the 1 failure is "
+            "test_embedder_shortfall_fails_loudly_instead_of_partial_success. "
+            "With the venv the errors clear."
+        ),
+    },
+    "darwin": {
+        "failures": 1,
+        "errors": 30,
+        "note": "same as linux; both are POSIX and share the venv dependency.",
+    },
+    "win32": {
+        "failures": 31,
+        "errors": 337,
+        "note": (
+            "the suite COLLECTS here (260 -> 625 tests in M2) but does not pass: "
+            "SQLite handles held across tempdir teardown, macOS-only launchd "
+            "fixtures, and the venv-dependent cases above. Closing this out is "
+            "M2 issue #70."
+        ),
+    },
+}
 
-  Run it on one of:
-      - Linux
-      - macOS
-      - Windows via WSL2   (wsl -e bash -lc '...')
+BASELINE_NOTE = """
+--------------------------------------------------------------------------------
+  Recorded baseline for {platform}: {failures} failure(s), {errors} error(s).
 
-  Making the substrate importable off macOS is milestone M2 "Gates Green";
-  native Windows transport and supervision is M5 "Native Everywhere".
+  {note}
 
-  This is NOT a pass. Nothing was verified on this platform.
-================================================================================
+  A non-zero exit that MATCHES the baseline is expected and is not evidence
+  that your change broke something. A count above it is.
+--------------------------------------------------------------------------------
 """
 
 
 def main() -> int:
-    if sys.platform not in SUPPORTED:
-        print(BANNER.format(platform=sys.platform), file=sys.stderr)
-        return 0
+    baseline = BASELINES.get(sys.platform)
+    if baseline is not None:
+        sys.stderr.write(BASELINE_NOTE.format(platform=sys.platform, **baseline))
 
     suite = unittest.defaultTestLoader.discover(
         start_dir=str(TESTS_DIR),
@@ -57,6 +90,31 @@ def main() -> int:
         top_level_dir=str(TESTS_DIR),
     )
     result = unittest.TextTestRunner(verbosity=1).run(suite)
+
+    failures, errors = len(result.failures), len(result.errors)
+    print(
+        f"substrate suite on {sys.platform}: {result.testsRun} run, "
+        f"{failures} failed, {errors} errored, {len(result.skipped)} skipped",
+        file=sys.stderr,
+    )
+    if baseline is not None:
+        delta_f = failures - baseline["failures"]
+        delta_e = errors - baseline["errors"]
+        if delta_f > 0 or delta_e > 0:
+            print(
+                f"  ABOVE BASELINE by {max(delta_f, 0)} failure(s) and "
+                f"{max(delta_e, 0)} error(s) -- this looks like a regression",
+                file=sys.stderr,
+            )
+        elif delta_f < 0 or delta_e < 0:
+            print(
+                f"  BELOW baseline by {-min(delta_f, 0)} failure(s) and "
+                f"{-min(delta_e, 0)} error(s) -- update BASELINES in this file",
+                file=sys.stderr,
+            )
+        else:
+            print("  exactly at the recorded baseline", file=sys.stderr)
+
     return 0 if result.wasSuccessful() else 1
 
 

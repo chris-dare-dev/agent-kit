@@ -2028,7 +2028,41 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+#: Platforms on which the resident service can actually listen. The transport is
+#: an AF_UNIX socket; a native Windows port (named pipe or loopback TCP) is M5.
+SERVICE_SUPPORTED_PLATFORMS = ("linux", "darwin")
+
+
+def _refuse_unsupported_platform() -> str | None:
+    """The message to print, or None if this platform can run the service.
+
+    Fails FAST and by NAME. Before this, an unsupported host got whatever error
+    happened to surface first from deep in socket setup — a message about socket
+    paths that told the operator nothing about the real problem, which is that
+    the platform has no AF_UNIX at all (M2, gates-green-t-supported-platforms).
+    """
+    if sys.platform in SERVICE_SUPPORTED_PLATFORMS:
+        return None
+    return (
+        f"artifact-memory-service: unsupported platform: {sys.platform}.\n"
+        f"  The resident service listens on a Unix-domain socket, and this "
+        f"platform has no AF_UNIX support.\n"
+        f"  Supported natively: {', '.join(SERVICE_SUPPORTED_PLATFORMS)}.\n"
+        # ASCII only: this message is read on a Windows console, whose default
+        # code page renders an em dash as a replacement character.
+        f"  On Windows, run it inside WSL2 - see docs/platforms/windows-wsl.md.\n"
+        f"  A native Windows transport is milestone M5 (native-everywhere).\n"
+        f"  Everything else in this repository (the MCP server, the generators "
+        f"and the substrate test suite) does run here."
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    refusal = _refuse_unsupported_platform()
+    if refusal is not None:
+        sys.stderr.write(refusal + "\n")
+        return 2
+
     args = _parser().parse_args(argv)
     state: ServiceState | None = None
     server: ArtifactUnixHTTPServer | None = None

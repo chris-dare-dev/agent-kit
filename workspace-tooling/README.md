@@ -84,10 +84,12 @@ is the compose *definition*; the Qdrant volume is Docker-managed.
 
 ## Run the tests
 
-**POSIX only.** This substrate imports `fcntl` and `os.geteuid` at module scope
-and binds an AF_UNIX socket, so on Windows it cannot be imported, let alone
-tested. Use macOS, Linux, or Windows via WSL2 — see
-[Supported platforms](../README.md#supported-platforms).
+**Runs on macOS, Linux and Windows.** It did not always: the modules imported
+`fcntl` and `os.geteuid` at module scope and subclassed
+`socketserver.UnixStreamServer`, so on Windows the suite collected 260 of ~593
+tests and fourteen modules died at import. M2 routed all of that through
+[`platform_compat.py`](./platform_compat.py); collection is now 625 on Windows
+and 627 on Linux.
 
 ```bash
 cd <repo-root>
@@ -96,9 +98,25 @@ PYTHONPATH="$PWD/workspace-tooling" \
   workspace-tooling/run-substrate-tests.py
 ```
 
-`run-substrate-tests.py` prints a single explanatory banner and does nothing on
-an unsupported platform, instead of emitting ~169 import errors that look like
-substrate defects. It is not a pass — nothing is verified there.
+Collecting is not passing. `run-substrate-tests.py` carries a recorded baseline
+per platform and reports whether this run is at, above or below it:
+
+| | collected | failures | errors |
+|---|---|---|---|
+| Linux / macOS (no venv) | 627 | 1 | 30 |
+| Windows 11 | 625 | 31 | 337 |
+
+It exits non-zero whenever anything failed, baseline-matching or not — a
+known-red platform that reports green is how a real regression hides. On POSIX
+~30 of the errors clear once you use the provisioned venv (they import
+`qdrant_client` at call time) and the remaining failure is
+`test_embedder_shortfall_fails_loudly_instead_of_partial_success`. The Windows
+residue — SQLite handles held across tempdir teardown, macOS-only launchd
+fixtures — is [#70](https://github.com/chris-dare-dev/agent-kit/issues/70).
+
+**What still needs WSL2 on Windows** is the resident service, not the suite: it
+listens on a Unix-domain socket. It refuses by name there, in under a second.
+See [`docs/platforms/windows-wsl.md`](../docs/platforms/windows-wsl.md).
 
 Use the provisioned venv, not the system interpreter: roughly 30 cases import
 `qdrant_client` at call time and error without it.
