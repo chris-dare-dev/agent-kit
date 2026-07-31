@@ -154,8 +154,74 @@ def default_config_path(name: str | None = None) -> Path:
 # Import-time snapshots, kept so the ~20 existing call sites that read these as
 # argparse defaults keep working. Anything that must honour an environment
 # change made after import should call derived_root() / default_config_path().
+#
+# THE HAZARD THESE CREATE, STATED PLAINLY: a profile selected AFTER import — as
+# `--profile` does, since argument parsing necessarily follows the import block
+# — cannot move them. `AGENT_KIT_PROFILE=p prog` and `prog --profile p` were
+# therefore observably different runs: service root and collection followed the
+# flag, while catalog, outbox, ingestion state, consumer state, receipts,
+# embedded Qdrant, model cache and the runtime config path all stayed on the
+# unprofiled default. Use ResolvedLayout below for anything that must be
+# correct under a late-selected profile.
 DEFAULT_DERIVED_ROOT = derived_root()
 DEFAULT_CONFIG = default_config_path()
+
+
+@dataclass(frozen=True)
+class ResolvedLayout:
+    """Every derived path for ONE profile, resolved together and then frozen.
+
+    The point is that it is computed at a single instant, from a single profile
+    name, and cannot drift afterwards. The bimodal alternative — module globals
+    for some paths and profile-aware functions for others — is what let a single
+    run write a profiled service root while pointing every payload path at the
+    unprofiled default, violating the stated "must not share a byte" contract.
+
+    Construct it AFTER argument parsing and pass it down. Do not read the
+    globals above alongside it.
+    """
+
+    profile: str | None
+    root: Path
+    config: Path
+    catalog: Path
+    ingestion_state: Path
+    consumer_state: Path
+    outbox_root: Path
+    dead_letter_root: Path
+    receipt_root: Path
+    embedded_qdrant: Path
+    model_cache: Path
+    main_port: int
+    restore_port: int
+
+    @classmethod
+    def for_profile(cls, name: str | None, *, restore_offset: int = 2) -> "ResolvedLayout":
+        """Resolve every path from `name` alone — no module globals consulted."""
+        root = derived_root(name)
+        return cls(
+            profile=name,
+            root=root,
+            config=root / "artifact-memory-runtime.json",
+            catalog=root / "artifact-catalog.sqlite3",
+            ingestion_state=root / "ingestion-state.sqlite3",
+            consumer_state=root / "artifact-event-consumer.sqlite3",
+            outbox_root=root / "outbox",
+            dead_letter_root=root / "outbox-dead-letter",
+            receipt_root=root / "skill-events",
+            embedded_qdrant=root / "qdrant",
+            model_cache=root / "model-cache",
+            main_port=qdrant_port(name),
+            restore_port=qdrant_port(name, offset=restore_offset),
+        )
+
+    def paths(self) -> tuple[Path, ...]:
+        """Every filesystem path this layout owns, for containment checks."""
+        return (
+            self.config, self.catalog, self.ingestion_state, self.consumer_state,
+            self.outbox_root, self.dead_letter_root, self.receipt_root,
+            self.embedded_qdrant, self.model_cache,
+        )
 
 COLLECTION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 GENERATION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")

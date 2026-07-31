@@ -131,6 +131,42 @@ def service_root(profile: str | None = None) -> Path:
     return artifact_runtime.derived_root(name).joinpath(*SOCKET_RELATIVE_PARTS[:-1])
 
 
+def resolve_layout(profile: str | None = None) -> artifact_runtime.ResolvedLayout:
+    """The one layout this run uses, resolved once and then never re-derived.
+
+    With a profile active every path is computed from the name, so a profile
+    chosen on the command line reaches the same answer as one exported into the
+    environment before launch. Those two used to differ in nine fields.
+
+    With NO profile the import-time globals ARE the answer, and are read rather
+    than recomputed: the provision tests patch `DEFAULT_CONFIG`,
+    `DEFAULT_MODEL_CACHE` and friends to redirect a run into a temp tree, and
+    recomputing would silently ignore those patches and send the run at the real
+    derived root — the same failure mode `service_root()` already documents.
+    """
+    name = _active(profile)
+    if name:
+        return artifact_runtime.ResolvedLayout.for_profile(
+            name, restore_offset=RESTORE_PORT_OFFSET
+        )
+    root = artifact_runtime.DEFAULT_DERIVED_ROOT
+    return artifact_runtime.ResolvedLayout(
+        profile=None,
+        root=root,
+        config=artifact_runtime.DEFAULT_CONFIG,
+        catalog=ingestion.DEFAULT_CATALOG,
+        ingestion_state=ingestion.DEFAULT_STATE,
+        consumer_state=root / "artifact-event-consumer.sqlite3",
+        outbox_root=root / "outbox",
+        dead_letter_root=root / "outbox-dead-letter",
+        receipt_root=root / "skill-events",
+        embedded_qdrant=ingestion.DEFAULT_QDRANT_PATH,
+        model_cache=ingestion.DEFAULT_MODEL_CACHE,
+        main_port=artifact_runtime.QDRANT_BASE_PORT,
+        restore_port=artifact_runtime.QDRANT_BASE_PORT + RESTORE_PORT_OFFSET,
+    )
+
+
 def collection(profile: str | None = None) -> str:
     name = _active(profile)
     return COLLECTION if not name else ingestion.collection_for(GENERATION, name)
@@ -296,37 +332,37 @@ def _runtime_payload(
     root: Path,
     snapshots: Path,
     retain_embedded_until: str,
+    layout: artifact_runtime.ResolvedLayout,
 ) -> dict[str, Any]:
+    # Every path below comes from `layout`. Reading a module global here is what
+    # produced a payload whose service root was profiled and whose catalog,
+    # outbox, ingestion state, consumer state, receipts, embedded Qdrant and
+    # model cache were not.
     return {
         "schema_version": artifact_runtime.SCHEMA_VERSION,
         "active_backend": "server",
         # Written explicitly so the TypeScript adapter READS the root rather
         # than reconstructing it from its own per-OS guess. Reconstruction is
         # what let the two sides disagree in the first place.
-        "derived_root": str(artifact_runtime.derived_root()),
+        "derived_root": str(layout.root),
         "qdrant": {
-            "url": qdrant_url(),
-            "collection": collection(),
+            "url": qdrant_url(layout.profile),
+            "collection": collection(layout.profile),
             "generation": GENERATION,
             "admin_key_file": str(root / SECRET_FILES["admin"]),
             "read_key_file": str(root / SECRET_FILES["read_only"]),
-            "embedded_path": str(ingestion.DEFAULT_QDRANT_PATH),
+            "embedded_path": str(layout.embedded_qdrant),
         },
         "service": {
             "socket_path": str(root / "artifact-memory.sock"),
         },
         "paths": {
             "workspace": str(workspace),
-            "catalog": str(ingestion.DEFAULT_CATALOG),
-            "outbox_root": str(artifact_runtime.DEFAULT_DERIVED_ROOT / "outbox"),
-            "ingestion_state": str(ingestion.DEFAULT_STATE),
-            "consumer_state": str(
-                artifact_runtime.DEFAULT_DERIVED_ROOT
-                / "artifact-event-consumer.sqlite3"
-            ),
-            "receipt_root": str(
-                artifact_runtime.DEFAULT_DERIVED_ROOT / "skill-events"
-            ),
+            "catalog": str(layout.catalog),
+            "outbox_root": str(layout.outbox_root),
+            "ingestion_state": str(layout.ingestion_state),
+            "consumer_state": str(layout.consumer_state),
+            "receipt_root": str(layout.receipt_root),
             "lexical_index": _lexical_index(GENERATION),
             "build_manifest": str(root / "build-manifest.json"),
             "snapshot_root": str(snapshots),
@@ -388,14 +424,20 @@ def provision(
     workspace: Path,
     apply: bool,
     replace_runtime: bool = False,
+    layout: artifact_runtime.ResolvedLayout | None = None,
 ) -> dict[str, Any]:
+    # One layout for the whole run. Resolved from the environment when the
+    # caller does not supply one, so importers keep working; main() supplies it
+    # explicitly, built from --profile, because the environment cannot be
+    # consulted early enough to move this module's import-time globals.
+    layout = layout if layout is not None else resolve_layout()
     workspace = workspace.expanduser().resolve(strict=True)
-    config = artifact_runtime.DEFAULT_CONFIG.expanduser().absolute()
-    root = service_root().expanduser().absolute()
+    config = layout.config.expanduser().absolute()
+    root = service_root(layout.profile).expanduser().absolute()
     storage = root / "storage"
     restore_storage = root / "restore-storage"
     snapshots = root / "snapshots"
-    model_cache = ingestion.DEFAULT_MODEL_CACHE.expanduser().absolute()
+    model_cache = layout.model_cache.expanduser().absolute()
     compose = root / "compose.yaml"
     environment = root / ".env"
 
@@ -412,6 +454,7 @@ def provision(
         root=root,
         snapshots=snapshots,
         retain_embedded_until=retain_embedded_until,
+        layout=layout,
     )
     changes = _payload_changes(previous_payload, planned)
     if previous_payload is None:
@@ -633,6 +676,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         # rather than produce a half-provisioned tree under a mangled path.
         if args.profile is not None:
             artifact_runtime.validate_profile(args.profile)
+            # Still exported, so `docker compose` and any other child process
+            # inherits the profile. It is NOT what this process reads: by the
+            # time argument parsing runs, every import-time global is already
+            # fixed, which is exactly how --profile and AGENT_KIT_PROFILE came
+            # to disagree. The layout below is the authority here.
             os.environ[artifact_runtime.PROFILE_ENV] = args.profile
         print(
             json.dumps(
@@ -640,6 +688,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     workspace=args.workspace,
                     apply=args.apply,
                     replace_runtime=args.replace_runtime,
+                    layout=resolve_layout(args.profile),
                 ),
                 indent=2,
                 sort_keys=True,

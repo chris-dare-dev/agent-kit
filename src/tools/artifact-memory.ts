@@ -7,7 +7,7 @@
  * model credential.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, lstatSync, type Stats } from "node:fs";
 import { lstat } from "node:fs/promises";
 import {
   request as httpRequest,
@@ -316,6 +316,40 @@ export function probeArtifactMemory(
     };
   }
 
+  // Existence is not availability. `existsSync` alone reported an ordinary
+  // file as a working service, so four tools were advertised and then failed
+  // on first use. This applies the SAME rules the per-request validator does —
+  // socket-ness, ownership and mode, up the whole chain — so a tool is only
+  // offered when it can actually be called.
+  const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+  if (uid === undefined) {
+    return {
+      available: false,
+      reason: "unsupported-platform",
+      detail: `this host exposes no process.getuid(), so ${socketPath} ownership cannot be verified`,
+    };
+  }
+  for (const current of socketChainPaths(socketPath)) {
+    let stat: Stats;
+    try {
+      stat = lstatSync(current);
+    } catch {
+      return {
+        available: false,
+        reason: "socket-missing",
+        detail: `${current} is unreadable while checking ${socketPath}`,
+      };
+    }
+    const reason = socketLinkReason(current, socketPath, stat, uid);
+    if (reason !== undefined) {
+      return {
+        available: false,
+        reason: "socket-insecure",
+        detail: `${reason} (attempted ${socketPath})`,
+      };
+    }
+  }
+
   return { available: true, socketPath };
 }
 
@@ -341,51 +375,69 @@ function isMissingSocket(error: unknown): boolean {
  * one trust principal; that is the strongest portable boundary available to a
  * local stdio adapter.
  */
-async function validateSecureSocket(socketPath: string): Promise<void> {
-  const uid = currentUid();
+/**
+ * Every path from the home directory down to the socket, in order.
+ *
+ * Shared so the startup probe and the per-request validator walk the SAME
+ * chain. They used to walk different ones: the probe checked path syntax and
+ * `existsSync`, which an ordinary file satisfies, so four tools were advertised
+ * as available and then failed on first use against a path that was never a
+ * socket.
+ */
+function socketChainPaths(socketPath: string): string[] {
   const home = normalize(homedir());
-  const parent = dirname(socketPath);
   const components = socketPath
     .slice(home.length + 1)
     .split(sep)
     .filter(Boolean);
+  const paths: string[] = [];
   let current = home;
+  for (const component of ["", ...components]) {
+    if (component) current = join(current, component);
+    paths.push(current);
+  }
+  return paths;
+}
 
+/**
+ * The security rule for ONE link in that chain, as a reason or undefined.
+ *
+ * The single definition of "secure socket" for this adapter. Ownership and mode
+ * are the whole point — existence proves nothing, since any regular file exists
+ * just as convincingly as a live socket.
+ */
+function socketLinkReason(
+  current: string,
+  socketPath: string,
+  stat: Stats,
+  uid: number,
+): string | undefined {
+  if (stat.isSymbolicLink()) return `${current} is a symlink`;
+  if (current !== socketPath) {
+    if (!stat.isDirectory()) return `${current} is not a directory`;
+    if (stat.uid !== uid) return `${current} is owned by uid ${stat.uid}, not ${uid}`;
+    if ((stat.mode & 0o022) !== 0) return `${current} is group- or world-writable`;
+  }
+  if (current === dirname(socketPath)) {
+    if ((stat.mode & 0o077) !== 0) return `${current} is accessible to other accounts`;
+    if ((stat.mode & 0o700) !== 0o700) return `${current} is not fully owner-accessible`;
+  }
+  if (current === socketPath) {
+    if (!stat.isSocket()) return `${current} exists but is not a socket`;
+    if (stat.uid !== uid) return `${current} is owned by uid ${stat.uid}, not ${uid}`;
+    if ((stat.mode & 0o077) !== 0) return `${current} is accessible to other accounts`;
+    if ((stat.mode & 0o600) !== 0o600) return `${current} is not owner read/write`;
+  }
+  return undefined;
+}
+
+async function validateSecureSocket(socketPath: string): Promise<void> {
+  const uid = currentUid();
   try {
-    for (const component of ["", ...components]) {
-      if (component) current = join(current, component);
+    for (const current of socketChainPaths(socketPath)) {
       const stat = await lstat(current);
-      if (stat.isSymbolicLink()) {
+      if (socketLinkReason(current, socketPath, stat, uid) !== undefined) {
         throw new ArtifactMemoryServiceError(SOCKET_ERROR);
-      }
-      if (current !== socketPath) {
-        if (
-          !stat.isDirectory() ||
-          stat.uid !== uid ||
-          (stat.mode & 0o022) !== 0
-        ) {
-          throw new ArtifactMemoryServiceError(SOCKET_ERROR);
-        }
-      }
-      if (current === parent) {
-        if (
-          !stat.isDirectory() ||
-          stat.uid !== uid ||
-          (stat.mode & 0o077) !== 0 ||
-          (stat.mode & 0o700) !== 0o700
-        ) {
-          throw new ArtifactMemoryServiceError(SOCKET_ERROR);
-        }
-      }
-      if (current === socketPath) {
-        if (
-          !stat.isSocket() ||
-          stat.uid !== uid ||
-          (stat.mode & 0o077) !== 0 ||
-          (stat.mode & 0o600) !== 0o600
-        ) {
-          throw new ArtifactMemoryServiceError(SOCKET_ERROR);
-        }
       }
     }
   } catch (error) {

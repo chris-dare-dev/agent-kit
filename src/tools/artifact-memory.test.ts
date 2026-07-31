@@ -638,3 +638,37 @@ posixTest("probe reports available for a live owner-private socket", async (t) =
   assert.equal(result.available, true);
   assert.equal(result.available === true && result.socketPath, socketPath);
 });
+
+/**
+ * Existence is not availability.
+ *
+ * The probe used to finish at `existsSync`, which an ordinary file satisfies
+ * exactly as well as a live socket. Four tools were therefore advertised as
+ * available and failed on first use. Verified against the pre-fix build: an
+ * ordinary file, a 0600 socket and a world-readable socket ALL reported
+ * available=true.
+ */
+posixTest("probe rejects an ordinary file standing where a socket should be", async (t) => {
+  const { root } = await socketFixture(t);
+  const filePath = join(root, "not-a-socket.sock");
+  await writeFile(filePath, "");
+  await chmod(filePath, 0o600);
+
+  const result = probeArtifactMemory({ socketPath: filePath });
+  assert.equal(result.available, false, "an ordinary file was advertised as a service");
+  assert.equal(result.available === false && result.reason, "socket-insecure");
+  assert.match(
+    result.available === false ? result.detail : "",
+    /is not a socket/,
+    "the detail must say what was actually wrong",
+  );
+});
+
+posixTest("probe rejects a socket other accounts can reach", async (t) => {
+  const { socketPath } = await socketFixture(t);
+  await chmod(socketPath, 0o666);
+
+  const result = probeArtifactMemory({ socketPath });
+  assert.equal(result.available, false, "a world-accessible socket was advertised");
+  assert.equal(result.available === false && result.reason, "socket-insecure");
+});

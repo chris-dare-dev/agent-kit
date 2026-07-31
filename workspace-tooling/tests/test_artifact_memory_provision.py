@@ -525,5 +525,92 @@ class ArtifactMemoryProvisionTests(unittest.TestCase):
         )
 
 
+class ProfileIsolationTests(unittest.TestCase):
+    """A profile must isolate every path, however the profile was selected.
+
+    `--profile` sets AGENT_KIT_PROFILE during argument parsing, which is
+    necessarily AFTER this module's imports have already snapshotted
+    DEFAULT_DERIVED_ROOT, DEFAULT_CONFIG, DEFAULT_CATALOG and the rest. Service
+    root and collection followed the flag because they are computed by
+    functions; the other nine fields did not, because they are globals. The two
+    supposedly equivalent ways of selecting a profile therefore produced
+    different runs, and a profiled deployment wrote its catalog, outbox,
+    ingestion state, consumer state, receipts, embedded Qdrant and model cache
+    into the UNPROFILED tree — sharing bytes with the default deployment, and
+    pointing `--profile` at the default deployment's runtime config file.
+    """
+
+    PROFILE = "isolationtest"
+
+    def test_the_layout_places_every_path_under_the_profiled_root(self) -> None:
+        layout = artifact_runtime.ResolvedLayout.for_profile(self.PROFILE)
+        self.assertEqual(layout.profile, self.PROFILE)
+        for path in layout.paths():
+            self.assertTrue(
+                str(path).startswith(str(layout.root)),
+                f"{path} escapes the profiled root {layout.root}",
+            )
+        # The suffix must actually be present, or "under the root" is vacuous.
+        self.assertTrue(layout.root.name.endswith(f"-{self.PROFILE}"), layout.root)
+
+    def test_an_unprofiled_layout_still_honours_the_patchable_globals(self) -> None:
+        # The provision tests redirect a whole run into a temp tree by patching
+        # these. Resolving them freshly would ignore the patch and send the run
+        # at the real derived root.
+        sentinel = Path("/tmp/sentinel-derived-root/artifact-memory-runtime.json")
+        with mock.patch.object(provision.artifact_runtime, "DEFAULT_CONFIG", sentinel):
+            self.assertEqual(provision.resolve_layout(None).config, sentinel)
+
+    def test_flag_and_environment_select_the_same_layout(self) -> None:
+        """The regression: these two disagreed in nine fields."""
+        from_flag = provision.resolve_layout(self.PROFILE)
+        with mock.patch.dict(
+            os.environ, {artifact_runtime.PROFILE_ENV: self.PROFILE}
+        ):
+            from_env = provision.resolve_layout(None)
+        self.assertEqual(from_flag, from_env)
+
+    def test_the_published_payload_never_leaks_an_unprofiled_path(self) -> None:
+        """The invariant, checked over the payload rather than a field list.
+
+        Asserting on named fields only catches the leaks already known. This
+        walks every string in the published configuration, so a path added
+        later that forgets the layout fails here too.
+        """
+        layout = provision.resolve_layout(self.PROFILE)
+        payload = provision._runtime_payload(
+            workspace=Path.cwd(),
+            root=layout.root / "services" / "qdrant",
+            snapshots=layout.root / "snapshots",
+            retain_embedded_until="2099-01-01T00:00:00+00:00",
+            layout=layout,
+        )
+        unprofiled_root = artifact_runtime.derived_root(None)
+
+        def under(path: Path, base: Path) -> bool:
+            # Path-aware, NOT a string prefix: the profiled root is a SIBLING
+            # whose name STARTS WITH the unprofiled one (`agent-kit-p` beside
+            # `agent-kit`), so `startswith` calls every profiled path a leak.
+            return path == base or base in path.parents
+
+        leaked = []
+
+        def walk(node: object, where: str) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    walk(value, f"{where}.{key}")
+            elif isinstance(node, str) and node.startswith(("/", "\\")) or (
+                isinstance(node, str) and len(node) > 2 and node[1] == ":"
+            ):
+                if under(Path(node), unprofiled_root):
+                    leaked.append((where, node))
+
+        walk(payload, "")
+        # `workspace` is the source repository, shared by every profile by
+        # design, so it is exempt — and only it.
+        leaked = [item for item in leaked if item[0] != ".paths.workspace"]
+        self.assertEqual(leaked, [], f"unprofiled paths in the payload: {leaked}")
+
+
 if __name__ == "__main__":
     unittest.main()
