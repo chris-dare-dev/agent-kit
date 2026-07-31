@@ -53,6 +53,17 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# The file-locking primitives live in the sibling workspace-tooling tree: one
+# definition, shared by both trees, so data/scripts and the substrate cannot
+# drift apart (M2, gates-green-t-fcntl-datascripts). The path is derived from
+# __file__ rather than guessed from the CWD -- these scripts are invoked from
+# runbooks, from the gate runner and (from M3) from CI, none of which promise a
+# working directory.
+_WORKSPACE_TOOLING = Path(__file__).resolve().parents[2] / "workspace-tooling"
+if str(_WORKSPACE_TOOLING) not in sys.path:
+    sys.path.insert(0, str(_WORKSPACE_TOOLING))
+import platform_compat  # noqa: E402
+
 # Schema version of the emitted record. Bump rule:
 #   additive nullable field   -> NO bump (readers use dict.get)
 #   renamed/removed/retyped    -> bump + summary() switches on schema_version
@@ -312,13 +323,12 @@ def _append_line(log_path, line_bytes):
                 % len(line_bytes)
             )
             try:
-                import fcntl
 
-                fcntl.flock(fd, fcntl.LOCK_EX)
+                platform_compat.lock_file_exclusive(fd)
                 try:
                     os.write(fd, line_bytes)
                 finally:
-                    fcntl.flock(fd, fcntl.LOCK_UN)
+                    platform_compat.unlock_file(fd)
             except (ImportError, OSError):
                 # No flock available (rare): best-effort single write; still one syscall.
                 os.write(fd, line_bytes)

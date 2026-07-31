@@ -51,7 +51,10 @@ import os
 import sys
 import time
 from contextlib import contextmanager
-from typing import Iterator
+from typing import IO, Iterator, Union
+
+#: What `fcntl.flock` accepts, and therefore what this shim must accept.
+FileDescriptorLike = Union[int, IO]
 
 __all__ = [
     "IS_WINDOWS",
@@ -59,10 +62,13 @@ __all__ = [
     "LockTimeout",
     "current_uid",
     "current_user_identity",
+    "create_directory_link",
     "exclusive_file_lock",
+    "fsync_directory",
     "lock_file_exclusive",
     "peak_rss_bytes",
     "supports_posix_privacy",
+    "supports_symlinks",
     "try_lock_exclusive",
     "unlock_file",
 ]
@@ -149,7 +155,19 @@ def current_user_identity() -> str:
 # Locking
 
 
-def try_lock_exclusive(fd: int) -> bool:
+def _as_fd(fd: FileDescriptorLike) -> int:
+    """Accept what `fcntl.flock` accepts: an int, or anything with `fileno()`.
+
+    Several call sites pass an open file object rather than a raw descriptor.
+    `fcntl.flock` takes either, so a shim that took only ints would have been a
+    silent narrowing of the contract it replaced — and it was: the first pass
+    raised `TypeError: '_io.TextIOWrapper' object cannot be interpreted as an
+    integer` from six self-tests.
+    """
+    return fd if isinstance(fd, int) else fd.fileno()
+
+
+def try_lock_exclusive(fd: FileDescriptorLike) -> bool:
     """One non-blocking attempt. True if the lock is now held, False if contended.
 
     This is the `flock(LOCK_EX | LOCK_NB)` form — the single-instance guard the
@@ -160,8 +178,9 @@ def try_lock_exclusive(fd: int) -> bool:
     return _try_lock_exclusive(fd)
 
 
-def _try_lock_exclusive(fd: int) -> bool:
+def _try_lock_exclusive(raw: FileDescriptorLike) -> bool:
     """One non-blocking attempt. True if the lock is now held."""
+    fd = _as_fd(raw)
     if not IS_WINDOWS:
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -181,7 +200,7 @@ def _try_lock_exclusive(fd: int) -> bool:
 
 
 def lock_file_exclusive(
-    fd: int,
+    fd: FileDescriptorLike,
     timeout: float | None = None,
     poll: float = DEFAULT_LOCK_POLL,
 ) -> None:
@@ -199,7 +218,7 @@ def lock_file_exclusive(
     only a caller that asks for a deadline pays for polling.
     """
     if timeout is None and not IS_WINDOWS:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        fcntl.flock(_as_fd(fd), fcntl.LOCK_EX)
         return
 
     deadline = None if timeout is None else time.monotonic() + timeout
@@ -213,8 +232,9 @@ def lock_file_exclusive(
         time.sleep(poll)
 
 
-def unlock_file(fd: int) -> None:
+def unlock_file(raw: FileDescriptorLike) -> None:
     """Release a lock taken by `lock_file_exclusive`."""
+    fd = _as_fd(raw)
     if not IS_WINDOWS:
         fcntl.flock(fd, fcntl.LOCK_UN)
         return
@@ -228,10 +248,10 @@ def unlock_file(fd: int) -> None:
 
 @contextmanager
 def exclusive_file_lock(
-    fd: int,
+    fd: FileDescriptorLike,
     timeout: float | None = None,
     poll: float = DEFAULT_LOCK_POLL,
-) -> Iterator[int]:
+) -> Iterator[FileDescriptorLike]:
     """Hold an exclusive lock on `fd` for the duration of the block.
 
     Released on normal exit and on exception — the `try/finally` is the point,
@@ -243,6 +263,86 @@ def exclusive_file_lock(
         yield fd
     finally:
         unlock_file(fd)
+
+
+# ---------------------------------------------------------------------------
+# Durability
+
+
+def fsync_directory(path: "os.PathLike[str] | str") -> bool:
+    """fsync a DIRECTORY so a temp+rename is durable. True if it actually synced.
+
+    The POSIX idiom is `os.open(dir, O_RDONLY)` then `os.fsync`, and it is what
+    makes atomic-rename writes survive a crash. Windows cannot open a directory
+    as a file at all — the call raises `PermissionError`, which is how
+    milestone-pipeline-checkpoint's self-test died on Windows long after its
+    fcntl problem was fixed.
+
+    On Windows this is a documented no-op returning False: `MoveFileEx` already
+    orders the rename against the file data, and there is no supported way to
+    flush a directory entry from Python. Callers that need to KNOW whether the
+    directory was synced get the bool; callers that just want best-effort
+    durability can ignore it.
+    """
+    if IS_WINDOWS:
+        return False
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+        return True
+    finally:
+        os.close(descriptor)
+
+
+def create_directory_link(target: "os.PathLike[str] | str", link: "os.PathLike[str] | str") -> str:
+    """Make `link` resolve to the directory `target`. Returns the mechanism used.
+
+    A directory symlink on POSIX, and on Windows a symlink if the account holds
+    the privilege, else an NTFS **junction** — which needs no privilege and is
+    transparent to every path operation that just wants to read through it.
+
+    Use this for *fixture and layout* links. It is deliberately NOT a
+    substitute for `os.symlink` where the symlink-ness itself is under test:
+    `os.path.islink()` is False for a junction, so a check that refuses symlink
+    aliases will not see one. Guard those with `supports_symlinks()`.
+    """
+    if not IS_WINDOWS:
+        os.symlink(target, link, target_is_directory=True)
+        return "symlink"
+    try:
+        os.symlink(target, link, target_is_directory=True)
+        return "symlink"
+    except OSError:
+        import _winapi
+
+        _winapi.CreateJunction(os.fspath(target), os.fspath(link))
+        return "junction"
+
+
+_symlink_support: bool | None = None
+
+
+def supports_symlinks() -> bool:
+    """Whether this process may create symlinks.
+
+    Windows needs Developer Mode or SeCreateSymbolicLinkPrivilege; without it
+    `os.symlink` raises `OSError: [WinError 1314] A required privilege is not
+    held by the client`. That is a property of the ACCOUNT, not the OS version,
+    so it is probed once rather than assumed from `sys.platform`.
+    """
+    global _symlink_support
+    if _symlink_support is None:
+        import tempfile
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                target = os.path.join(tmp, "target")
+                os.mkdir(target)
+                os.symlink(target, os.path.join(tmp, "link"), target_is_directory=True)
+            _symlink_support = True
+        except (OSError, NotImplementedError, AttributeError):
+            _symlink_support = False
+    return _symlink_support
 
 
 # ---------------------------------------------------------------------------

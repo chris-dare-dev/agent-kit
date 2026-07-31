@@ -133,6 +133,16 @@ class TestLocking(unittest.TestCase):
         finally:
             os.close(other)
 
+    def test_accepts_a_file_object_not_just_an_int_fd(self):
+        """`fcntl.flock` takes an int OR anything with fileno(), and several
+        call sites pass an open file. A shim that took only ints would be a
+        silent narrowing of the contract it replaced."""
+        with open(self.lock_path, "r+", encoding="utf-8") as handle:
+            with platform_compat.exclusive_file_lock(handle):
+                pass
+            self.assertTrue(platform_compat.try_lock_exclusive(handle))
+            platform_compat.unlock_file(handle)
+
     def test_lock_does_not_disturb_the_file_offset(self):
         os.lseek(self.fd, 0, os.SEEK_END)
         before = os.lseek(self.fd, 0, os.SEEK_CUR)

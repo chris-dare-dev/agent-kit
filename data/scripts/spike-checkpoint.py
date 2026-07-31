@@ -44,14 +44,13 @@ review.decision_hash / review.note_hash). This file re-hashes every upstream
 artifact at every advance, so an out-of-band edit to design.json after 'designed'
 makes 'executed' refuse — the stale generation is caught, not silently resumed.
 
-Concurrency + durability mirror milestone-pipeline-checkpoint.py: an fcntl lock
+Concurrency + durability mirror milestone-pipeline-checkpoint.py: an exclusive advisory lock
 on <state.json>.lock serializes the read-modify-write; the write is atomic
 (temp+rename). Only schema_version 1 is mutated.
 """
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -61,6 +60,17 @@ import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+
+# The file-locking primitives live in the sibling workspace-tooling tree: one
+# definition, shared by both trees, so data/scripts and the substrate cannot
+# drift apart (M2, gates-green-t-fcntl-datascripts). The path is derived from
+# __file__ rather than guessed from the CWD -- these scripts are invoked from
+# runbooks, from the gate runner and (from M3) from CI, none of which promise a
+# working directory.
+_WORKSPACE_TOOLING = Path(__file__).resolve().parents[2] / "workspace-tooling"
+if str(_WORKSPACE_TOOLING) not in sys.path:
+    sys.path.insert(0, str(_WORKSPACE_TOOLING))
+import platform_compat  # noqa: E402
 
 SCHEMA_VERSION = 1
 
@@ -175,11 +185,11 @@ def _locked(sp: Path):
     lock_path = sp.with_name(sp.name + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "w", encoding="utf-8") as lf:
-        fcntl.flock(lf, fcntl.LOCK_EX)
+        platform_compat.lock_file_exclusive(lf)
         try:
             yield
         finally:
-            fcntl.flock(lf, fcntl.LOCK_UN)
+            platform_compat.unlock_file(lf)
 
 
 def _skeleton(sid: str, roadmap_path: str | None, brief_source: str | None) -> dict:

@@ -28,6 +28,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# The file-locking primitives live in the sibling workspace-tooling tree: one
+# definition, shared by both trees, so data/scripts and the substrate cannot
+# drift apart (M2, gates-green-t-fcntl-datascripts). The path is derived from
+# __file__ rather than guessed from the CWD -- these scripts are invoked from
+# runbooks, from the gate runner and (from M3) from CI, none of which promise a
+# working directory.
+_WORKSPACE_TOOLING = Path(__file__).resolve().parents[2] / "workspace-tooling"
+if str(_WORKSPACE_TOOLING) not in sys.path:
+    sys.path.insert(0, str(_WORKSPACE_TOOLING))
+import platform_compat  # noqa: E402
+
 
 POINTERS = {
     "review_manifest": "review-manifest.json",
@@ -276,11 +287,7 @@ def _write_atomic(path: Path, content: bytes) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     os.replace(tmp, path)
-    directory = os.open(path.parent, os.O_RDONLY)
-    try:
-        os.fsync(directory)
-    finally:
-        os.close(directory)
+    platform_compat.fsync_directory(path.parent)
 
 
 def _load(path: Path) -> dict[str, Any]:

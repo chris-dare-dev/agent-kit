@@ -27,7 +27,7 @@ incoming milestones (a draft carrying status/history is a contract violation).
 
 Register absent -> the (validated-shape) incoming becomes the register.
 
-The register is LOCAL-ONLY, never committed (policy 2026-07-09). Exclusive fcntl lock
+The register is LOCAL-ONLY, never committed (policy 2026-07-09). Exclusive advisory lock
 on <register>.lock; atomic temp+rename write.
 
 Exit codes: 0 merged | 2 usage/contract violation | 3 active-milestone drop refused.
@@ -35,12 +35,22 @@ Exit codes: 0 merged | 2 usage/contract violation | 3 active-milestone drop refu
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import sys
 from contextlib import contextmanager
 from pathlib import Path
+
+# The file-locking primitives live in the sibling workspace-tooling tree: one
+# definition, shared by both trees, so data/scripts and the substrate cannot
+# drift apart (M2, gates-green-t-fcntl-datascripts). The path is derived from
+# __file__ rather than guessed from the CWD -- these scripts are invoked from
+# runbooks, from the gate runner and (from M3) from CI, none of which promise a
+# working directory.
+_WORKSPACE_TOOLING = Path(__file__).resolve().parents[2] / "workspace-tooling"
+if str(_WORKSPACE_TOOLING) not in sys.path:
+    sys.path.insert(0, str(_WORKSPACE_TOOLING))
+import platform_compat  # noqa: E402
 
 STRUCTURE_FIELDS = [
     "title",
@@ -70,11 +80,11 @@ def _locked(path: Path):
     lock_path = path.with_name(path.name + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "w", encoding="utf-8") as lf:
-        fcntl.flock(lf, fcntl.LOCK_EX)
+        platform_compat.lock_file_exclusive(lf)
         try:
             yield
         finally:
-            fcntl.flock(lf, fcntl.LOCK_UN)
+            platform_compat.unlock_file(lf)
 
 
 def _read(path: Path, label: str) -> dict:

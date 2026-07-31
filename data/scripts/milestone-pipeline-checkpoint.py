@@ -19,7 +19,6 @@ advances the phase atomically.
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -30,6 +29,17 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+# The file-locking primitives live in the sibling workspace-tooling tree: one
+# definition, shared by both trees, so data/scripts and the substrate cannot
+# drift apart (M2, gates-green-t-fcntl-datascripts). The path is derived from
+# __file__ rather than guessed from the CWD -- these scripts are invoked from
+# runbooks, from the gate runner and (from M3) from CI, none of which promise a
+# working directory.
+_WORKSPACE_TOOLING = Path(__file__).resolve().parents[2] / "workspace-tooling"
+if str(_WORKSPACE_TOOLING) not in sys.path:
+    sys.path.insert(0, str(_WORKSPACE_TOOLING))
+import platform_compat  # noqa: E402
 
 
 MILESTONE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -268,11 +278,7 @@ def _save_atomic(path: Path, state: dict[str, Any]) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     os.replace(tmp, path)
-    directory = os.open(path.parent, os.O_RDONLY)
-    try:
-        os.fsync(directory)
-    finally:
-        os.close(directory)
+    platform_compat.fsync_directory(path.parent)
 
 
 @contextmanager
@@ -280,11 +286,11 @@ def _locked(path: Path):
     lock = path.with_name(path.name + ".lock")
     lock.parent.mkdir(parents=True, exist_ok=True)
     with lock.open("w") as fh:
-        fcntl.flock(fh, fcntl.LOCK_EX)
+        platform_compat.lock_file_exclusive(fh)
         try:
             yield
         finally:
-            fcntl.flock(fh, fcntl.LOCK_UN)
+            platform_compat.unlock_file(fh)
 
 
 def _refuse_pending_transactions(path: Path) -> None:

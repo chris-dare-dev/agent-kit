@@ -69,7 +69,7 @@ checkpoint.py, which already knows the state dir, and by the self-test).
 Repo-root detection (in order): $REPO_ROOT env var; git rev-parse --show-toplevel
 from CWD; walk up from this script's dir to nearest .git/.
 
-Concurrency: exclusive fcntl flock on <findings.json>.lock around every
+Concurrency: an exclusive advisory lock on <findings.json>.lock around every
 read-modify-write; writes are atomic (temp + os.replace).
 
 Exit codes: 0 ok/no-op | 1 malformed critique, illegal transition, integrity
@@ -79,7 +79,6 @@ refusal, or not found | 2 usage | 3 gate refusal (open CRITICAL/HIGH).
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
 import os
 import re
@@ -89,6 +88,17 @@ from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+
+# The file-locking primitives live in the sibling workspace-tooling tree: one
+# definition, shared by both trees, so data/scripts and the substrate cannot
+# drift apart (M2, gates-green-t-fcntl-datascripts). The path is derived from
+# __file__ rather than guessed from the CWD -- these scripts are invoked from
+# runbooks, from the gate runner and (from M3) from CI, none of which promise a
+# working directory.
+_WORKSPACE_TOOLING = Path(__file__).resolve().parents[2] / "workspace-tooling"
+if str(_WORKSPACE_TOOLING) not in sys.path:
+    sys.path.insert(0, str(_WORKSPACE_TOOLING))
+import platform_compat  # noqa: E402
 
 SCHEMA_VERSION = 1
 
@@ -384,11 +394,11 @@ def _locked(path: Path):
     lock_path = path.with_name(path.name + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "w", encoding="utf-8") as lf:
-        fcntl.flock(lf, fcntl.LOCK_EX)
+        platform_compat.lock_file_exclusive(lf)
         try:
             yield
         finally:
-            fcntl.flock(lf, fcntl.LOCK_UN)
+            platform_compat.unlock_file(lf)
 
 
 def _now() -> str:

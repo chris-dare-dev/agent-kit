@@ -38,7 +38,6 @@ from __future__ import annotations
 import argparse
 import base64
 import binascii
-import fcntl
 import hashlib
 import json
 import os
@@ -55,6 +54,17 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
+
+# The file-locking primitives live in the sibling workspace-tooling tree: one
+# definition, shared by both trees, so data/scripts and the substrate cannot
+# drift apart (M2, gates-green-t-fcntl-datascripts). The path is derived from
+# __file__ rather than guessed from the CWD -- these scripts are invoked from
+# runbooks, from the gate runner and (from M3) from CI, none of which promise a
+# working directory.
+_WORKSPACE_TOOLING = Path(__file__).resolve().parents[2] / "workspace-tooling"
+if str(_WORKSPACE_TOOLING) not in sys.path:
+    sys.path.insert(0, str(_WORKSPACE_TOOLING))
+import platform_compat  # noqa: E402
 
 
 SCRIPT_ROOT = Path(__file__).resolve().parents[2]
@@ -2031,9 +2041,29 @@ def _check_command_inputs(
     try:
         repo_executable = resolved_executable.relative_to(repo_resolved).as_posix()
     except ValueError:
-        trusted_roots = tuple(Path(value).resolve() for value in (
-            "/bin", "/usr", "/opt/homebrew", "/Applications/Xcode.app", "/Library/Frameworks",
-        ))
+        # System locations an unprivileged user cannot write to. On Windows the
+        # POSIX list was not merely wrong, it was VACUOUS: `Path("/usr")`
+        # resolves to `C:\usr`, which does not exist, so the `if root.exists()`
+        # filter emptied the tuple and `any(())` refused every executable. The
+        # control looked strict and was in fact inoperable.
+        #
+        # A per-user Python install (the Windows default, under %LOCALAPPDATA%)
+        # is deliberately NOT trusted: it is user-writable, which is exactly
+        # what this check exists to exclude. On such a host the check refuses,
+        # correctly — widening it is a trust-model decision, not a portability
+        # fix.
+        if os.name == "nt":
+            trusted_values = (
+                os.environ.get("SystemRoot", r"C:\Windows"),
+                os.environ.get("ProgramFiles", r"C:\Program Files"),
+                os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+            )
+        else:
+            trusted_values = (
+                "/bin", "/usr", "/opt/homebrew", "/Applications/Xcode.app",
+                "/Library/Frameworks",
+            )
+        trusted_roots = tuple(Path(value).resolve() for value in trusted_values)
         _expect(any(
             resolved_executable == root or root in resolved_executable.parents
             for root in trusted_roots if root.exists()
@@ -7547,11 +7577,7 @@ def _save_bytes_atomic(path: Path, content: bytes) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     os.replace(tmp, path)
-    directory = os.open(path.parent, os.O_RDONLY)
-    try:
-        os.fsync(directory)
-    finally:
-        os.close(directory)
+    platform_compat.fsync_directory(path.parent)
 
 
 @contextmanager
@@ -7563,11 +7589,11 @@ def _state_lock(state_path: Path):
     lock_path = state_path.with_name(state_path.name + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+", encoding="utf-8") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        platform_compat.lock_file_exclusive(lock)
         try:
             yield
         finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
+            platform_compat.unlock_file(lock)
 
 
 def _transaction_path(state_path: Path) -> Path:
@@ -7582,22 +7608,14 @@ def _clear_transaction(state_path: Path) -> None:
     journal = _transaction_path(state_path)
     if journal.exists():
         journal.unlink()
-        directory = os.open(journal.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        platform_compat.fsync_directory(journal.parent)
 
 
 def _clear_check_transaction(state_path: Path) -> None:
     journal = _check_transaction_path(state_path)
     if journal.exists():
         journal.unlink()
-        directory = os.open(journal.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        platform_compat.fsync_directory(journal.parent)
 
 
 def _apply_check_record_to_state(
@@ -10442,6 +10460,19 @@ def self_test() -> int:
     ALLOW_LOCAL_DELIVERY_ENDPOINTS = True
     ALLOW_TEST_OPERATION_EXECUTABLES = True
     failures = 0
+    skipped = 0
+
+    def skip(name: str, reason: str) -> None:
+        """Record a case this host cannot execute, loudly.
+
+        A case that silently vanishes is the skip-to-green pattern M2 exists to
+        remove, so skips are printed with a machine-readable reason and counted
+        in the summary line. They are NOT failures — the code under test is
+        unexercised here, not broken.
+        """
+        nonlocal skipped
+        skipped += 1
+        print(f"  {name}: SKIP {reason}")
 
     def check(name: str, fn, contains: str | None = None) -> None:
         nonlocal failures
@@ -10471,11 +10502,15 @@ def self_test() -> int:
         kit = workspace / "GitLab" / "group" / "agent-kit"
         (kit / "data" / "agents").mkdir(parents=True)
         (kit / "data" / "scripts").mkdir(parents=True)
-        (workspace / ".claude" / "scripts").symlink_to(
-            kit / "data" / "scripts", target_is_directory=True
+        # Layout links, not symlink-semantics assertions: a Windows account
+        # without SeCreateSymbolicLinkPrivilege gets an NTFS junction, which
+        # reads through identically. (The cases that test symlink REFUSAL are
+        # guarded on supports_symlinks() instead — a junction is not a symlink.)
+        platform_compat.create_directory_link(
+            kit / "data" / "scripts", workspace / ".claude" / "scripts"
         )
-        (workspace / ".claude" / "agents").symlink_to(
-            kit / "data" / "agents", target_is_directory=True
+        platform_compat.create_directory_link(
+            kit / "data" / "agents", workspace / ".claude" / "agents"
         )
         fixture_roles = [
             "milestone-adversary", "milestone-delivery-integrity-adversary",
@@ -10641,14 +10676,20 @@ def self_test() -> int:
                 {"head_commit": head, "remote_url": remote_url}, root,
             )
         ))
-        state_alias = state_dir / "state-alias.json"
-        state_alias.symlink_to(state_path)
-        def exercise_state_alias() -> None:
-            with _state_lock(state_alias):
-                pass
-        check("state symlink aliases are refused", exercise_state_alias,
-              "symlink aliases forbidden")
-        state_alias.unlink()
+        # A junction is not a symlink (os.path.islink() is False), so this case
+        # cannot be faked on a Windows account without the privilege — the
+        # refusal it asserts is specifically about symlink-ness.
+        if platform_compat.supports_symlinks():
+            state_alias = state_dir / "state-alias.json"
+            state_alias.symlink_to(state_path)
+            def exercise_state_alias() -> None:
+                with _state_lock(state_alias):
+                    pass
+            check("state symlink aliases are refused", exercise_state_alias,
+                  "symlink aliases forbidden")
+            state_alias.unlink()
+        else:
+            skip("state symlink aliases are refused", "REQUIRES:symlink-privilege")
         (kit / "upgrade-marker.txt").write_text("compatible fixture upgrade\n", encoding="utf-8")
         subprocess.run(["git", "-C", str(kit), "add", "upgrade-marker.txt"], check=True)
         subprocess.run(["git", "-C", str(kit), "commit", "-qm", "fixture kit upgrade"], check=True)
@@ -10701,7 +10742,12 @@ def self_test() -> int:
             critique = root / critique_paths[idx]
             reviews.append({
                 "role": role, "stage": "assessment", "provider": "codex", "model": None,
-                "agent_task_id": f"task-{idx}", "agent_body_path": str(body.relative_to(kit)),
+                # .as_posix(), not str(): the validator compares against the
+                # literal "data/agents/<role>.md", and str(PurePath) is
+                # OS-native, so this produced "data\\agents\\..." and failed on
+                # Windows. Unreachable until the self-test stopped crashing at
+                # import (M2, gates-green-t-fcntl-datascripts).
+                "agent_task_id": f"task-{idx}", "agent_body_path": body.relative_to(kit).as_posix(),
                 "agent_body_snapshot_path": f"artifacts/reviews/{role}-task-{idx}-agent.md",
                 "agent_kit_commit": kit_commit, "workspace_root": str(workspace.resolve()),
                 "reviewed_remote_url": remote_url,
@@ -12588,11 +12634,14 @@ def self_test() -> int:
         escape_state = dict(state); escape_state["operations_plan"] = "artifacts/../../outside.json"
         outside = state_dir / "outside.json"; outside.write_text("{}")
         check("artifact traversal refused", lambda: _safe_artifact_path(state_path, escape_state, "operations_plan"), "escapes")
-        external = Path(td) / "external.json"; external.write_text("{}")
-        link = art / "escape-link.json"; link.symlink_to(external)
-        symlink_state = dict(state); symlink_state["operations_plan"] = "artifacts/escape-link.json"
-        check("artifact symlink escape refused", lambda: _safe_artifact_path(state_path, symlink_state, "operations_plan"), "escapes")
-        link.unlink()
+        if platform_compat.supports_symlinks():
+            external = Path(td) / "external.json"; external.write_text("{}")
+            link = art / "escape-link.json"; link.symlink_to(external)
+            symlink_state = dict(state); symlink_state["operations_plan"] = "artifacts/escape-link.json"
+            check("artifact symlink escape refused", lambda: _safe_artifact_path(state_path, symlink_state, "operations_plan"), "escapes")
+            link.unlink()
+        else:
+            skip("artifact symlink escape refused", "REQUIRES:symlink-privilege")
         prior_meta = validate_operations_evidence(evidence, state, plan, now)
         prior_binding = _binding("operations_evidence", fixture_operations_path, evidence, "applied", prior_meta)
         pending = json.loads(json.dumps(evidence))
@@ -13052,7 +13101,12 @@ def self_test() -> int:
             "endpoint allowlist used a raw string prefix",
         ))
 
-    print(f"milestone-pipeline-artifacts self-test: {'OK' if failures == 0 else f'{failures} failure(s)'}")
+    verdict = "OK" if failures == 0 else f"{failures} failure(s)"
+    # Skips are surfaced in the verdict, not swallowed: a green line that hid an
+    # unrun security assertion is the exact defect M2 is closing.
+    if skipped:
+        verdict += f" ({skipped} skipped on {sys.platform})"
+    print(f"milestone-pipeline-artifacts self-test: {verdict}")
     return 0 if failures == 0 else 1
 
 
