@@ -94,7 +94,7 @@ def _spike_dep_status(repo_root: Path | None, spike_id: str) -> tuple[bool, str]
     if not sp.is_file():
         return False, "not run (no spike state.json)"
     try:
-        st = json.loads(sp.read_text())
+        st = json.loads(sp.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         return False, f"spike state unreadable ({exc})"
     terminal = st.get("terminal_status")
@@ -106,7 +106,7 @@ def _spike_dep_status(repo_root: Path | None, spike_id: str) -> tuple[bool, str]
 def _locked(path: Path):
     """Exclusive advisory lock for the read-modify-write window."""
     lock_path = path.with_name(path.name + ".lock")
-    with open(lock_path, "w") as lf:
+    with open(lock_path, "w", encoding="utf-8") as lf:
         fcntl.flock(lf, fcntl.LOCK_EX)
         try:
             yield
@@ -122,7 +122,7 @@ def _load(path: Path) -> dict:
     if not path.exists():
         sys.exit(f"milestones register not found: {path}")
     try:
-        doc = json.loads(path.read_text())
+        doc = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         sys.exit(f"not valid JSON: {path}: {exc}")
     if not isinstance(doc, dict) or not isinstance(doc.get("milestones"), list):
@@ -137,7 +137,7 @@ def _load(path: Path) -> dict:
 
 def _save_atomic(path: Path, doc: dict) -> None:
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(doc, indent=2) + "\n")
+    tmp.write_text(json.dumps(doc, indent=2, encoding="utf-8") + "\n")
     os.replace(tmp, path)
 
 
@@ -159,7 +159,7 @@ def find_file(repo_root: Path, mid: str) -> Path | None | str:
     matches: list[Path] = []
     for candidate in sorted(roadmaps.glob("*/milestones.json")):
         try:
-            doc = json.loads(candidate.read_text())
+            doc = json.loads(candidate.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             continue
         if isinstance(doc, dict) and _milestone(doc, mid) is not None:
@@ -365,17 +365,17 @@ def self_test() -> int:
                 milestone(4, ["demo-slug-spike-2"]),  # spike prerequisite (absent, for override)
             ],
         }
-        path.write_text(json.dumps(doc, indent=2))
+        path.write_text(json.dumps(doc, indent=2, encoding="utf-8"))
 
         expect("check-only blocks m2 (no write)", transition(path, "demo-slug-m2", "in_progress", None, [], check_only=True), 3)
-        d = json.loads(path.read_text())
+        d = json.loads(path.read_text(encoding="utf-8"))
         ok = _milestone(d, "demo-slug-m2")["status"] == "pending" and not _milestone(d, "demo-slug-m2")["history"]
         print(f"  check-only left file untouched: {'ok' if ok else 'FAIL'}")
         failures += 0 if ok else 1
 
         expect("m2 blocked by dep-gate", transition(path, "demo-slug-m2", "in_progress", None, []), 3)
         expect("m2 override passes gate", transition(path, "demo-slug-m2", "in_progress", "hotfix test", []), 0)
-        d = json.loads(path.read_text())
+        d = json.loads(path.read_text(encoding="utf-8"))
         m2 = _milestone(d, "demo-slug-m2")
         ok = m2["run"]["override"] and m2["history"][-1]["reason"] == "hotfix test"
         print(f"  override audited in history+run: {'ok' if ok else 'FAIL'}")
@@ -388,7 +388,7 @@ def self_test() -> int:
         expect("backward refused", transition(path, "demo-slug-m2", "pending", None, []), 1)
         expect("cancel in_progress ok", transition(path, "demo-slug-m2", "cancelled", None, []), 0)
         expect("reopen cancelled ok", transition(path, "demo-slug-m2", "pending", None, []), 0)
-        d = json.loads(path.read_text())
+        d = json.loads(path.read_text(encoding="utf-8"))
         m2 = _milestone(d, "demo-slug-m2")
         ok = all(m2["run"][k] is None for k in m2["run"]) and len(m2["history"]) >= 3
         print(f"  reopen cleared run.* (audit kept): {'ok' if ok else 'FAIL'}")
@@ -403,7 +403,7 @@ def self_test() -> int:
             sd.mkdir(parents=True, exist_ok=True)
             (sd / "state.json").write_text(json.dumps(
                 {"schema_version": 1, "spike_id": sid, "terminal_status": terminal, "verdict": verdict}
-            ))
+            , encoding="utf-8"))
 
         expect("m3 blocked: spike not run", transition(path, "demo-slug-m3", "in_progress", None, []), 3)
         write_spike("demo-slug-spike-1", "skip-review", "YES")
@@ -414,13 +414,13 @@ def self_test() -> int:
         expect("m3 starts: spike ACCEPTed (a NO still answers the question)", transition(path, "demo-slug-m3", "in_progress", None, []), 0)
         expect("m4 blocked: spike-2 absent", transition(path, "demo-slug-m4", "in_progress", None, []), 3)
         expect("m4 override passes spike gate", transition(path, "demo-slug-m4", "in_progress", "verified spike manually", []), 0)
-        d = json.loads(path.read_text())
+        d = json.loads(path.read_text(encoding="utf-8"))
         m4 = _milestone(d, "demo-slug-m4")
         ok = bool(m4["run"]["override"]) and m4["history"][-1]["reason"] == "verified spike manually"
         print(f"  spike-dep override audited: {'ok' if ok else 'FAIL'}")
         failures += 0 if ok else 1
 
-        d = json.loads(path.read_text())
+        d = json.loads(path.read_text(encoding="utf-8"))
         m1 = _milestone(d, "demo-slug-m1")
         ok = (
             m1["run"]["started_at"]
@@ -441,7 +441,7 @@ def self_test() -> int:
         # Ambiguity: a second register claiming the same id.
         dup_dir = Path(td) / ".claude" / "notes" / "roadmaps" / "other-slug"
         dup_dir.mkdir(parents=True)
-        (dup_dir / "milestones.json").write_text(json.dumps(doc))
+        (dup_dir / "milestones.json").write_text(json.dumps(doc, encoding="utf-8"))
         found = find_file(Path(td), "demo-slug-m1")
         print(f"  --find flags ambiguous id: {'ok' if found == 'AMBIGUOUS' else 'FAIL'}")
         failures += 0 if found == "AMBIGUOUS" else 1
@@ -449,7 +449,7 @@ def self_test() -> int:
         # Version guard.
         bad = dict(doc)
         bad["schema_version"] = 2
-        (dup_dir / "milestones.json").write_text(json.dumps(bad))
+        (dup_dir / "milestones.json").write_text(json.dumps(bad, encoding="utf-8"))
         try:
             _load(dup_dir / "milestones.json")
             print("  v2 register refused by writer: FAIL (no exit)")

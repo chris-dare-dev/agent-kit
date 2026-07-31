@@ -215,6 +215,12 @@ def _provider_support(kind: str, fm: dict, partial: bool) -> dict[str, str]:
 
 
 def _entry(kind: str, name: str, fm: dict, body: str, rel_path: str) -> dict:
+    """rel_path MUST already be POSIX-separated.
+
+    provenance lands in a committed artifact, so an OS-native separator makes
+    catalog.json differ byte-for-byte between a Windows and a Linux regeneration
+    and the --check gate can never pass on both. Callers use Path.as_posix().
+    """
     tools = _tool_list(fm.get("allowed-tools") if kind == "skill" else fm.get("tools"))
     partial, note = _provider_partial(kind, fm, tools, body)
     support = _provider_support(kind, fm, partial)
@@ -263,7 +269,7 @@ def build_catalog() -> dict:
         if _excluded(fm):
             continue
         name = str(fm.get("name") or skill_md.parent.name)
-        rel = str(skill_md.relative_to(ROOT))
+        rel = skill_md.relative_to(ROOT).as_posix()
         entries.append(_entry("skill", name, fm, body, rel))
 
     for agent_md in sorted(AGENTS_DIR.glob("*.md")):
@@ -271,7 +277,7 @@ def build_catalog() -> dict:
         if _excluded(fm):
             continue
         name = str(fm.get("name") or agent_md.stem)
-        rel = str(agent_md.relative_to(ROOT))
+        rel = agent_md.relative_to(ROOT).as_posix()
         entries.append(_entry("agent", name, fm, body, rel))
 
     for cmd_md in sorted(COMMANDS_DIR.glob("*.md")):
@@ -279,7 +285,7 @@ def build_catalog() -> dict:
         if _excluded(fm):
             continue
         name = cmd_md.stem  # commands carry no `name:` — filename IS the /slash id
-        rel = str(cmd_md.relative_to(ROOT))
+        rel = cmd_md.relative_to(ROOT).as_posix()
         entries.append(_entry("entrypoint", name, fm, body, rel))
 
     entries.sort(key=lambda e: (e["kind"], e["name"]))

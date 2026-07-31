@@ -69,7 +69,7 @@ GITLAB_SKELETON = {"epic_iid": None, "story_iids": []}
 def _locked(path: Path):
     lock_path = path.with_name(path.name + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock_path, "w") as lf:
+    with open(lock_path, "w", encoding="utf-8") as lf:
         fcntl.flock(lf, fcntl.LOCK_EX)
         try:
             yield
@@ -79,7 +79,7 @@ def _locked(path: Path):
 
 def _read(path: Path, label: str) -> dict:
     try:
-        doc = json.loads(path.read_text())
+        doc = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         sys.exit(f"{label}: unreadable JSON at {path}: {exc}")
     if not isinstance(doc, dict) or not isinstance(doc.get("milestones"), list):
@@ -110,7 +110,7 @@ def _check_skeleton(incoming: dict) -> list[str]:
 
 def _save_atomic(path: Path, doc: dict) -> None:
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(doc, indent=2) + "\n")
+    tmp.write_text(json.dumps(doc, indent=2, encoding="utf-8") + "\n")
     os.replace(tmp, path)
 
 
@@ -232,24 +232,24 @@ def self_test() -> int:
         reg = Path(td) / ".claude" / "notes" / "roadmaps" / "demo-slug" / "milestones.json"
         inc = Path(td) / "incoming.json"
 
-        inc.write_text(json.dumps(doc(milestone(1), milestone(2, deps=["demo-slug-m1"]))))
+        inc.write_text(json.dumps(doc(milestone(1, encoding="utf-8"), milestone(2, deps=["demo-slug-m1"]))))
         expect("create-on-absent", merge(reg, inc), 0)
 
         # Simulate execution state, then re-materialize with a title change + new m3.
-        live = json.loads(reg.read_text())
+        live = json.loads(reg.read_text(encoding="utf-8"))
         live["milestones"][0]["status"] = "complete"
         live["milestones"][0]["run"]["rectification_commit"] = "abc1234"
         live["milestones"][0]["history"] = [
             {"at": "t", "from": "pending", "to": "in_progress", "reason": None},
             {"at": "t", "from": "in_progress", "to": "complete", "reason": None},
         ]
-        reg.write_text(json.dumps(live))
+        reg.write_text(json.dumps(live, encoding="utf-8"))
 
         inc.write_text(
-            json.dumps(doc(milestone(1, title="Retitled"), milestone(2, deps=["demo-slug-m1"]), milestone(3)))
+            json.dumps(doc(milestone(1, title="Retitled", encoding="utf-8"), milestone(2, deps=["demo-slug-m1"]), milestone(3)))
         )
         expect("merge preserves + adopts", merge(reg, inc), 0)
-        merged = json.loads(reg.read_text())
+        merged = json.loads(reg.read_text(encoding="utf-8"))
         m1 = merged["milestones"][0]
         ok = (
             m1["title"] == "Retitled"
@@ -262,23 +262,23 @@ def self_test() -> int:
         failures += 0 if ok else 1
 
         # Dropping the completed m1 must refuse; dropping pending m3 is fine.
-        inc.write_text(json.dumps(doc(milestone(2, deps=[]))))
+        inc.write_text(json.dumps(doc(milestone(2, deps=[], encoding="utf-8"))))
         expect("refuses dropping non-pending", merge(reg, inc), 3)
-        inc.write_text(json.dumps(doc(milestone(1), milestone(2, deps=["demo-slug-m1"]))))
+        inc.write_text(json.dumps(doc(milestone(1, encoding="utf-8"), milestone(2, deps=["demo-slug-m1"]))))
         expect("drops pending silently", merge(reg, inc), 0)
-        ok = len(json.loads(reg.read_text())["milestones"]) == 2
+        ok = len(json.loads(reg.read_text(encoding="utf-8"))["milestones"]) == 2
         print(f"  pending m3 dropped: {'ok' if ok else 'FAIL'}")
         failures += 0 if ok else 1
 
         # Contract violations.
         bad = doc(milestone(1))
         bad["milestones"][0]["status"] = "in_progress"
-        inc.write_text(json.dumps(bad))
+        inc.write_text(json.dumps(bad, encoding="utf-8"))
         expect("refuses stateful draft", merge(reg, inc), 2)
 
         bad = doc(milestone(1))
         bad["slug"] = "other-slug"
-        inc.write_text(json.dumps(bad))
+        inc.write_text(json.dumps(bad, encoding="utf-8"))
         expect("refuses slug mismatch", merge(reg, inc), 2)
 
     print(f"self-test: {'PASS' if failures == 0 else f'{failures} FAILURE(S)'}")

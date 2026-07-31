@@ -89,7 +89,7 @@ class TestConcurrency(unittest.TestCase):
                         expected_ids.add(mid)
 
             total_expected = writers * iterations
-            lines = log.read_text().splitlines()
+            lines = log.read_text(encoding="utf-8").splitlines()
             self.assertEqual(
                 len(lines), total_expected, "line count must equal number of emits"
             )
@@ -124,7 +124,7 @@ class TestConcurrency(unittest.TestCase):
             expected_ids = {mid for _, mid in jobs}
             self.assertEqual(len(returned), total_expected)
 
-            lines = log.read_text().splitlines()
+            lines = log.read_text(encoding="utf-8").splitlines()
             self.assertEqual(
                 len(lines),
                 total_expected,
@@ -149,7 +149,7 @@ class TestConcurrency(unittest.TestCase):
             big_id = "x" * (mod.PIPE_BUF + 200)
             rc = mod.emit("milestone", big_id, None, {}, str(log))
             self.assertEqual(rc, 0)
-            lines = log.read_text().splitlines()
+            lines = log.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(lines), 1)
             obj = json.loads(lines[0])  # still one intact parseable line
             self.assertEqual(obj["id"], big_id)
@@ -189,7 +189,7 @@ class TestNonBlocking(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             log = Path(d) / "out.jsonl"
             sp = Path(d) / "state.json"
-            sp.write_text("")
+            sp.write_text("", encoding="utf-8")
             res = run_emit_subprocess(
                 ["--pipeline", "milestone", "--id", "m1", "--state", str(sp)], log
             )
@@ -202,7 +202,7 @@ class TestNonBlocking(unittest.TestCase):
             sp = Path(d) / "state.json"
             sp.write_text(
                 '{"id": "m1", "critique_finding_counts": {trunc'
-            )  # broken JSON
+            , encoding="utf-8")  # broken JSON
             res = run_emit_subprocess(
                 ["--pipeline", "milestone", "--id", "m1", "--state", str(sp)], log
             )
@@ -216,7 +216,7 @@ class TestNonBlocking(unittest.TestCase):
             log = Path(d) / "out.jsonl"
             sp = Path(d) / "state.json"
             # Valid JSON, but missing critique_finding_counts AND rectification_commit.
-            sp.write_text(json.dumps({"id": "m1", "phase": "complete"}))
+            sp.write_text(json.dumps({"id": "m1", "phase": "complete"}, encoding="utf-8"))
             res = run_emit_subprocess(
                 ["--pipeline", "milestone", "--id", "m1", "--state", str(sp)], log
             )
@@ -256,7 +256,7 @@ class TestRectificationCount(unittest.TestCase):
             log = Path(d) / "out.jsonl"
             sp = Path(d) / "state.json"
             sp.write_text(
-                json.dumps({"id": "m1", "fixed_findings": ["C1", "H1", "H2", "M1"]})
+                json.dumps({"id": "m1", "fixed_findings": ["C1", "H1", "H2", "M1"]}, encoding="utf-8")
             )
             mod.emit("milestone", "m1", str(sp), {}, str(log))
             records, _ = mod.read_records(log)
@@ -295,7 +295,7 @@ class TestAppendOnly(unittest.TestCase):
             for i in range(5):
                 mod.emit("milestone", "id-%d" % i, None, {}, str(log))
             # Hand-append a deliberately corrupt line.
-            with open(log, "a") as f:
+            with open(log, "a", encoding="utf-8") as f:
                 f.write("{not valid json at all\n")
             res = subprocess.run(
                 [sys.executable, str(SCRIPT), "summary", "--log", str(log), "--json"],
@@ -340,7 +340,7 @@ class TestPerPipelineEmitSmoke(unittest.TestCase):
                         "updated_at": "2026-06-17T15:00:00Z",
                         "phase": "complete",
                     }
-                )
+                , encoding="utf-8")
             )
             # --field values arrive as STRINGS from the CLI (key=value); the writer JSON-coerces
             # them. Pass strings here to faithfully exercise the live `--field` invocation shape.
@@ -379,7 +379,7 @@ class TestPerPipelineEmitSmoke(unittest.TestCase):
                             "low": 0,
                         },
                     }
-                )
+                , encoding="utf-8")
             )
             for fam in [
                 "capability-scout",

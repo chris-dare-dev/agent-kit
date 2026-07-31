@@ -83,7 +83,7 @@ def _sha256_file(p: Path) -> str:
 
 def _save_atomic(path: Path, obj: dict) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(obj, indent=2))
+    tmp.write_text(json.dumps(obj, indent=2, encoding="utf-8"))
     os.replace(tmp, path)
 
 
@@ -158,8 +158,8 @@ def decide(sid: str) -> None:
     for p in (design_path, meas_path):
         if not p.is_file():
             sys.exit(f"required artifact missing: {p}")
-    design = json.loads(design_path.read_text())
-    measurements = json.loads(meas_path.read_text())
+    design = json.loads(design_path.read_text(encoding="utf-8"))
+    measurements = json.loads(meas_path.read_text(encoding="utf-8"))
 
     per_criterion, verdict, errors = derive_decision(design, measurements)
     if errors:

@@ -73,13 +73,13 @@ REQUIRED_ROUTER_IDS = frozenset({
 
 
 def load_catalog() -> dict:
-    return json.loads(CATALOG_PATH.read_text())
+    return json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
 
 
 def load_coverage_map(text: str | None = None) -> dict:
     """Parse the machine-source ```json block out of the coverage-map markdown."""
     if text is None:
-        text = COVERAGE_MAP_PATH.read_text()
+        text = COVERAGE_MAP_PATH.read_text(encoding="utf-8")
     blocks = _JSON_BLOCK.findall(text)
     if len(blocks) != 1:
         # The map is hand-edited and explicitly invites future editing; a second
@@ -210,9 +210,9 @@ def check(catalog: dict, cmap: dict) -> int:
 
     # 2. drift vs on-disk data/ copies
     expected_agents_data = AGENTS_FRONTMATTER + agents_body
-    if not AGENTS_DATA.exists() or AGENTS_DATA.read_text() != expected_agents_data:
+    if not AGENTS_DATA.exists() or AGENTS_DATA.read_text(encoding="utf-8") != expected_agents_data:
         problems.append(f"DRIFT: {AGENTS_DATA.relative_to(ROOT)} differs from a fresh render")
-    if not CONTEXT_DATA.exists() or CONTEXT_DATA.read_text() != context_body:
+    if not CONTEXT_DATA.exists() or CONTEXT_DATA.read_text(encoding="utf-8") != context_body:
         problems.append(f"DRIFT: {CONTEXT_DATA.relative_to(ROOT)} differs from a fresh render")
 
     if problems:
@@ -264,7 +264,7 @@ def check(catalog: dict, cmap: dict) -> int:
 
     # Self-description honesty: the map must describe the anchor mechanism, not the
     # abandoned <!-- r:{id} --> markers the generator does not emit (adversary M1).
-    if COVERAGE_MAP_PATH.exists() and "<!-- r:" in COVERAGE_MAP_PATH.read_text():
+    if COVERAGE_MAP_PATH.exists() and "<!-- r:" in COVERAGE_MAP_PATH.read_text(encoding="utf-8"):
         coverage.append("coverage map still describes a <!-- r: --> marker mechanism the generator does not use (anchors only)")
 
     if coverage:
@@ -284,13 +284,13 @@ def check(catalog: dict, cmap: dict) -> int:
 def write_all(catalog: dict, cmap: dict) -> None:
     agents_body = render_agents(catalog, cmap)
     context_body = render_context(catalog)
-    AGENTS_DATA.write_text(AGENTS_FRONTMATTER + agents_body)
-    CONTEXT_DATA.write_text(context_body)
+    AGENTS_DATA.write_text(AGENTS_FRONTMATTER + agents_body, encoding="utf-8")
+    CONTEXT_DATA.write_text(context_body, encoding="utf-8")
     written = [str(AGENTS_DATA.relative_to(ROOT)), str(CONTEXT_DATA.relative_to(ROOT))]
     ws = _workspace_root()
     if ws is not None:
-        (ws / "AGENTS.md").write_text(agents_body)  # workspace copy: no frontmatter
-        (ws / "CONTEXT.md").write_text(context_body)
+        (ws / "AGENTS.md").write_text(agents_body, encoding="utf-8")  # workspace copy: no frontmatter
+        (ws / "CONTEXT.md").write_text(context_body, encoding="utf-8")
         written += [f"{ws}/AGENTS.md", f"{ws}/CONTEXT.md"]
     nbytes = len(agents_body.encode("utf-8"))
     print(f"wrote: {', '.join(written)}")

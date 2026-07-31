@@ -379,7 +379,7 @@ def validate_file(kind: str, path: Path) -> list[str]:
     if not path.is_file():
         return [f"file not found: {path}"]
     try:
-        obj = json.loads(path.read_text())
+        obj = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         return [f"not valid JSON: {exc}"]
     return VALIDATORS[kind](obj)

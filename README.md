@@ -149,14 +149,17 @@ npm run verify:quickstart                  # executes the Quick start block abov
 # Needs the provisioned venv: ~30 cases import qdrant_client at call time.
 python3 workspace-tooling/run-substrate-tests.py
 
-# the four generator gates — all must be clean before committing data/ changes.
-# PYTHONUTF8=1 is REQUIRED on Windows: without it these mis-decode UTF-8 content
-# under a non-UTF-8 console codepage and report drift that is not there.
-PYTHONUTF8=1 python3 data/scripts/catalog-generate.py --check
-PYTHONUTF8=1 python3 data/scripts/generate-adapter-packs.py --check
-PYTHONUTF8=1 python3 data/scripts/generate-root-contract.py --check
-PYTHONUTF8=1 python3 data/scripts/model-policy-apply.py --check
-PYTHONUTF8=1 python3 data/scripts/mcp-server-name-check.py --check
+# the generator gates — all must be clean before committing data/ changes.
+# No PYTHONUTF8 needed: every text I/O in data/scripts names its encoding, and
+# catalog provenance is POSIX-separated, so these are byte-identical on Windows,
+# macOS and Linux. Both were verified on Windows AND Linux.
+python3 data/scripts/catalog-generate.py --check
+python3 data/scripts/generate-adapter-packs.py --check
+python3 data/scripts/generate-root-contract.py --check
+python3 data/scripts/model-policy-apply.py --check
+python3 data/scripts/mcp-server-name-check.py --check
+python3 data/scripts/denylist-check.py --check
+python3 data/scripts/template-settings-check.py --check
 ```
 
 The last one is why a rename is survivable: every `mcp__<server>__` tool grant in

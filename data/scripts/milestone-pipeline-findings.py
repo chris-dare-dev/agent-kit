@@ -383,7 +383,7 @@ def _locked(path: Path):
     """Exclusive advisory lock for the read-modify-write window."""
     lock_path = path.with_name(path.name + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock_path, "w") as lf:
+    with open(lock_path, "w", encoding="utf-8") as lf:
         fcntl.flock(lf, fcntl.LOCK_EX)
         try:
             yield
@@ -399,7 +399,7 @@ def _load_register(path: Path) -> dict:
     if not path.exists():
         sys.exit(f"findings register not found: {path} — run 'extract' first")
     try:
-        doc = json.loads(path.read_text())
+        doc = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         sys.exit(f"not valid JSON: {path}: {exc}")
     if not isinstance(doc, dict) or not isinstance(doc.get("findings"), list):
@@ -446,7 +446,7 @@ def _load_register(path: Path) -> dict:
 
 def _save_atomic(path: Path, doc: dict) -> None:
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(doc, indent=2) + "\n")
+    tmp.write_text(json.dumps(doc, indent=2, encoding="utf-8") + "\n")
     os.replace(tmp, path)
 
 
@@ -464,7 +464,7 @@ def _parse_files(paths: list[str]) -> tuple[list[dict], list[str]]:
         if not fp.is_file():
             problems.append(f"{p}: file not found")
             continue
-        findings, probs = parse_critique(fp.read_text(), p)
+        findings, probs = parse_critique(fp.read_text(encoding="utf-8"), p)
         problems.extend(probs)
         for f in findings:
             f["critique_file"] = p
@@ -725,7 +725,7 @@ def cmd_dedupe(args: argparse.Namespace) -> int:
     if not path.is_file():
         print(f"file not found: {path}", file=sys.stderr)
         return 1
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     if "## Cross-critic agreement" in text:
         print(f"{path}: already deduped (skipping)")
         return 0
@@ -784,7 +784,7 @@ def cmd_dedupe(args: argparse.Namespace) -> int:
         rewritten = text.replace(marker, "\n".join(callouts) + "\n\n" + marker, 1)
     else:
         rewritten = text.rstrip() + "\n\n" + "\n".join(callouts) + "\n"
-    path.write_text(rewritten)
+    path.write_text(rewritten, encoding="utf-8")
     print(
         f"{path}: deduped -- {len(clusters)} cluster(s) covering "
         f"{sum(len(c) for c in clusters)} findings"
@@ -878,7 +878,7 @@ def self_test() -> int:
         (root / "docs").mkdir()
         reg = root / "findings.json"
         crit = root / "docs" / "demo-m1_adversary_critique.md"
-        crit.write_text(VALID_CRITIQUE)
+        crit.write_text(VALID_CRITIQUE, encoding="utf-8")
         rel_crit = str(crit)
 
         # 1. --check passes a valid v1.0 critique
@@ -888,25 +888,25 @@ def self_test() -> int:
         # 2. malformed: missing File: line fails loud, names the id
         bad = VALID_CRITIQUE.replace("File: `README.md`\n\n", "")
         p = root / "docs" / "bad1.md"
-        p.write_text(bad)
+        p.write_text(bad, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: missing File: fails loud", rc == 1 and "M1" in err, f"rc={rc}")
 
         # 3. counts-line mismatch fails
         bad = VALID_CRITIQUE.replace("C1 H0 M1 L0", "C1 H1 M1 L0")
-        p.write_text(bad)
+        p.write_text(bad, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: counts mismatch fails", rc == 1 and "Severity counts" in err, f"rc={rc}")
 
         # 4. missing counts line fails
         bad = VALID_CRITIQUE.replace("- **Severity counts:** C1 H0 M1 L0\n", "")
-        p.write_text(bad)
+        p.write_text(bad, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: missing counts line fails", rc == 1 and "no 'Severity counts" in err, f"rc={rc}")
 
         # 5. missing format-version header fails
         bad = VALID_CRITIQUE.replace("**Critique format version:** 1.0\n", "")
-        p.write_text(bad)
+        p.write_text(bad, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: missing format version fails", rc == 1 and "format version" in err, f"rc={rc}")
 
@@ -914,7 +914,7 @@ def self_test() -> int:
         bad = VALID_CRITIQUE.replace("**M1 — Doc drift on convention** (MEDIUM)",
                                      "**M1 — Doc drift on convention** (HIGH)")
         bad = bad.replace("C1 H0 M1 L0", "C1 H1 M0 L0")
-        p.write_text(bad)
+        p.write_text(bad, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: id/severity mismatch fails", rc == 1 and "id-letter" in err, f"rc={rc}")
 
@@ -922,19 +922,19 @@ def self_test() -> int:
         bad = VALID_CRITIQUE.replace("**M1 — Doc drift on convention** (MEDIUM)",
                                      "**C1 — Doc drift on convention** (CRITICAL)")
         bad = bad.replace("C1 H0 M1 L0", "C2 H0 M0 L0")
-        p.write_text(bad)
+        p.write_text(bad, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: duplicate id fails", rc == 1 and "duplicate" in err, f"rc={rc}")
 
         # 8. prefixed counts line (conditional critics) parses
         pref = VALID_CRITIQUE.replace("C1 H0 M1 L0", "F-C1 F-H0 F-M1 F-L0")
-        p.write_text(pref)
+        p.write_text(pref, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: F- prefixed counts line parses", rc == 0, f"rc={rc} {err}")
 
         # 9. extract writes the register (all open)
         rc, out, err = run_main(["extract", "--id", "demo-m1", "--register", str(reg), rel_crit])
-        doc = json.loads(reg.read_text())
+        doc = json.loads(reg.read_text(encoding="utf-8"))
         expect(
             "extract: register written, statuses open",
             rc == 0 and len(doc["findings"]) == 2
@@ -982,7 +982,7 @@ def self_test() -> int:
 
         # 17. re-extract preserves statuses (merge-safe)
         rc, out, err = run_main(["extract", "--id", "demo-m1", "--register", str(reg), rel_crit])
-        doc = json.loads(reg.read_text())
+        doc = json.loads(reg.read_text(encoding="utf-8"))
         by_id = {f["id"]: f for f in doc["findings"]}
         expect(
             "extract: re-extract preserves statuses",
@@ -997,7 +997,7 @@ def self_test() -> int:
             "**Proposed fix:** Update it.\n\n**Regression-guard:** (none feasible)\n\n"
             "**Source critic:** adversary\n\n", "")
         sub = sub.replace("C1 H0 M1 L0", "C1 H0 M0 L0")
-        p.write_text(sub)
+        p.write_text(sub, encoding="utf-8")
         rc, out, err = run_main(["extract", "--id", "demo-m1", "--register", str(reg), str(p)])
         expect("extract: refuses dropped ids", rc == 1 and "M1" in err, f"rc={rc}")
 
@@ -1020,9 +1020,9 @@ def self_test() -> int:
         # 21. dedupe: clusters within 5 lines, inserts before the marker, idempotent
         two = VALID_CRITIQUE.replace("File: `README.md`", "File: `ci/deploy.yml:14`")
         dd = root / "docs" / "dedupe.md"
-        dd.write_text(two)
+        dd.write_text(two, encoding="utf-8")
         rc, out, err = run_main(["dedupe", str(dd)])
-        text = dd.read_text()
+        text = dd.read_text(encoding="utf-8")
         expect(
             "dedupe: cluster emitted before rectification order",
             rc == 0 and "## Cross-critic agreement" in text
@@ -1035,7 +1035,7 @@ def self_test() -> int:
         # 22. dedupe fails loud on malformed (the old silent-skip gap)
         bad = VALID_CRITIQUE.replace("File: `ci/deploy.yml:12`\n\n", "")
         dd2 = root / "docs" / "dedupe-bad.md"
-        dd2.write_text(bad)
+        dd2.write_text(bad, encoding="utf-8")
         rc, out, err = run_main(["dedupe", str(dd2)])
         expect("dedupe: malformed block fails loud", rc == 1 and "C1" in err, f"rc={rc}")
 
@@ -1048,7 +1048,7 @@ def self_test() -> int:
             "**Source critic:** adversary\n\n- **Severity counts:** C9 H9 M9 L9\n```\n\n"
             "## What was done well",
         )
-        p.write_text(fenced)
+        p.write_text(fenced, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: fenced finding block ignored (M2)", rc == 0 and "2 finding(s)" in out,
                f"rc={rc} {err[:120]}")
@@ -1058,7 +1058,7 @@ def self_test() -> int:
             "- **Headline finding:** demo",
             "- **Headline finding:** demo\n- **Severity counts:** C9 H9 M9 L9",
         )
-        p.write_text(dup)
+        p.write_text(dup, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: duplicate counts lines refused (L1)", rc == 1 and "exactly" in err,
                f"rc={rc} {err[:120]}")
@@ -1073,7 +1073,7 @@ def self_test() -> int:
             "- **Severity counts:** I-C0 I-H0 I-M0 I-L0\n"
         )
         zf = root / "docs" / "demo-m1_infra_critique.md"
-        zf.write_text(clean)
+        zf.write_text(clean, encoding="utf-8")
         reg2 = root / "findings2.json"
         rc, out, err = run_main(["extract", "--id", "demo-m1", "--register", str(reg2),
                                  rel_crit, str(zf)])
@@ -1093,7 +1093,7 @@ def self_test() -> int:
         near = VALID_CRITIQUE.replace("**M1 — Doc drift on convention** (MEDIUM)",
                                       "**M1: Doc drift on convention** (MEDIUM)")
         near = near.replace("C1 H0 M1 L0", "C1 H0 M0 L0")
-        p.write_text(near)
+        p.write_text(near, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: near-miss header refused (F1)",
                rc == 1 and "looks like a finding header" in err, f"rc={rc} {err[:120]}")
@@ -1107,7 +1107,7 @@ def self_test() -> int:
                           "file": "x", "line": 1, "title": "t",
                           "regression_guard": None, "critique_file": "f",
                           "status": "opened", "resolution": None, "history": []}],
-        }))
+        }, encoding="utf-8"))
         rc, out, err = run_main(["gate", "demo-m1", "--register", str(bad_reg)])
         expect("gate: hand-edited status refuses, never fail-open (F2)",
                rc == 1 and "opened" in err and "fail-open" in err, f"rc={rc} {err[:120]}")
@@ -1124,7 +1124,7 @@ def self_test() -> int:
 
         # 30. missing remediation body field refused (round-4 F9)
         nobody = VALID_CRITIQUE.replace("**Proposed fix:** Update it.\n\n", "")
-        p.write_text(nobody)
+        p.write_text(nobody, encoding="utf-8")
         rc, out, err = run_main(["extract", "--check", str(p)])
         expect("check: missing body field refused (F9)",
                rc == 1 and "Proposed fix" in err and "M1" in err, f"rc={rc} {err[:140]}")

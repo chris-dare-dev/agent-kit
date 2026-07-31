@@ -155,7 +155,7 @@ def _sha256_file(p: Path) -> str:
 def _load(sp: Path) -> dict:
     if not sp.exists():
         sys.exit(f"state.json not found at {sp} — run spike-checkpoint.py <id> --init first")
-    state = json.loads(sp.read_text())
+    state = json.loads(sp.read_text(encoding="utf-8"))
     if state.get("schema_version") != SCHEMA_VERSION:
         sys.exit(
             f"unsupported schema_version {state.get('schema_version')!r} in {sp} — "
@@ -166,7 +166,7 @@ def _load(sp: Path) -> dict:
 
 def _save_atomic(sp: Path, state: dict) -> None:
     tmp = sp.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(state, indent=2))
+    tmp.write_text(json.dumps(state, indent=2, encoding="utf-8"))
     os.replace(tmp, sp)
 
 
@@ -174,7 +174,7 @@ def _save_atomic(sp: Path, state: dict) -> None:
 def _locked(sp: Path):
     lock_path = sp.with_name(sp.name + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock_path, "w") as lf:
+    with open(lock_path, "w", encoding="utf-8") as lf:
         fcntl.flock(lf, fcntl.LOCK_EX)
         try:
             yield
@@ -261,10 +261,10 @@ def _gate_designed(sid: str, sdir: str, state: dict, problems: list[str]) -> dic
     if msg:
         problems.append(f"design.json invalid:\n    {msg.replace(chr(10), chr(10)+'    ')}")
         return {}
-    if not dm.is_file() or not dm.read_text().strip():
+    if not dm.is_file() or not dm.read_text(encoding="utf-8").strip():
         problems.append("design.md not written (or empty)")
         return {}
-    return {"design_hash": _sha256_file(dj), "brief_source": json.loads(dj.read_text()).get("brief_source")}
+    return {"design_hash": _sha256_file(dj), "brief_source": json.loads(dj.read_text(encoding="utf-8")).get("brief_source")}
 
 
 def _gate_executed(sid: str, sdir: str, state: dict, problems: list[str]) -> dict:
@@ -278,7 +278,7 @@ def _gate_executed(sid: str, sdir: str, state: dict, problems: list[str]) -> dic
     if msg:
         problems.append(f"measurements.json invalid:\n    {msg.replace(chr(10), chr(10)+'    ')}")
         return {}
-    meas = json.loads(mj.read_text())
+    meas = json.loads(mj.read_text(encoding="utf-8"))
     if meas.get("design_hash") != state.get("design_hash"):
         problems.append(
             "measurements.design_hash does not echo the checkpointed design_hash "
@@ -286,7 +286,7 @@ def _gate_executed(sid: str, sdir: str, state: dict, problems: list[str]) -> dic
             "design; re-dispatch it with the current design_hash"
         )
     # Coverage: every design criterion field must have a measured value.
-    design = json.loads((sd / "design.json").read_text())
+    design = json.loads((sd / "design.json").read_text(encoding="utf-8"))
     values = meas.get("values", {})
     missing = [c.get("field") for c in design.get("criteria", []) if c.get("field") not in values]
     if missing:
@@ -310,7 +310,7 @@ def _gate_decided(sid: str, sdir: str, state: dict, problems: list[str]) -> dict
     if msg:
         problems.append(f"decision.json invalid:\n    {msg.replace(chr(10), chr(10)+'    ')}")
         return {}
-    dec = json.loads(cj.read_text())
+    dec = json.loads(cj.read_text(encoding="utf-8"))
     if dec.get("design_hash") != state.get("design_hash"):
         problems.append("decision.design_hash does not echo the checkpointed design_hash")
     if dec.get("measurements_hash") != state.get("measurements_hash"):
@@ -324,7 +324,7 @@ def _gate_written(sid: str, sdir: str, state: dict, problems: list[str]) -> dict
     sd = Path(sdir)
     _verify_upstream(state, sd, "decision_hash", problems)
     nt = sd / "note.md"
-    if not nt.is_file() or not nt.read_text().strip():
+    if not nt.is_file() or not nt.read_text(encoding="utf-8").strip():
         problems.append("note.md not written (or empty)")
     if problems:
         return {}
@@ -342,7 +342,7 @@ def _gate_reviewed(sid: str, sdir: str, state: dict, problems: list[str]) -> dic
     if msg:
         problems.append(f"review.json invalid:\n    {msg.replace(chr(10), chr(10)+'    ')}")
         return {}
-    rev = json.loads(rj.read_text())
+    rev = json.loads(rj.read_text(encoding="utf-8"))
     if rev.get("decision_hash") != state.get("decision_hash"):
         problems.append(
             "review.decision_hash does not echo the checkpointed decision_hash — the "
@@ -643,15 +643,15 @@ def self_test() -> int:
                           {"confound": "c", "control": "z"}],
             "measurement_fields": ["p95_ms"],
             "poc_constraints": {"language": "python3-stdlib", "max_loc": 200, "dependencies": []},
-        }))
-        (sd / "design.md").write_text("# Design\nassumption etc.\n")
+        }, encoding="utf-8"))
+        (sd / "design.md").write_text("# Design\nassumption etc.\n", encoding="utf-8")
 
     def write_measurements(sd: Path, design_hash: str, val: float = 14.2) -> None:
         (sd / "measurements.json").write_text(json.dumps({
             "schema_version": 1, "spike_id": SID, "design_hash": design_hash,
             "executed_at": "2026-07-10T00:00:00Z", "poc_command": "python3 poc/b.py",
             "iterations": 1, "sample_count": 1000, "values": {"p95_ms": val},
-        }))
+        }, encoding="utf-8"))
 
     def write_decision(sd: Path, dh: str, mh: str, verdict: str, result: str) -> None:
         (sd / "decision.json").write_text(json.dumps({
@@ -659,7 +659,7 @@ def self_test() -> int:
             "verdict": verdict, "derived_at": "t",
             "per_criterion": [{"name": "p95", "field": "p95_ms", "operator": "<=",
                                "threshold": 20, "unit": "ms", "measured": 14.2, "result": result}],
-        }))
+        }, encoding="utf-8"))
 
     def write_review(sd: Path, dh: str, nh: str, verdict: str) -> None:
         (sd / "review.json").write_text(json.dumps({
@@ -668,7 +668,7 @@ def self_test() -> int:
             "axes": {"design_validity": "sound", "sample_size": "sound", "confound": "sound",
                      "methodology": "sound", "decision_validity": "sound", "implications": "sound"},
             "verdict": verdict, "reviewed_at": "t",
-        }))
+        }, encoding="utf-8"))
 
     print("self-test: spike-checkpoint.py")
     with tempfile.TemporaryDirectory() as td:
@@ -693,7 +693,7 @@ def self_test() -> int:
         # out-of-band edit to design.json is caught at the next advance
         dh = sha(sd / "design.json")
         write_measurements(sd, dh)
-        (sd / "design.json").write_text((sd / "design.json").read_text() + "\n")  # tamper
+        (sd / "design.json").write_text((sd / "design.json").read_text(encoding="utf-8") + "\n")  # tamper
         rc, out = run([SID, "executed"])
         expect("out-of-band design edit refuses executed", rc != 0 and "changed on disk" in out)
         write_valid_design(sd)  # restore -> deterministic identical bytes -> hash re-matches stored
@@ -716,7 +716,7 @@ def self_test() -> int:
         dch = sha(sd / "decision.json")
 
         # written
-        (sd / "note.md").write_text("# Note\nVerdict cited from decision.json\n")
+        (sd / "note.md").write_text("# Note\nVerdict cited from decision.json\n", encoding="utf-8")
         rc, out = run([SID, "written"])
         expect("written passes", rc == 0)
         nh = sha(sd / "note.md")
@@ -743,7 +743,7 @@ def self_test() -> int:
         write_valid_design(sd); run([SID, "designed"]); dh = sha(sd / "design.json")
         write_measurements(sd, dh); run([SID, "executed"]); mh = sha(sd / "measurements.json")
         write_decision(sd, dh, mh, "YES", "pass"); run([SID, "decided"]); dch = sha(sd / "decision.json")
-        (sd / "note.md").write_text("# Note v2\n"); run([SID, "written"]); nh = sha(sd / "note.md")
+        (sd / "note.md").write_text("# Note v2\n", encoding="utf-8"); run([SID, "written"]); nh = sha(sd / "note.md")
         write_review(sd, dch, nh, "ACCEPT"); run([SID, "reviewed"])
         rc, out = run([SID, "complete"])
         expect("complete passes on ACCEPT + canonical verdict", rc == 0, out.strip()[:160])
@@ -768,22 +768,22 @@ def self_test() -> int:
                               {"confound": "c", "control": "z"}],
                 "measurement_fields": ["p95_ms"],
                 "poc_constraints": {"language": "python3-stdlib", "max_loc": 200},
-            }))
-            (sd / "design.md").write_text("# d\n")
+            }, encoding="utf-8"))
+            (sd / "design.md").write_text("# d\n", encoding="utf-8")
 
         # rewrite fixtures for SID2
         orig_write_design = write_valid_design
         run([SID2, "--init"]); wd(sd2, SID2); run([SID2, "designed"]); dh2 = sha(sd2 / "design.json")
         (sd2 / "measurements.json").write_text(json.dumps({
             "schema_version": 1, "spike_id": SID2, "design_hash": dh2, "executed_at": "t",
-            "values": {"p95_ms": 14.0}}))
+            "values": {"p95_ms": 14.0}}, encoding="utf-8"))
         run([SID2, "executed"]); mh2 = sha(sd2 / "measurements.json")
         # hand-crafted decision with a tampered non-canonical verdict must fail validation at 'decided'
         (sd2 / "decision.json").write_text(json.dumps({
             "schema_version": 1, "spike_id": SID2, "design_hash": dh2, "measurements_hash": mh2,
             "verdict": "GO-ephemeral", "derived_at": "t",
             "per_criterion": [{"name": "p95", "field": "p95_ms", "operator": "<=", "threshold": 20,
-                               "unit": "ms", "measured": 14.0, "result": "pass"}]}))
+                               "unit": "ms", "measured": 14.0, "result": "pass"}]}, encoding="utf-8"))
         rc, out = run([SID2, "decided"])
         expect("decided refuses non-canonical decision verdict (GO-ephemeral)",
                rc != 0 and "invalid" in out)
@@ -795,13 +795,13 @@ def self_test() -> int:
         run([SID3, "--init"]); wd(sd3, SID3); run([SID3, "designed"]); dh3 = sha(sd3 / "design.json")
         (sd3 / "measurements.json").write_text(json.dumps({
             "schema_version": 1, "spike_id": SID3, "design_hash": dh3, "executed_at": "t",
-            "values": {"p95_ms": 14.0}}))
+            "values": {"p95_ms": 14.0}}, encoding="utf-8"))
         run([SID3, "executed"]); mh3 = sha(sd3 / "measurements.json")
         (sd3 / "decision.json").write_text(json.dumps({
             "schema_version": 1, "spike_id": SID3, "design_hash": dh3, "measurements_hash": mh3,
             "verdict": "YES", "derived_at": "t",
             "per_criterion": [{"name": "p95", "field": "p95_ms", "operator": "<=", "threshold": 20,
-                               "unit": "ms", "measured": 14.0, "result": "pass"}]}))
+                               "unit": "ms", "measured": 14.0, "result": "pass"}]}, encoding="utf-8"))
         run([SID3, "decided"])
         rc, o1 = run([SID3, "--reconsider"]); rc, o2 = run([SID3, "--reconsider"])
         rc, o3 = run([SID3, "--reconsider"])

@@ -623,7 +623,7 @@ def _fixture_repo(root: Path, kit_commit: str, milestone_id: str) -> tuple[Path,
         "schema_version": 2, "id": milestone_id, "phase": "critique-running",
         "agent_kit_commit": kit_commit,
         "implementation_base": base, "implementation_commits": [head],
-    }), encoding="utf-8")
+    }, encoding="utf-8"), encoding="utf-8")
     return repo, base, head
 
 
@@ -742,13 +742,13 @@ def self_test() -> int:
         # 5. Body snapshot comes from the kit COMMIT, not the working tree.
         (kit / "data" / "agents" / "milestone-adversary.md").write_text(
             "# TAMPERED\n", encoding="utf-8"
-        )
+        , encoding="utf-8")
         result2 = prepare_wave(
             milestone_id=mid, repo_root=repo, stage="assessment",
             roles_override=["milestone-adversary"], artifacts=artifacts,
             kit_root=kit, workspace_root=ws, now=now,
         )
-        snap = (state_dir / result2["reviewers"][0]["agent_body_snapshot_path"]).read_text()
+        snap = (state_dir / result2["reviewers"][0]["agent_body_snapshot_path"]).read_text(encoding="utf-8")
         expect("kit-commit: snapshot ignores a dirty working-tree body",
                snap == bodies["milestone-adversary"], repr(snap))
 
@@ -794,7 +794,7 @@ def self_test() -> int:
             ["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True
         ).stdout.strip()
         sp = repo / ".claude" / "notes" / "milestones" / mid / "state.json"
-        doc = json.loads(sp.read_text())
+        doc = json.loads(sp.read_text(encoding="utf-8"))
         doc["implementation_commits"] = [head2]
         sp.write_text(json.dumps(doc), encoding="utf-8")
         ws = root / "workspace"

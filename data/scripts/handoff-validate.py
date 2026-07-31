@@ -460,21 +460,21 @@ def self_test():
         os.makedirs(os.path.join(td, "scripts"))
         os.makedirs(os.path.join(td, "plans"))
         os.makedirs(os.path.join(td, ".obsidian"))
-        with open(os.path.join(td, "scripts", "project-map.json"), "w") as f:
+        with open(os.path.join(td, "scripts", "project-map.json"), "w", encoding="utf-8") as f:
             json.dump(FIXTURE_MAP, f)
         rp = os.path.join(td, "plans", "testproj-roadmap.md")
-        open(rp, "w").write(FIXTURE_ROADMAP)
+        open(rp, "w", encoding="utf-8").write(FIXTURE_ROADMAP)
 
         cont = os.path.join(td, "plans", "HANDOFF-2026-07-12-testproj-continuation.md")
-        open(cont, "w").write(FIXTURE_CONT)
+        open(cont, "w", encoding="utf-8").write(FIXTURE_CONT)
         rev = os.path.join(td, "plans", "HANDOFF-2026-07-12-testproj-session-review.md")
-        open(rev, "w").write(FIXTURE_REVIEW)
+        open(rev, "w", encoding="utf-8").write(FIXTURE_REVIEW)
 
         # checkpoint insertion (before validation so the review's roadmap warn clears)
         rc = insert_checkpoint(rp, "plans/HANDOFF-2026-07-12-testproj-session-review.md",
                                "testproj-m1,testproj-m2", "gpt-5.6-sol-ultra")
         check("insert-checkpoint returns 0", rc == 0)
-        txt = open(rp).read()
+        txt = open(rp, encoding="utf-8").read()
         check("checkpoint section created", CHECKPOINT_HEADING in txt)
         check("checkpoint line parser-safe prefix",
               "- [ ] (optional) session audit 2026-07-12" in txt)
@@ -483,22 +483,22 @@ def self_test():
         rc2 = insert_checkpoint(rp, "plans/HANDOFF-2026-07-12-testproj-session-review.md",
                                 "testproj-m1", "gpt-5.6-sol-ultra")
         check("insert is idempotent", rc2 == 0 and
-              open(rp).read().count("HANDOFF-2026-07-12-testproj-session-review.md") == 1)
+              open(rp, encoding="utf-8").read().count("HANDOFF-2026-07-12-testproj-session-review.md") == 1)
 
         check("valid continuation passes", validate_file(cont) is True)
         check("valid review passes", validate_file(rev) is True)
 
         # failure cases
         badtype = os.path.join(td, "plans", "HANDOFF-2026-07-12-testproj-x-continuation.md")
-        open(badtype, "w").write(FIXTURE_CONT.replace("type: handoff", "type: session-handoff"))
+        open(badtype, "w", encoding="utf-8").write(FIXTURE_CONT.replace("type: handoff", "type: session-handoff"))
         check("legacy type fails", validate_file(badtype) is False)
 
         mismatch = os.path.join(td, "plans", "HANDOFF-2026-07-12-testproj-y-session-review.md")
-        open(mismatch, "w").write(FIXTURE_CONT)  # continuation fm under review suffix
+        open(mismatch, "w", encoding="utf-8").write(FIXTURE_CONT)  # continuation fm under review suffix
         check("kind/suffix mismatch fails", validate_file(mismatch) is False)
 
         unclaimed = os.path.join(td, "plans", "HANDOFF-2026-07-12-zzunknown-continuation.md")
-        open(unclaimed, "w").write(FIXTURE_CONT.replace("project: testproj", "project: zzunknown"))
+        open(unclaimed, "w", encoding="utf-8").write(FIXTURE_CONT.replace("project: testproj", "project: zzunknown"))
         check("unclaimed filename fails", validate_file(unclaimed) is False)
 
         claims = claiming_projects("HANDOFF-2026-07-12-tp-sub-foo-continuation.md",

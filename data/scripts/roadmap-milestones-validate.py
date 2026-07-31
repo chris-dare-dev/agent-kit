@@ -474,7 +474,7 @@ def main(argv: list[str]) -> int:
                 allowed.update(argv[i + 1].split(","))
 
     try:
-        doc = json.loads(path.read_text())
+        doc = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         print(f"FAIL: {path}: not valid JSON: {exc}", file=sys.stderr)
         return 2

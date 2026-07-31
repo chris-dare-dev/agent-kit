@@ -114,7 +114,7 @@ class TestConsolidate(unittest.TestCase):
         (unified / "milestone-researcher" / "lessons.md").write_text(
             "# milestone-researcher lessons\nSHARED-LINE common to every copy\n"
             "unified-seed lesson A\n"
-        )
+        , encoding="utf-8")
 
         # Several legacy roots at nested paths, mimicking charts/velero, source/foo, plans, poc.
         legacy_specs = {
@@ -138,7 +138,7 @@ class TestConsolidate(unittest.TestCase):
             for agent, lessons in agents.items():
                 d = root / agent
                 d.mkdir(parents=True)
-                (d / "lessons.md").write_text(lessons)
+                (d / "lessons.md").write_text(lessons, encoding="utf-8")
             legacy_roots.append(root)
         return unified, legacy_roots, legacy_specs
 
@@ -154,14 +154,14 @@ class TestConsolidate(unittest.TestCase):
                 f = adir / "lessons.md"
                 if f.is_file():
                     pre_lines.setdefault(adir.name, set()).update(
-                        _distinct_nonblank_lines(f.read_text())
+                        _distinct_nonblank_lines(f.read_text(encoding="utf-8"))
                     )
             for root in legacy_roots:
                 for adir in root.iterdir():
                     f = adir / "lessons.md"
                     if f.is_file():
                         pre_lines.setdefault(adir.name, set()).update(
-                            _distinct_nonblank_lines(f.read_text())
+                            _distinct_nonblank_lines(f.read_text(encoding="utf-8"))
                         )
 
             # Dry-run first: must touch nothing.
@@ -194,7 +194,7 @@ class TestConsolidate(unittest.TestCase):
             for agent, lines in pre_lines.items():
                 merged = unified / agent / "lessons.md"
                 self.assertTrue(merged.is_file(), f"missing merged corpus for {agent}")
-                post = _distinct_nonblank_lines(merged.read_text())
+                post = _distinct_nonblank_lines(merged.read_text(encoding="utf-8"))
                 missing = lines - post
                 self.assertEqual(
                     missing, set(), f"{agent}: lessons LOST in merge: {missing}"
@@ -203,7 +203,7 @@ class TestConsolidate(unittest.TestCase):
             # (c) DEDUP: the shared line appears exactly once in milestone-researcher's corpus.
             mr = (
                 (unified / "milestone-researcher" / "lessons.md")
-                .read_text()
+                .read_text(encoding="utf-8")
                 .splitlines()
             )
             shared = [
@@ -218,7 +218,7 @@ class TestConsolidate(unittest.TestCase):
             self.assertEqual(
                 len(tarballs), len(legacy_roots), "one backup tarball per migrated root"
             )
-            with tarfile.open(tarballs[0]) as tf:
+            with tarfile.open(tarballs[0], encoding="utf-8") as tf:
                 names = tf.getnames()
                 self.assertTrue(
                     any(n.endswith("lessons.md") for n in names),
@@ -230,7 +230,7 @@ class TestConsolidate(unittest.TestCase):
             #     the 2nd --apply must report every migrated root as `already-symlinked` (NOT
             #     silently skipped as "is unified root", which the pre-M1 skip-ordering bug did).
             counts_before = {
-                a: (unified / a / "lessons.md").read_text()
+                a: (unified / a / "lessons.md").read_text(encoding="utf-8")
                 for a in [
                     d.name
                     for d in unified.iterdir()
@@ -245,7 +245,7 @@ class TestConsolidate(unittest.TestCase):
                 self.assertTrue(root.is_symlink(), "still a symlink after 2nd apply")
             for a, txt in counts_before.items():
                 self.assertEqual(
-                    (unified / a / "lessons.md").read_text(),
+                    (unified / a / "lessons.md").read_text(encoding="utf-8"),
                     txt,
                     f"{a}: corpus changed on idempotent re-run",
                 )
@@ -276,7 +276,7 @@ class TestConsolidate(unittest.TestCase):
             (missed / "milestone-researcher").mkdir(parents=True)
             (missed / "milestone-researcher" / "lessons.md").write_text(
                 "escaped lesson\n"
-            )
+            , encoding="utf-8")
 
             # FALLBACK branch: AGENT_MEMORY_ROOT unset AND WORKSPACE_ROOT points at a dir
             # with NO new root present -> resolver must return the LEGACY path, never empty,
@@ -320,7 +320,7 @@ class TestConsolidate(unittest.TestCase):
             unified.mkdir(parents=True)
             stub = ws / "stub-repo" / ".claude" / "agent-memory"
             (stub / "spike-designer").mkdir(parents=True)
-            (stub / "spike-designer" / "lessons.md").write_text("")  # 0 lines
+            (stub / "spike-designer" / "lessons.md").write_text("", encoding="utf-8")  # 0 lines
 
             res = _run_consolidate(ws, unified, ws / "_b", apply=True)
             self.assertEqual(res.returncode, 0, res.stderr)

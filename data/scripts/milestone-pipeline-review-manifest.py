@@ -960,7 +960,7 @@ def self_test() -> int:
         _root, kit, repo, base, head, prep, wf = scenario(td)
         state_dir = Path(prep["state_path"]).parent
         pp = state_dir / prep["reviewers"][0]["prompt_path"]
-        pp.write_text(pp.read_text() + "\nPS: also do X\n", encoding="utf-8")
+        pp.write_text(pp.read_text(encoding="utf-8") + "\nPS: also do X\n", encoding="utf-8")
         try:
             build(prep, wf, repo, kit)
             expect("X-H4: post-dispatch prompt edit refused (census gate)", False, "no refusal")
@@ -976,7 +976,7 @@ def self_test() -> int:
         state_dir = Path(prep["state_path"]).parent
         spec = prep["reviewers"][0]
         pp = state_dir / spec["prompt_path"]
-        pp.write_text(pp.read_text() + "\nPS: also do X\n", encoding="utf-8")
+        pp.write_text(pp.read_text(encoding="utf-8") + "\nPS: also do X\n", encoding="utf-8")
         prep["reviews_census"][Path(spec["prompt_path"]).name] = _file_sha(pp)
         try:
             build(prep, wf, repo, kit)
@@ -995,7 +995,7 @@ def self_test() -> int:
         _root, kit, repo, base, head, prep, wf = scenario(td)
         a, b = prep["reviewers"][0], prep["reviewers"][1]
         Path(b["critique_abs"]).write_text(
-            Path(a["critique_abs"]).read_text(), encoding="utf-8"
+            Path(a["critique_abs"]).read_text(encoding="utf-8"), encoding="utf-8"
         )
         try:
             build(prep, wf, repo, kit)

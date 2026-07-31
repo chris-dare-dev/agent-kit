@@ -74,7 +74,7 @@ def load_log(path: Path) -> list[dict]:
     if not path.exists():
         return []
     entries = []
-    with path.open() as fh:
+    with path.open(encoding="utf-8") as fh:
         for lineno, raw in enumerate(fh, 1):
             raw = raw.strip()
             if not raw:

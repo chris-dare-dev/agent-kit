@@ -208,7 +208,7 @@ def main(argv: list[str]) -> int:
             elif argv.index(arg) + 1 < len(argv):
                 allowed.update(argv[argv.index(arg) + 1].split(","))
 
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
 
     all_failures: list[tuple[str, str]] = []
     for name, fn in CHECKS.items():

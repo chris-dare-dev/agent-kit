@@ -122,7 +122,7 @@ def main(argv: list[str]) -> int:
         if not path.exists():
             print(f"file not found: {path}", file=sys.stderr)
             return 1
-        raw = path.read_text()
+        raw = path.read_text(encoding="utf-8")
 
     try:
         items = json.loads(raw)

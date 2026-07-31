@@ -98,7 +98,7 @@ def reconcile_file(mfile: Path, repo_root: Path) -> list[str]:
     rel = mfile.relative_to(repo_root)
 
     try:
-        doc = json.loads(mfile.read_text())
+        doc = json.loads(mfile.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         return [f"{rel}: unreadable milestones file: {exc}"]
     milestones = [m for m in doc.get("milestones", []) if isinstance(m, dict)]
@@ -110,7 +110,7 @@ def reconcile_file(mfile: Path, repo_root: Path) -> list[str]:
         findings.append(f"{rel}: [doc-exists] roadmap_doc '{roadmap_rel}' not found")
         roadmap_text = None
     else:
-        roadmap_text = roadmap_path.read_text()
+        roadmap_text = roadmap_path.read_text(encoding="utf-8")
 
     # id-sync + checkbox-sync
     if roadmap_text is not None:
@@ -147,7 +147,7 @@ def reconcile_file(mfile: Path, repo_root: Path) -> list[str]:
             findings.append(f"{rel}: [state-sync] {mid}: state_path '{state_rel}' not found")
             continue
         try:
-            state = json.loads(state_path.read_text())
+            state = json.loads(state_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
             findings.append(f"{rel}: [state-sync] {mid}: unreadable state.json: {exc}")
             continue
@@ -192,7 +192,7 @@ def check_critique(state: dict, mid: str, repo_root: Path) -> list[str]:
             f"[critique-sync] {mid}: critique_finding_counts never recorded (null)"
         )
         return findings
-    sev = SEVERITY_RE.search(critique_path.read_text())
+    sev = SEVERITY_RE.search(critique_path.read_text(encoding="utf-8"))
     if not sev:
         findings.append(
             f"[critique-sync] {mid}: no 'Severity counts: C_ H_ M_ L_' line in {critique_rel}"
@@ -212,7 +212,7 @@ def check_findings(state_dir: Path, repo_root: Path) -> list[str]:
     reg_path = state_dir / "findings.json"
     mid = state_dir.name
     try:
-        reg = json.loads(reg_path.read_text())
+        reg = json.loads(reg_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         return [f"[findings-sync] {mid}: unreadable findings.json: {exc}"]
     if reg.get("schema_version") != 1 or not isinstance(reg.get("findings"), list):
@@ -243,7 +243,7 @@ def check_findings(state_dir: Path, repo_root: Path) -> list[str]:
                 f"[findings-sync] {mid}: critique_files entry '{rel}' not found"
             )
             continue
-        sev = SEVERITY_RE.search(cpath.read_text())
+        sev = SEVERITY_RE.search(cpath.read_text(encoding="utf-8"))
         if not sev:
             findings_out.append(
                 f"[findings-sync] {mid}: no 'Severity counts:' line in {rel}"
@@ -269,7 +269,7 @@ def check_findings(state_dir: Path, repo_root: Path) -> list[str]:
         )
         return findings_out
     try:
-        state = json.loads(state_path.read_text())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         findings_out.append(f"[findings-sync] {mid}: unreadable state.json: {exc}")
         return findings_out
