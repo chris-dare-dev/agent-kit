@@ -29,7 +29,7 @@ const SOCKET_ERROR_FRAGMENT = "socket is not configured securely";
  */
 const REQUIRES_AF_UNIX =
   process.platform === "win32"
-    ? "requires AF_UNIX; Windows cannot bind a Unix domain socket"
+    ? "PLATFORM:win32 — requires AF_UNIX; Windows cannot bind a Unix domain socket"
     : false;
 
 const posixTest: typeof test = ((name: string, fn: never) =>

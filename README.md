@@ -142,12 +142,17 @@ stderr exactly which group is unavailable and why.
 ## Testing
 
 ```bash
-npm test                                   # MCP contract + config + transport lock
-npm run verify:quickstart                  # executes the Quick start block above
+npm run test:all        # everything below that runs without a provisioned substrate
+
+npm run test:unit       # all 10 TypeScript suites (globbed) + init + uninstall
+npm run test:gates      # every generator gate, consistency check and shell harness
+npm run verify:quickstart
 
 # substrate suite (593 tests) — POSIX only; declines with a banner on Windows.
-# Needs the provisioned venv: ~30 cases import qdrant_client at call time.
-python3 workspace-tooling/run-substrate-tests.py
+npm run test:substrate
+
+# The substrate suite needs the provisioned venv: ~30 cases import qdrant_client
+# at call time. It is NOT part of test:all for that reason.
 
 # the generator gates — all must be clean before committing data/ changes.
 # No PYTHONUTF8 needed: every text I/O in data/scripts names its encoding, and

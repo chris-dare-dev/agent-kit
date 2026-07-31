@@ -1,6 +1,6 @@
 /**
  * Tests for the AIDefence scanner (ruflo-security-salvage-m1, S1.3 threshold-lock).
- * Run via `npm test` (tsx loader — not type-checked by tsc; excluded from build).
+ * Run by `npm test`, which globs every test file under src/.
  *
  * This is the committed REGRESSION GATE. The spike's real 984-entry tool-call
  * corpus is personal/gitignored, so this test uses curated in-file FIXTURES that

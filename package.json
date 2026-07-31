@@ -22,13 +22,17 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "build": "tsc",
-    "test": "node --import tsx --test src/mcp-contract.test.ts src/server-profile.test.ts src/transport-lock.test.ts src/config.test.ts src/tools/artifact-memory.test.ts",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "test:update-golden": "node scripts/update-golden.mjs",
     "verify:quickstart": "node scripts/verify-quickstart.mjs",
     "init": "node scripts/init.mjs",
     "doctor": "node scripts/doctor.mjs",
     "test:init": "node --test tests/init.test.mjs",
-    "test:uninstall": "node --test tests/uninstall.test.mjs"
+    "test:uninstall": "node --test tests/uninstall.test.mjs",
+    "test:unit": "npm test && npm run test:init && npm run test:uninstall",
+    "test:gates": "node scripts/run-gates.mjs",
+    "test:substrate": "python3 workspace-tooling/run-substrate-tests.py",
+    "test:all": "npm run test:unit && npm run test:gates && npm run verify:quickstart"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.750.0",

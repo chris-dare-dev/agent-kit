@@ -1,6 +1,6 @@
 /**
  * Tests for the tool-input guard (ruflo-security-salvage-m2, E2 wiring).
- * Run via `npm test` (tsx loader — not type-checked by tsc; covered by the
+ * Run by `npm test`, which globs every test file under src/.
  * `src/**` test glob).
  *
  * Guards the load-bearing properties of the pure `guardToolInput(serializedArgs,
