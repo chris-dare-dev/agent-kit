@@ -39,6 +39,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -62,6 +63,54 @@ CANONICAL_COMPOSE = Path(__file__).parent / "services" / "qdrant" / "compose.yam
 # asserts the adapter still contains every segment below.
 SOCKET_RELATIVE_PARTS = ("services", "qdrant", "artifact-memory.sock")
 GENERATION = "p20260721v1"
+
+
+
+COMPOSE_PROJECT = "personal-artifact-memory"
+#: The restore stack sits two ports above the main one (6343 main / 6345 restore).
+RESTORE_PORT_OFFSET = 2
+
+
+def render_compose(text: str, profile: str | None = None) -> str:
+    """Rewrite the canonical compose for one profile.
+
+    Docker refuses to start two containers with the same container_name, and the
+    second `docker compose up` would fail on an already-published port. Both are
+    therefore derived from the profile rather than hardcoded, so `up` for two
+    profiles simply works instead of colliding.
+
+    Substitution is textual and exact: the canonical file is the single source
+    of image digests and volume layout, and this must not become a second copy
+    of it that can drift.
+    """
+    name = _active(profile)
+    if not name:
+        return text
+
+    artifact_runtime.validate_profile(name)
+    main_port = artifact_runtime.qdrant_port(name)
+    restore_port = artifact_runtime.qdrant_port(name, offset=RESTORE_PORT_OFFSET)
+    base = artifact_runtime.QDRANT_BASE_PORT
+
+    # Anchored to END OF LINE, and applied with re.sub rather than str.replace.
+    # Plain sequential replaces double-suffix: once the restore rule produces
+    # "...-qdrant-restore-work", the shorter "...-qdrant" rule matches that same
+    # line's prefix and yields "...-qdrant-work-restore-work". Anchoring makes
+    # each rule match exactly one whole name.
+    # The project name is anchored with MULTILINE ^ so it also matches line 1,
+    # where there is no preceding newline to key on.
+    substitutions = (
+        (rf"^(\s*container_name: {re.escape(COMPOSE_PROJECT)}-qdrant-restore)$",
+         rf"\1-{name}"),
+        (rf"^(\s*container_name: {re.escape(COMPOSE_PROJECT)}-qdrant)$",
+         rf"\1-{name}"),
+        (rf"^name: {re.escape(COMPOSE_PROJECT)}$", f"name: {COMPOSE_PROJECT}-{name}"),
+        (rf'"127\.0\.0\.1:{base + RESTORE_PORT_OFFSET}:', f'"127.0.0.1:{restore_port}:'),
+        (rf'"127\.0\.0\.1:{base}:', f'"127.0.0.1:{main_port}:'),
+    )
+    for pattern, replacement in substitutions:
+        text = re.sub(pattern, replacement, text, flags=re.MULTILINE)
+    return text
 
 
 def _active(profile: str | None) -> str | None:
@@ -390,7 +439,9 @@ def provision(
         str(path): _directory_state(path)
         for path in (root, storage, restore_storage, snapshots, model_cache)
     }
-    compose_bytes = CANONICAL_COMPOSE.read_bytes()
+    compose_bytes = render_compose(
+        CANONICAL_COMPOSE.read_text(encoding="utf-8")
+    ).encode("utf-8")
     secret_paths = {
         name: root / filename for name, filename in SECRET_FILES.items()
     }

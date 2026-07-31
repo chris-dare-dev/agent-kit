@@ -73,3 +73,53 @@ class ProfileIsolationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ComposeRenderTests(unittest.TestCase):
+    """`docker compose up` for two profiles must not collide."""
+
+    def setUp(self) -> None:
+        self.text = provision.CANONICAL_COMPOSE.read_text(encoding="utf-8")
+
+    def _names(self, out: str) -> list[str]:
+        return [l.split(": ", 1)[1].strip() for l in out.splitlines() if "container_name" in l]
+
+    def _ports(self, out: str) -> list[str]:
+        return [l.strip().strip('- "') for l in out.splitlines() if "127.0.0.1:6" in l]
+
+    def test_unprofiled_render_is_byte_identical(self) -> None:
+        """No profile must mean no rewrite at all."""
+        self.assertEqual(provision.render_compose(self.text, None), self.text)
+
+    def test_each_profile_gets_distinct_names_and_ports(self) -> None:
+        work = provision.render_compose(self.text, "work")
+        personal = provision.render_compose(self.text, "personal")
+        self.assertEqual(len(set(self._names(work)) & set(self._names(personal))), 0)
+        self.assertEqual(len(set(self._ports(work)) & set(self._ports(personal))), 0)
+        for out, name in ((work, "work"), (personal, "personal")):
+            for container in self._names(out):
+                self.assertTrue(container.endswith(name), container)
+
+    def test_the_restore_container_is_not_double_suffixed(self) -> None:
+        """Sequential str.replace produced '-qdrant-work-restore-work'.
+
+        The shorter '<project>-qdrant' rule matched the prefix of the line the
+        restore rule had already rewritten. The substitutions are anchored to
+        end-of-line so each matches exactly one whole name.
+        """
+        names = self._names(provision.render_compose(self.text, "work"))
+        self.assertIn("personal-artifact-memory-qdrant-work", names)
+        self.assertIn("personal-artifact-memory-qdrant-restore-work", names)
+        for container in names:
+            self.assertEqual(container.count("work"), 1, f"double-suffixed: {container}")
+
+    def test_the_compose_project_name_is_suffixed(self) -> None:
+        """It sits on line 1, so a rule keyed on a preceding newline misses it."""
+        out = provision.render_compose(self.text, "work")
+        project = next(l for l in out.splitlines() if l.startswith("name:"))
+        self.assertEqual(project, "name: personal-artifact-memory-work")
+
+    def test_restore_port_keeps_its_offset_from_the_main_port(self) -> None:
+        main = artifact_runtime.qdrant_port("work")
+        restore = artifact_runtime.qdrant_port("work", offset=provision.RESTORE_PORT_OFFSET)
+        self.assertEqual(restore - main, provision.RESTORE_PORT_OFFSET)
