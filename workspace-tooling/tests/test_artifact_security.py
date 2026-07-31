@@ -5,6 +5,8 @@ import stat
 import sys
 import tempfile
 import unittest
+
+import platform_compat
 from pathlib import Path
 from unittest import mock
 
@@ -68,7 +70,7 @@ class ArtifactSecurityTests(unittest.TestCase):
                 real.st_ino,
                 real.st_dev,
                 real.st_nlink,
-                os.geteuid() + 1,
+                platform_compat.current_uid() + 1,
                 real.st_gid,
                 real.st_size,
                 real.st_atime,

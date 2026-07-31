@@ -19,6 +19,8 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
+import platform_compat
+
 
 PRIVATE_DIR_MODE = 0o700
 PRIVATE_FILE_MODE = 0o600
@@ -41,10 +43,35 @@ def _mode(info: os.stat_result) -> int:
     return stat.S_IMODE(info.st_mode)
 
 
+def _owner_and_mode_ok(info: os.stat_result, path: Path) -> bool:
+    """Whether `info` shows an owner-private regular file.
+
+    Both halves are POSIX-only facts: `st_uid` is 0 for every file on Windows,
+    and the mode bits do not reflect the ACL that actually governs access. So
+    on Windows this reports the degradation once and returns True — the caller
+    keeps its other checks (regular file, digest, size) and this one is
+    explicitly not enforced rather than silently satisfied.
+    """
+    if not platform_compat.supports_posix_privacy():
+        platform_compat.owner_check_degraded(
+            "artifact_security._owner_and_mode_ok", str(path)
+        )
+        return True
+    return info.st_uid == platform_compat.current_uid() and _mode(info) == PRIVATE_FILE_MODE
+
+
 def _owned(info: os.stat_result, path: Path) -> None:
-    if info.st_uid != os.geteuid():
+    if not platform_compat.supports_posix_privacy():
+        # st_uid is hardcoded to 0 for every file on Windows, so comparing it
+        # would either pass everything (if we compared 0 to 0) or fail
+        # everything. Neither is an ownership check. The degradation is
+        # recorded and warned once rather than silently treated as a pass;
+        # a real ACL-backed check is F003, a later milestone.
+        platform_compat.owner_check_degraded("artifact_security._owned", str(path))
+        return
+    if info.st_uid != platform_compat.current_uid():
         raise PrivateStateError(
-            f"derived state is not owned by uid {os.geteuid()}: {path}"
+            f"derived state is not owned by uid {platform_compat.current_uid()}: {path}"
         )
 
 
@@ -70,7 +97,12 @@ def _reject_user_owned_symlink_ancestors(path: Path) -> None:
             raise PrivateStateError(
                 f"derived-state path contains a user-controlled symlink: {current}"
             )
-        if info.st_uid != os.geteuid():
+        if not platform_compat.supports_posix_privacy():
+            platform_compat.owner_check_degraded(
+                "artifact_security._walk_owned_ancestors", str(current)
+            )
+            return
+        if info.st_uid != platform_compat.current_uid():
             return
         parent = current.parent
         if parent == current:
@@ -152,11 +184,7 @@ def private_tree_manifest(path: Path) -> tuple[str, list[dict[str, Any]]]:
         size = 0
         with os.fdopen(descriptor, "rb") as handle:
             before = os.fstat(handle.fileno())
-            if (
-                not stat.S_ISREG(before.st_mode)
-                or before.st_uid != os.geteuid()
-                or _mode(before) != PRIVATE_FILE_MODE
-            ):
+            if not stat.S_ISREG(before.st_mode) or not _owner_and_mode_ok(before, candidate):
                 raise PrivateStateError(
                     f"private manifest entry changed before read: {candidate}"
                 )
@@ -359,9 +387,14 @@ def sweep_private_tree(
             )
             return
         counts[counter] += 1
-        if info.st_uid != os.geteuid():
+        if not platform_compat.supports_posix_privacy():
+            platform_compat.owner_check_degraded("artifact_security._sweep", str(path))
+        elif info.st_uid != platform_compat.current_uid():
             violations.append(
-                _sweep_finding(path, root, kind, mode, f"not owned by uid {os.geteuid()}")
+                _sweep_finding(
+                    path, root, kind, mode,
+                    f"not owned by uid {platform_compat.current_uid()}",
+                )
             )
             return
         if mode & 0o077:

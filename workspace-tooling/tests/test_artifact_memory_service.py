@@ -14,6 +14,8 @@ import sys
 import tempfile
 import threading
 import unittest
+
+import platform_compat
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -1921,7 +1923,8 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
             information = self.socket_path.lstat()
             self.assertTrue(stat.S_ISSOCK(information.st_mode))
             self.assertEqual(stat.S_IMODE(information.st_mode), 0o600)
-            self.assertEqual(information.st_uid, os.geteuid())
+            if platform_compat.supports_posix_privacy():
+                self.assertEqual(information.st_uid, platform_compat.current_uid())
         finally:
             server.server_close()
             server.server_close()
@@ -2026,7 +2029,8 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
             information = lock_path.lstat()
             self.assertTrue(stat.S_ISREG(information.st_mode))
             self.assertEqual(stat.S_IMODE(information.st_mode), 0o600)
-            self.assertEqual(information.st_uid, os.geteuid())
+            if platform_compat.supports_posix_privacy():
+                self.assertEqual(information.st_uid, platform_compat.current_uid())
         finally:
             first.server_close()
 

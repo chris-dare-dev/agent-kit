@@ -31,6 +31,7 @@ import artifact_runtime
 import artifact_security as security
 import artifact_skill_capture as capture
 import artifact_watermark as watermark
+import platform_compat
 
 
 SCHEMA_VERSION = 2
@@ -935,7 +936,7 @@ class ConsumerState:
                   dead_letter_id, action, detail, actor_uid, created_at
                 ) VALUES (?, 'observed', ?, ?, ?)
                 """,
-                (dead_id, problem.code, os.geteuid(), now),
+                (dead_id, problem.code, platform_compat.current_uid(), now),
             )
         return dead_id
 
@@ -965,7 +966,7 @@ class ConsumerState:
                       dead_letter_id, action, detail, actor_uid, created_at
                     ) VALUES (?, 'resolved', 'receipt validates', ?, ?)
                     """,
-                    (dead_id, os.geteuid(), now),
+                    (dead_id, platform_compat.current_uid(), now),
                 )
 
     def update_health_alerts(self, issue_codes: Sequence[str]) -> tuple[str, bool]:
@@ -1045,7 +1046,7 @@ class ConsumerState:
                   dead_letter_id, action, detail, actor_uid, created_at
                 ) VALUES (?, ?, ?, ?, ?)
                 """,
-                (dead_letter_id, action, detail[:1000], os.geteuid(), now),
+                (dead_letter_id, action, detail[:1000], platform_compat.current_uid(), now),
             )
 
     def record_publication_failure(
@@ -2475,7 +2476,7 @@ def quarantine_ack(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
         "name": name,
         "fingerprint": fingerprint,
         "acknowledged_at": _now(),
-        "actor_uid": os.geteuid(),
+        "actor_uid": platform_compat.current_uid(),
         "reason": args.reason,
         "review_by": review_by,
     }

@@ -22,6 +22,7 @@ from typing import Any, Callable, Iterable, Sequence
 
 import artifact_ingestion as ingestion
 import artifact_security as security
+import platform_compat
 
 
 SCHEMA_VERSION = 1
@@ -230,8 +231,7 @@ class LexicalIndex:
         self._identity = self._file_identity(opened)
         if (
             not stat.S_ISREG(opened.st_mode)
-            or opened.st_uid != os.geteuid()
-            or stat.S_IMODE(opened.st_mode) != security.PRIVATE_FILE_MODE
+            or not security._owner_and_mode_ok(opened, self.path)
             or self._identity != self._file_identity(named)
         ):
             os.close(self._descriptor)

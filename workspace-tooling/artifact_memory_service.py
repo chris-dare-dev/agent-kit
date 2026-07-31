@@ -1648,11 +1648,8 @@ class ArtifactUnixHTTPServer(socketserver.ThreadingMixIn, _UnixStreamServerBase)
             ) from exc
         try:
             information = os.fstat(descriptor)
-            if (
-                not stat.S_ISREG(information.st_mode)
-                or information.st_uid != os.geteuid()
-                or stat.S_IMODE(information.st_mode)
-                != security.PRIVATE_FILE_MODE
+            if not stat.S_ISREG(information.st_mode) or not security._owner_and_mode_ok(
+                information, self._socket_lifecycle_lock_file
             ):
                 raise ServiceError("refusing unsafe service socket lifecycle lock")
             try:
@@ -1739,10 +1736,19 @@ class ArtifactUnixHTTPServer(socketserver.ThreadingMixIn, _UnixStreamServerBase)
             ).lstat()
         except artifact_runtime.RuntimeConfigError:
             return
+        # Unlinking someone else's socket is the risk this guards; where
+        # st_uid cannot answer that, the socket identity match is what remains.
+        if not platform_compat.supports_posix_privacy():
+            platform_compat.owner_check_degraded(
+                "artifact_memory_service._unlink_stale_socket", str(self.socket_path)
+            )
+            owner_ok = True
+        else:
+            owner_ok = current.st_uid == platform_compat.current_uid()
         if (
             stat.S_ISSOCK(current.st_mode)
             and _socket_identity(current) == expected
-            and current.st_uid == os.geteuid()
+            and owner_ok
         ):
             self.socket_path.unlink()
             try:

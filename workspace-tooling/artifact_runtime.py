@@ -20,6 +20,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import artifact_security as security
+import platform_compat
 
 
 SCHEMA_VERSION = 2
@@ -257,9 +258,13 @@ def require_private_socket(path: Path, label: str = "service socket") -> Path:
         raise RuntimeConfigError(f"{label} is missing: {path}") from exc
     if stat.S_ISLNK(information.st_mode) or not stat.S_ISSOCK(information.st_mode):
         raise RuntimeConfigError(f"{label} must be a real Unix-domain socket: {path}")
-    if information.st_uid != os.geteuid():
+    if not platform_compat.supports_posix_privacy():
+        platform_compat.owner_check_degraded(
+            "artifact_runtime._private_socket", f"{label}: {path}"
+        )
+    elif information.st_uid != platform_compat.current_uid():
         raise RuntimeConfigError(
-            f"{label} is not owned by uid {os.geteuid()}: {path}"
+            f"{label} is not owned by uid {platform_compat.current_uid()}: {path}"
         )
     mode = stat.S_IMODE(information.st_mode)
     if mode != PRIVATE_SOCKET_MODE:

@@ -62,6 +62,9 @@ __all__ = [
     "LockTimeout",
     "current_uid",
     "current_user_identity",
+    "degraded_owner_checks",
+    "owner_check_degraded",
+    "reset_degraded_owner_checks",
     "create_directory_link",
     "exclusive_file_lock",
     "fsync_directory",
@@ -149,6 +152,46 @@ def current_user_identity() -> str:
         return pwd.getpwuid(os.geteuid()).pw_name
     except (ImportError, KeyError):
         return f"uid:{os.geteuid()}"
+
+
+#: Ownership checks that could not be enforced on this host, keyed by check
+#: name. Read by tests (and by anything that wants to report posture) so a
+#: degradation is an ASSERTABLE fact, not a log line nobody greps for.
+_degraded_owner_checks: dict[str, str] = {}
+
+
+def owner_check_degraded(check: str, detail: str = "") -> None:
+    """Record that an ownership check cannot be enforced on this platform.
+
+    Called from the `else` branch of `supports_posix_privacy()`. Emits ONE
+    structured warning per check name — the checks run in hot loops, and a
+    warning per file would be noise nobody reads, which is the same outcome as
+    silence.
+
+    The rule these sites follow: on a platform where `st_uid` carries no
+    identity, an ownership check must not silently PASS. It either applies a
+    platform-appropriate check or comes through here, where the degradation is
+    named, counted and testable.
+    """
+    if check in _degraded_owner_checks:
+        return
+    _degraded_owner_checks[check] = detail
+    sys.stderr.write(
+        f"[platform_compat] DEGRADED ownership check {check!r} on {sys.platform}: "
+        f"st_uid carries no identity here, so owner verification is not enforced"
+        + (f" ({detail})" if detail else "")
+        + "\n"
+    )
+
+
+def degraded_owner_checks() -> dict[str, str]:
+    """The ownership checks degraded so far in this process."""
+    return dict(_degraded_owner_checks)
+
+
+def reset_degraded_owner_checks() -> None:
+    """Clear the record (tests only)."""
+    _degraded_owner_checks.clear()
 
 
 # ---------------------------------------------------------------------------

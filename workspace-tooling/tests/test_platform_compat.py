@@ -201,6 +201,55 @@ class TestLocking(unittest.TestCase):
         )
 
 
+class TestOwnershipDegradation(unittest.TestCase):
+    """A degraded ownership check must be an assertable fact, not a silent pass.
+
+    gates-green-t-geteuid: where `st_uid` carries no identity, the checks in
+    artifact_security / artifact_runtime / artifact_memory_service must record
+    that they could not enforce, so posture is inspectable rather than assumed.
+    """
+
+    def setUp(self):
+        self._saved = platform_compat.degraded_owner_checks()
+        platform_compat.reset_degraded_owner_checks()
+
+    def tearDown(self):
+        platform_compat.reset_degraded_owner_checks()
+        for check, detail in self._saved.items():
+            platform_compat.owner_check_degraded(check, detail)
+
+    def test_degradation_is_recorded_and_retrievable(self):
+        platform_compat.owner_check_degraded("some.check", "/some/path")
+        self.assertIn("some.check", platform_compat.degraded_owner_checks())
+        self.assertEqual(
+            platform_compat.degraded_owner_checks()["some.check"], "/some/path"
+        )
+
+    def test_degradation_warns_once_per_check(self):
+        """These checks run in hot loops; a warning per file is the same as
+        silence, so the record is keyed by check name."""
+        platform_compat.owner_check_degraded("hot.loop", "first")
+        platform_compat.owner_check_degraded("hot.loop", "second")
+        self.assertEqual(len(platform_compat.degraded_owner_checks()), 1)
+        self.assertEqual(platform_compat.degraded_owner_checks()["hot.loop"], "first")
+
+    def test_real_ownership_check_degrades_only_where_it_must(self):
+        """On POSIX nothing degrades — the check really runs. On Windows the
+        security module records exactly why it could not."""
+        import artifact_security
+
+        with tempfile.TemporaryDirectory() as tmp:
+            probe = Path(tmp) / "probe"
+            probe.write_text("x", encoding="utf-8")
+            artifact_security._owner_and_mode_ok(probe.stat(), probe)
+
+        degraded = platform_compat.degraded_owner_checks()
+        if sys.platform == "win32":
+            self.assertIn("artifact_security._owner_and_mode_ok", degraded)
+        else:
+            self.assertEqual(degraded, {})
+
+
 class TestNoDirectPlatformImports(unittest.TestCase):
     """The shim is only worth having if it is the single definition."""
 
