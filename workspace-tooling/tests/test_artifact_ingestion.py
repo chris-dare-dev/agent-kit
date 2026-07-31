@@ -517,5 +517,73 @@ class ArtifactIngestionTests(unittest.TestCase):
             )
 
 
+class EmbeddingModelResolutionTests(unittest.TestCase):
+    """Querying with the wrong embedding model must fail, not return nonsense.
+
+    `artifact_memory.search_artifacts` used to read
+    `runtime.retrieval.embedding_model` with `ingestion.DEFAULT_EMBEDDING_MODEL`
+    as a fallback. `retrieval` is schema-optional for legacy-vector-v1, so that
+    fallback fired routinely — and ingestion permits any model, so a collection
+    built with a different one was then queried with the default. That is not a
+    degraded search: it is nearest-neighbour lookup in an unrelated vector
+    space, returned with full confidence and no error anywhere.
+
+    The test that was supposed to cover this put `embedding_model` on a loose
+    top-level Mock. Production read `runtime.retrieval.embedding_model`, which a
+    Mock AUTO-CREATES, so the fixture's value was never consulted, a Mock object
+    was passed through as the model, and the search argument was never asserted.
+    It proved nothing.
+
+    These cases are on the pure resolver rather than on `qdrant_search`, because
+    importing `qdrant_client` is optional in this tree and absent on the hosts
+    that report the 30 dependency errors — logic left inside the search call
+    cannot be executed by the suite at all.
+    """
+
+    COLLECTION = "personal_artifact_chunks_v1"
+
+    def resolve(self, configured, recorded, populated=True):
+        return ingestion.resolve_embedding_model(
+            self.COLLECTION,
+            configured=configured,
+            recorded=recorded,
+            populated=populated,
+        )
+
+    def test_agreement_returns_the_model(self) -> None:
+        self.assertEqual(self.resolve("m1", "m1"), "m1")
+
+    def test_mismatch_refuses_and_names_both_models(self) -> None:
+        with self.assertRaises(ingestion.IngestionError) as caught:
+            self.resolve("query-model", "ingest-model")
+        message = str(caught.exception)
+        self.assertIn("ingest-model", message)
+        self.assertIn("query-model", message)
+
+    def test_the_collection_answers_when_the_config_does_not(self) -> None:
+        """The legacy path: no retrieval block, so the collection is authority."""
+        self.assertEqual(self.resolve(None, "ingest-model"), "ingest-model")
+
+    def test_a_populated_collection_with_no_recorded_model_refuses(self) -> None:
+        with self.assertRaises(ingestion.IngestionError) as caught:
+            self.resolve("m1", None)
+        self.assertIn("records no embedding_model", str(caught.exception))
+
+    def test_an_empty_collection_accepts_the_declared_model(self) -> None:
+        """Nothing ingested yet, so nothing can contradict the config."""
+        self.assertEqual(self.resolve("m1", None, populated=False), "m1")
+
+    def test_knowing_nothing_refuses_rather_than_guessing(self) -> None:
+        with self.assertRaises(ingestion.IngestionError):
+            self.resolve(None, None, populated=False)
+
+    def test_the_default_model_is_never_silently_substituted(self) -> None:
+        """The specific regression: the default must not stand in for unknown."""
+        with self.assertRaises(ingestion.IngestionError):
+            self.resolve(None, None, populated=True)
+        with self.assertRaises(ingestion.IngestionError):
+            self.resolve(ingestion.DEFAULT_EMBEDDING_MODEL, "some-other-model")
+
+
 if __name__ == "__main__":
     unittest.main()

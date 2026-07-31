@@ -91,10 +91,15 @@ class ArtifactMemoryControlTests(unittest.TestCase):
         # running the suite happens to declare. It used to pin to an unreadable
         # config, which silently degraded to the embedded branch; that degrade
         # is now a hard error, so the backend is stubbed explicitly instead.
+        # `retrieval=None`, not a bare Mock. A Mock AUTO-CREATES attributes, so
+        # `runtime.retrieval.embedding_model` silently produced a Mock object
+        # and the `embedding_model=` set here was never read by anything. The
+        # search argument was then never asserted, so this fixture proved
+        # nothing whatsoever about model selection.
         embedded = mock.Mock(
             active_backend="embedded",
             qdrant_collection="personal_artifact_chunks_v1",
-            embedding_model="sentence-transformers/all-MiniLM-L6-v2",
+            retrieval=None,
         )
         with mock.patch.object(
             memory, "_runtime_selector", return_value=(embedded, {})
@@ -117,6 +122,40 @@ class ArtifactMemoryControlTests(unittest.TestCase):
             )
         self.assertEqual(result["results"], [])
         self.assertTrue(search.call_args.kwargs["current_only"])
+        # A config with no retrieval block declares no model, so search must be
+        # asked to resolve it from the collection -- never handed a guess.
+        self.assertIsNone(
+            search.call_args.kwargs["embedding_model"],
+            "a model was invented for a config that declares none",
+        )
+
+    def test_a_declared_embedding_model_is_passed_through(self) -> None:
+        """When the config DOES declare a model, that exact string is used."""
+        declared = mock.Mock(
+            active_backend="embedded",
+            qdrant_collection="personal_artifact_chunks_v1",
+            retrieval=mock.Mock(embedding_model="BAAI/bge-small-en-v1.5"),
+        )
+        with mock.patch.object(
+            memory, "_runtime_selector", return_value=(declared, {})
+        ), mock.patch.object(
+            memory.ingestion, "qdrant_search", return_value={"results": []}
+        ) as search:
+            memory.search_artifacts(
+                workspace=self.workspace,
+                catalog=self.catalog,
+                query="q",
+                limit=8,
+                include_history=False,
+                project=None,
+                artifact_type=None,
+                authority_class=None,
+                repository=None,
+                lifecycle_hint=None,
+            )
+        self.assertEqual(
+            search.call_args.kwargs["embedding_model"], "BAAI/bge-small-en-v1.5"
+        )
 
     def test_pilot_facts_are_rejected_before_falkordb_access(self) -> None:
         with self.assertRaisesRegex(

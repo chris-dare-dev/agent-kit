@@ -56,6 +56,22 @@ class MemoryReadError(ValueError):
     """A read request is invalid, unsafe, or unavailable."""
 
 
+def _configured_embedding_model(runtime: Any) -> str | None:
+    """The model the runtime config DECLARES, or None if it declares none.
+
+    Deliberately returns None rather than a default. `getattr(x, "a", default)`
+    also hid a test bug: on a Mock, `runtime.retrieval` auto-creates an
+    attribute, so the default never applied and a Mock object was passed
+    through as the model — which the test then never asserted on, so it proved
+    nothing about model selection at all.
+    """
+    retrieval = getattr(runtime, "retrieval", None)
+    if retrieval is None:
+        return None
+    model = getattr(retrieval, "embedding_model", None)
+    return model if isinstance(model, str) and model else None
+
+
 def _json_print(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
 
@@ -280,14 +296,13 @@ def search_artifacts(
         api_key_env="QDRANT_API_KEY",
         collection=runtime.qdrant_collection,
         # The retrieval block is optional (the legacy vector generation has no
-        # lexical index and omits it), so fall back to the ingestion default
-        # only for the model. The COLLECTION is the field that actually
-        # diverged, and it always comes from the runtime config now.
-        embedding_model=getattr(
-            getattr(runtime, "retrieval", None),
-            "embedding_model",
-            ingestion.DEFAULT_EMBEDDING_MODEL,
-        ),
+        # lexical index and omits it), so the model may genuinely be unknown
+        # here. None means "ask the collection", which records the model that
+        # produced its vectors; it does NOT mean "use the ingestion default".
+        # Defaulting was a silent correctness bug: an ingest run may specify any
+        # model, and querying with a different one searches a foreign vector
+        # space and returns confident nonsense rather than an error.
+        embedding_model=_configured_embedding_model(runtime),
         query=query,
         limit=limit,
         current_only=True,

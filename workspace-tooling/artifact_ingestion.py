@@ -1311,6 +1311,54 @@ def _qdrant_query_filter(
     return models.Filter(must=conditions) if conditions else None
 
 
+def resolve_embedding_model(
+    collection: str,
+    *,
+    configured: str | None,
+    recorded: str | None,
+    populated: bool,
+) -> str:
+    """Which model may embed a query against `collection`, or raise.
+
+    Pure, and deliberately separated from the Qdrant call: importing
+    `qdrant_client` is optional in this tree, so logic left inside
+    `qdrant_search` cannot be executed by the test suite on a host without it —
+    which is every host that reports the 30 dependency errors. The rule is the
+    part that must be right, so the rule is testable on its own.
+
+    `configured` is what the runtime config declares, or None when it declares
+    nothing (`retrieval` is schema-optional for legacy-vector-v1). `recorded` is
+    what the collection's points say produced their vectors. `populated` says
+    whether the collection had any point to ask.
+
+    Querying with a model other than the one that embedded the collection is not
+    a degraded result, it is a meaningless one: nearest neighbours in an
+    unrelated vector space, returned with full confidence and no error. So a
+    mismatch raises, an unknown raises, and nothing is ever guessed.
+    """
+    if recorded and configured and recorded != configured:
+        raise IngestionError(
+            f"collection {collection!r} was embedded with {recorded!r}, but this "
+            f"query would use {configured!r}; querying across embedding models "
+            "returns plausible but meaningless results"
+        )
+    if recorded:
+        return recorded
+    if populated:
+        raise IngestionError(
+            f"collection {collection!r} records no embedding_model, so the model "
+            "that produced its vectors cannot be established; re-ingest or run "
+            "qdrant-reconcile"
+        )
+    # Empty collection: nothing to contradict, so the declared model stands.
+    if configured:
+        return configured
+    raise IngestionError(
+        f"no embedding model is configured and collection {collection!r} records "
+        "none; cannot search"
+    )
+
+
 def qdrant_search(
     *,
     workspace: Path,
@@ -1319,7 +1367,9 @@ def qdrant_search(
     url: str | None,
     api_key_env: str,
     collection: str,
-    embedding_model: str,
+    #: None means "ask the collection". It must NEVER mean "use the default":
+    #: a guessed model queries a foreign vector space and returns nonsense.
+    embedding_model: str | None,
     query: str,
     limit: int,
     current_only: bool,
@@ -1364,26 +1414,50 @@ def qdrant_search(
                 _outside_workspace(catalog, workspace, "catalog")
             )
             current_revisions = {artifact.revision_id for artifact in artifacts}
-    if query_vector is None:
-        if embedder is None:
-            embedder = create_text_embedder(embedding_model)
-        vector = list(embedder.embed([query]))[0].tolist()
-    else:
-        vector = list(query_vector)
     try:
         if not client.collection_exists(collection):
             raise IngestionError(f"Qdrant collection does not exist: {collection}")
-        if current_only and verify_lifecycle_payload:
+
+        # Resolve the embedding model BEFORE embedding anything.
+        #
+        # The collection is the authority: every point carries the
+        # `embedding_model` that produced its vector, and the ingest path
+        # already refuses to add points under a different one. Search never
+        # checked, so querying a collection with a different model returned
+        # confident nonsense -- nearest neighbours in an unrelated vector space,
+        # with no error anywhere. `retrieval` is schema-optional for
+        # legacy-vector-v1, so the caller may legitimately not know the model;
+        # what it must never do is GUESS one, which is what defaulting did.
+        if verify_lifecycle_payload or embedding_model is None:
+            wanted = ["embedding_model"] + (["catalog_current"] if current_only else [])
             sample, _sample_offset = client.scroll(
                 collection_name=collection,
                 limit=1,
-                with_payload=["catalog_current"],
+                with_payload=wanted,
                 with_vectors=False,
             )
-            if sample and "catalog_current" not in (sample[0].payload or {}):
-                raise IngestionError(
-                    "Qdrant lifecycle payloads are missing; run qdrant-reconcile"
-                )
+            payload = (sample[0].payload or {}) if sample else {}
+            embedding_model = resolve_embedding_model(
+                collection,
+                configured=embedding_model,
+                recorded=payload.get("embedding_model"),
+                populated=bool(sample),
+            )
+
+            if current_only and verify_lifecycle_payload:
+                if sample and "catalog_current" not in payload:
+                    raise IngestionError(
+                        "Qdrant lifecycle payloads are missing; run qdrant-reconcile"
+                    )
+        elif embedding_model is None:  # pragma: no cover - guarded above
+            raise IngestionError("no embedding model is configured; cannot search")
+
+        if query_vector is None:
+            if embedder is None:
+                embedder = create_text_embedder(embedding_model)
+            vector = list(embedder.embed([query]))[0].tolist()
+        else:
+            vector = list(query_vector)
         query_filter = _qdrant_query_filter(
             models,
             current_only=current_only,
