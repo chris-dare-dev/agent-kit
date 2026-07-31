@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import fcntl
 import gzip
 import hashlib
 import json
@@ -40,6 +39,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Sequence
 
 import graphiti_policy
+import platform_compat
 import artifact_security as security
 import artifact_runtime
 
@@ -454,10 +454,10 @@ def _outbox_publish_lock(output_root: Path) -> Iterator[None]:
     descriptor = os.open(lock_path, flags, security.PRIVATE_FILE_MODE)
     try:
         security.secure_created_file(lock_path)
-        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        platform_compat.lock_file_exclusive(descriptor)
         yield
     finally:
-        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        platform_compat.unlock_file(descriptor)
         os.close(descriptor)
 
 

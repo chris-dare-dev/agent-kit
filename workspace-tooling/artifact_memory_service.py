@@ -15,12 +15,10 @@ from __future__ import annotations
 import argparse
 import collections
 import errno
-import fcntl
 import hashlib
 import json
 import os
 import queue
-import resource
 import signal
 import socket
 import socketserver
@@ -38,6 +36,7 @@ import artifact_ingestion as ingestion
 import artifact_memory
 import artifact_retrieval
 import artifact_runtime
+import platform_compat
 import artifact_security as security
 
 
@@ -1296,7 +1295,10 @@ class ServiceState:
                 "active_backend": self.runtime.active_backend,
                 "active_retrieval": self.runtime.active_retrieval,
                 "max_concurrent_requests": MAX_CONCURRENT_REQUESTS,
-                "rss_peak_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss),
+                # None where the platform cannot report it. Previously this was
+                # `int(ru_maxrss)`, which is bytes on macOS but KILOBYTES on
+                # Linux — the field was 1024x low on every Linux host.
+                "rss_peak_bytes": platform_compat.peak_rss_bytes(),
                 "metrics": self.metric_summary(),
                 "operational_metrics": self.operational_summary(),
             },
@@ -1561,7 +1563,32 @@ def _socket_lifecycle_lock_path(socket_path: Path) -> Path:
     return socket_path.with_name(f".{socket_path.name}.lock")
 
 
-class ArtifactUnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
+if hasattr(socketserver, "UnixStreamServer"):
+    _UnixStreamServerBase = socketserver.UnixStreamServer
+else:
+    # Windows has no AF_UNIX, so `socketserver` does not define
+    # UnixStreamServer and the class statement below was an AttributeError at
+    # IMPORT time — which is why this module, and the ten test modules that
+    # reach it, never collected off POSIX (M2, gates-green-t-fcntl-substrate).
+    #
+    # The stub makes the module importable and nothing more: constructing the
+    # server still fails, with a named error that says why and what to do,
+    # rather than a NameError or a server that pretends to listen. Porting the
+    # transport is M5 (native-everywhere); WSL2 is the supported Windows path
+    # until then.
+    class _UnixStreamServerBase(socketserver.BaseServer):  # type: ignore[misc]
+        """Import-time placeholder for socketserver.UnixStreamServer."""
+
+        def __init__(self, *args, **kwargs):
+            raise ServiceError(
+                "the resident Artifact Memory Service needs a Unix-domain socket, "
+                f"and {sys.platform} has no AF_UNIX support. Run the service inside "
+                "WSL2 (see docs/platforms/windows-wsl.md); a native Windows "
+                "transport is tracked as M5."
+            )
+
+
+class ArtifactUnixHTTPServer(socketserver.ThreadingMixIn, _UnixStreamServerBase):
     """HTTP/1.1 over an owner-private pathname Unix-domain socket."""
 
     daemon_threads = True
@@ -1638,12 +1665,11 @@ class ArtifactUnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStrea
             if _socket_identity(named) != _socket_identity(information):
                 raise ServiceError("service socket lifecycle lock changed while opening")
             try:
-                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError as exc:
-                if exc.errno in (errno.EACCES, errno.EAGAIN):
+                if not platform_compat.try_lock_exclusive(descriptor):
                     raise ServiceError(
                         "Artifact Memory Service socket startup is already in progress"
-                    ) from exc
+                    )
+            except OSError as exc:
                 raise ServiceError(
                     f"could not acquire service socket lifecycle lock: {exc}"
                 ) from exc
@@ -1659,7 +1685,7 @@ class ArtifactUnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStrea
         if descriptor is None:
             return
         try:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            platform_compat.unlock_file(descriptor)
         finally:
             os.close(descriptor)
 

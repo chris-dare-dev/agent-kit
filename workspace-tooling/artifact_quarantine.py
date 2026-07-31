@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import errno
-import fcntl
 import fnmatch
 import hashlib
 import json
@@ -33,6 +32,7 @@ from typing import Any, Iterator, Sequence
 import artifact_catalog as catalog
 import artifact_security as security
 import artifact_runtime
+import platform_compat
 
 
 SCHEMA_VERSION = 1
@@ -207,10 +207,10 @@ def _locked(path: Path) -> Iterator[None]:
         0o600,
     )
     try:
-        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        platform_compat.lock_file_exclusive(descriptor)
         yield
     finally:
-        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        platform_compat.unlock_file(descriptor)
         os.close(descriptor)
 
 
