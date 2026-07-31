@@ -46,7 +46,7 @@ goal:
   - The server answers `server/discover` per MCP 2026-07-28 with the v2 SDK pinned to an exact version,
     every list result carries resultType/ttlMs/cacheScope, and src/transport-lock.test.ts fails if any
     deprecated-feature import is reintroduced.
-  - '`git grep -c "PERSONAL_"` over tracked files matches only the deprecation shim and its test, and
+  - '`git grep -c "PERSONAL_" -- ":!plans/"` over tracked files matches only the deprecation shim and its test, and
     `grep -rn "personal multi-repo workspace|personal fork|on my own projects" README.md package.json
     workspace-tooling/README.md` returns nothing.'
   wont:
@@ -104,7 +104,7 @@ items:
     -c "argObj as {" src/index.ts` returns 0.
   - Given a client sending `server/discover`, then the server responds per MCP 2026-07-28 and src/transport-lock.test.ts
     fails when a deprecated-feature import is reintroduced.
-  - Given `git grep -c "PERSONAL_"` over tracked files, then the only matches are the compatibility shim
+  - Given `git grep -c "PERSONAL_" -- ":!plans/"` over tracked files, then the only matches are the compatibility shim
     module and its test; and `grep -rn "personal multi-repo workspace\|personal fork\|on my own projects\|Personal
     provider-neutral" README.md package.json workspace-tooling/README.md` returns nothing.
   depends_on:
@@ -446,7 +446,7 @@ items:
   lane: next
   size: M
   acceptance:
-  - Given `git grep -c "PERSONAL_"` over tracked files, then the only matching files are the single compatibility
+  - Given `git grep -c "PERSONAL_" -- ":!plans/"` over tracked files, then the only matching files are the single compatibility
     shim module and its test.
   - Given a shell exporting only the legacy variable, when any affected CLI runs, then it resolves the
     value, emits exactly one deprecation line to stderr naming the replacement variable and the removal
@@ -570,7 +570,7 @@ items:
   - Given the renames, then `python -c "import agent_kit_substrate.project_linker, agent_kit_substrate.frontmatter_stamp,
     agent_kit_substrate.obsidian_stamp, agent_kit_substrate.obsidian_repair, agent_kit_substrate.fix_frontmatter_tags,
     agent_kit_substrate.consolidate_project_folders"` exits 0.
-  - Given the repo, then `git grep -c "spec_from_file_location"` returns 0 — every module is now importable
+  - Given the repo, then `git grep -n "spec_from_file_location" -- ":!plans/"` exits 1 (no matches) — every module is now importable
     by name.
   - Given a test that extracts every path matching workspace-tooling/*.py from tracked files and calls
     Path.exists on it, then the test passes because the only remaining textual references are inside CHANGELOG.md
@@ -638,7 +638,7 @@ items:
   acceptance:
   - Given `pip install .` in a clean venv, when a CI step reads the [project.scripts] table out of pyproject.toml
     and invokes each declared script with --help, then every one exits 0.
-  - Given the repo, then `git grep -c "workspace-artifacts/venv"` returns 0.
+  - Given the repo, then `git grep -n "workspace-artifacts/venv" -- ":!plans/"` exits 1 (no matches).
   - Given the service renderer run in a venv at an arbitrary path, then the rendered unit's interpreter
     string equals that venv's sys.executable — asserted by a test that renders from two different venv
     locations and diffs the results.

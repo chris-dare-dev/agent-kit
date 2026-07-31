@@ -1156,8 +1156,7 @@ items:
   size: M
   acceptance:
   - Given the repo, when `git grep -nE "SWAT DevOps|Nalej|nalej-|GitLab/workspace/platform|gitlab\\.example\\.com|claude-mcp-server"`
-    is run over tracked files, then it returns zero matches, and `bash data/scripts/denylist-check.sh`
-    exits 0 (and non-zero when any literal is reintroduced).
+    is run over tracked files, then `python3 data/scripts/denylist-check.py --check` exits 0 (and non-zero when any literal is reintroduced). The gate is the assertion rather than a repo-wide grep, because these criteria must quote the literals they forbid, so a raw grep matches this very file and can never pass.
   - Given the repo, when `node -e "const d=require('./package.json').dependencies; console.log(Object.keys(d).filter(k=>k.startsWith('@aws-sdk')).length)"`
     is run, then it prints 0, and `npm ci && npm run build && npm test` all succeed.
   - Given a fresh clone with `core.autocrlf=true`, when `git ls-files --eol setup-local.sh data/hooks/*.sh`
@@ -1346,7 +1345,7 @@ items:
     :51-60 is replaced by a single `${process.env.AGENT_KIT_ROOT}/data/hooks/block-plaintext-secret-write.sh`
     resolution with the repo-relative path as the only fallback, and the unresolvable-guard branch emits
     a stderr warning naming the path it looked for instead of failing open silently.
-  - Given workspace-tooling/artifact_retrieval_eval.py, when `git grep -n _LEGACY_ADAPTER_OFFSET` is run,
+  - Given workspace-tooling/artifact_retrieval_eval.py, when `git grep -n _LEGACY_ADAPTER_OFFSET -- ":!plans/"` is run,
     then it returns nothing — the constant at :217-220 and its branch at :268-271 are deleted, leaving
     the explicit root plus the ancestor walk.
   - Given data/scripts/generate-adapter-packs.py, when it is run with no arguments in a bare clone, then
@@ -1393,8 +1392,7 @@ items:
     POSIX-separator reason — that is gates-green's item, not this one; this story asserts content only.)
   - Given README.md:126-132, when it is read, then the falsifiable 'were removed' sentence is replaced
     by one pointing at `docs/provenance-ledger.json` and the denylist gate.
-  - Given the repo-wide rename, when `git grep -n 'claude-mcp-server'` is run, then it returns zero matches
-    and `npm test` plus the macOS/Linux substrate suite still pass.
+  - Given the repo-wide rename, when `python3 data/scripts/denylist-check.py --check` is run, then it exits 0 (the pre-fork-package pattern covers this name) and `npm test` plus the macOS/Linux substrate suite still pass.
   depends_on:
   - starts-everywhere-t-purge-employer-code-paths
   - starts-everywhere-t-name-collision-decision
