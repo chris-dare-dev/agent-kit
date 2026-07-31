@@ -33,6 +33,7 @@
     "gates": "node scripts/run-gates.mjs",
     "test:gates": "npm run gates",
     "test:substrate": "python3 workspace-tooling/run-substrate-tests.py",
+    "wsl:smoke": "node scripts/wsl-smoke.mjs",
     "test:all": "npm run test:unit && npm run test:gates && npm run verify:quickstart"
   },
   "dependencies": {
