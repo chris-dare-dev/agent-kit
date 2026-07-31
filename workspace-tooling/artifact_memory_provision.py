@@ -71,7 +71,12 @@ COMPOSE_PROJECT = "personal-artifact-memory"
 RESTORE_PORT_OFFSET = 2
 
 
-def render_compose(text: str, profile: str | None = None) -> str:
+def render_compose(
+    text: str,
+    profile: str | None = None,
+    *,
+    ports: tuple[int, int] | None = None,
+) -> str:
     """Rewrite the canonical compose for one profile.
 
     Docker refuses to start two containers with the same container_name, and the
@@ -88,8 +93,12 @@ def render_compose(text: str, profile: str | None = None) -> str:
         return text
 
     artifact_runtime.validate_profile(name)
-    main_port = artifact_runtime.qdrant_port(name)
-    restore_port = artifact_runtime.qdrant_port(name, offset=RESTORE_PORT_OFFSET)
+    # Allocated, not derived. `ports` lets a caller that has already reserved a
+    # pair render with exactly those, so the compose file, the runtime config
+    # and the ledger cannot disagree about which port this profile publishes.
+    main_port, restore_port = ports if ports is not None else artifact_runtime.allocate_ports(
+        name, restore_offset=RESTORE_PORT_OFFSET
+    )
     base = artifact_runtime.QDRANT_BASE_PORT
 
     # Anchored to END OF LINE, and applied with re.sub rather than str.replace.
@@ -162,6 +171,9 @@ def resolve_layout(profile: str | None = None) -> artifact_runtime.ResolvedLayou
         receipt_root=root / "skill-events",
         embedded_qdrant=ingestion.DEFAULT_QDRANT_PATH,
         model_cache=ingestion.DEFAULT_MODEL_CACHE,
+        # Under the patchable root, so a redirected test run cannot touch the
+        # real machine-wide ledger.
+        port_registry=root / artifact_runtime.PORT_REGISTRY_NAME,
         main_port=artifact_runtime.QDRANT_BASE_PORT,
         restore_port=artifact_runtime.QDRANT_BASE_PORT + RESTORE_PORT_OFFSET,
     )
@@ -177,7 +189,7 @@ def qdrant_url(profile: str | None = None) -> str:
     name = _active(profile)
     if not name:
         return QDRANT_URL
-    return f"http://127.0.0.1:{artifact_runtime.qdrant_port(name)}"
+    return f"http://127.0.0.1:{artifact_runtime.allocate_ports(name, restore_offset=RESTORE_PORT_OFFSET)[0]}"
 
 
 # Import-time snapshots for the unprofiled default, so existing call sites and
@@ -346,7 +358,9 @@ def _runtime_payload(
         # what let the two sides disagree in the first place.
         "derived_root": str(layout.root),
         "qdrant": {
-            "url": qdrant_url(layout.profile),
+            # From the layout's allocated port, not a re-derivation: the
+            # published URL must name the port the compose file actually binds.
+            "url": f"http://127.0.0.1:{layout.main_port}",
             "collection": collection(layout.profile),
             "generation": GENERATION,
             "admin_key_file": str(root / SECRET_FILES["admin"]),
@@ -483,7 +497,9 @@ def provision(
         for path in (root, storage, restore_storage, snapshots, model_cache)
     }
     compose_bytes = render_compose(
-        CANONICAL_COMPOSE.read_text(encoding="utf-8")
+        CANONICAL_COMPOSE.read_text(encoding="utf-8"),
+        layout.profile,
+        ports=(layout.main_port, layout.restore_port),
     ).encode("utf-8")
     secret_paths = {
         name: root / filename for name, filename in SECRET_FILES.items()
@@ -539,6 +555,17 @@ def provision(
         }
 
     # ---- apply path: every write lives below this line ---------------------
+    # Reserve FIRST. An allocation that is never written down is recomputed by
+    # the next profile to provision, which then picks the very same "free" port
+    # and collides on `docker compose up`. The plan branch above returns without
+    # reaching this, so a plan still writes nothing.
+    if layout.profile:
+        artifact_runtime.reserve_ports(
+            layout.profile,
+            (layout.main_port, layout.restore_port),
+            path=layout.port_registry,
+        )
+
     root = security.ensure_private_directory(root)
     storage = security.ensure_private_directory(storage)
     restore_storage = security.ensure_private_directory(restore_storage)

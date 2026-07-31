@@ -9,6 +9,7 @@ parent must be 0700 and the bound socket must be an owner-owned 0600 socket.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -79,19 +80,156 @@ def profile_suffix(name: str | None = None) -> str:
     return f"-{resolved}" if resolved else ""
 
 
-def qdrant_port(name: str | None = None, *, offset: int = 0) -> int:
-    """Deterministic per-profile port: same profile, same port, every time.
+#: Profiles are allocated from here upward, leaving the unprofiled default
+#: (QDRANT_BASE_PORT and its restore port) permanently reserved below.
+FIRST_PROFILE_PORT = QDRANT_BASE_PORT + 10
+#: Each profile occupies {main, main + restore_offset}; stepping by 4 keeps one
+#: profile's restore port clear of the next profile's main port.
+PORT_STRIDE = 4
+PORT_CEILING = 65000
+PORT_REGISTRY_NAME = "port-allocations.json"
 
-    Derived from the name rather than allocated, so a provisioned runtime config
-    stays valid across restarts and two profiles never negotiate for a port.
+PortRegistry = dict[str, dict[str, int]]
+
+
+def port_registry_path() -> Path:
+    """The shared ledger, deliberately in the UNPROFILED root.
+
+    Every profile must read the same file or none of them can see what the
+    others hold — a per-profile ledger would let two profiles each conclude a
+    port was free.
+
+    `derived_root("")`, NOT `derived_root(None)`. None means "consult
+    AGENT_KIT_PROFILE", so with a profile active it returns that profile's root
+    and the ledger stops being shared — the same None-is-bimodal trap that made
+    --profile and the environment variable disagree in the first place. The
+    empty string is the only way to say "definitely no profile".
+    """
+    return derived_root("") / PORT_REGISTRY_NAME
+
+
+def read_port_registry(path: Path | None = None) -> PortRegistry:
+    """Recorded allocations, or {} when the ledger is absent or unreadable."""
+    target = path if path is not None else port_registry_path()
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: PortRegistry = {}
+    for name, entry in (data.get("profiles") or {}).items():
+        if (
+            isinstance(entry, dict)
+            and isinstance(entry.get("main"), int)
+            and isinstance(entry.get("restore"), int)
+        ):
+            out[name] = {"main": entry["main"], "restore": entry["restore"]}
+    return out
+
+
+def allocate_ports(
+    name: str | None,
+    *,
+    registry: PortRegistry | None = None,
+    restore_offset: int = 2,
+) -> tuple[int, int]:
+    """The (main, restore) pair for `name`, avoiding every recorded allocation.
+
+    Ports are ALLOCATED against a shared ledger, not derived from the name. The
+    previous scheme hashed the name into 200 buckets and two ports per bucket:
+
+        span = sum(ord(c) * (i + 1) for i, c in enumerate(name))
+        return QDRANT_BASE_PORT + offset + 10 + (span % 200) * 2
+
+    That is a birthday problem with a 200-slot table, and it collided
+    immediately: `a` and `ad` both hash to bucket 97 and both claim 6547, while
+    `aag`'s restore port and `acf`'s main port both claim 6355. Across every
+    one-, two- and three-letter name, 185 of the 187 reachable ports had more
+    than one claimant. Two such profiles cannot run at once — the second
+    `docker compose up` fails on an already-published port.
+
+    A recorded allocation is returned unchanged, so a provisioned runtime
+    configuration stays valid across restarts and an operator may pin a port by
+    editing the ledger. Only a profile with no entry is assigned one.
+
+    Checks the ledger, not the live network: a bind probe would make allocation
+    depend on what happens to be running at that instant, and two provisions
+    racing would still both see the port free. Docker remains the backstop for a
+    port held by something outside this tool.
     """
     resolved = name if name is not None else profile()
     if not resolved:
-        return QDRANT_BASE_PORT + offset
+        return QDRANT_BASE_PORT, QDRANT_BASE_PORT + restore_offset
     validate_profile(resolved)
-    # Small, stable, collision-resistant enough for a handful of local profiles.
-    span = sum(ord(char) * (index + 1) for index, char in enumerate(resolved))
-    return QDRANT_BASE_PORT + offset + 10 + (span % 200) * 2
+
+    recorded = registry if registry is not None else read_port_registry()
+    if resolved in recorded:
+        entry = recorded[resolved]
+        return entry["main"], entry["restore"]
+
+    taken = {QDRANT_BASE_PORT, QDRANT_BASE_PORT + restore_offset}
+    for entry in recorded.values():
+        taken.add(entry["main"])
+        taken.add(entry["restore"])
+
+    # Start from a name-derived slot, then probe forward until the pair is free.
+    #
+    # The ledger is what GUARANTEES uniqueness; the derived start is what makes
+    # two profiles that have not been applied yet still plan onto different
+    # ports, so a dry run shows what an apply would really do. sha256 rather
+    # than hash(): the built-in is randomised per process, which would move a
+    # profile's port on every invocation.
+    slots = (PORT_CEILING - FIRST_PROFILE_PORT) // PORT_STRIDE
+    digest = hashlib.sha256(resolved.encode("utf-8")).digest()
+    start = int.from_bytes(digest[:4], "big") % slots
+    for step in range(slots):
+        candidate = FIRST_PROFILE_PORT + ((start + step) % slots) * PORT_STRIDE
+        if candidate not in taken and (candidate + restore_offset) not in taken:
+            return candidate, candidate + restore_offset
+    raise RuntimeConfigError(
+        f"no free port pair below {PORT_CEILING} for profile {resolved!r}; "
+        f"{len(recorded)} profile(s) are already allocated in "
+        f"{port_registry_path()}"
+    )
+
+
+def allocated_ports(
+    name: str | None = None, *, restore_offset: int = 2
+) -> tuple[int, int]:
+    """Read-only lookup against the on-disk ledger."""
+    return allocate_ports(name, restore_offset=restore_offset)
+
+
+def reserve_ports(
+    name: str,
+    ports: tuple[int, int],
+    *,
+    path: Path | None = None,
+) -> PortRegistry:
+    """Record `ports` for `name` and persist the ledger. Returns the new state.
+
+    Writing is what makes the allocation binding: an unrecorded allocation is
+    recomputed by the next profile, which then picks the same free port.
+    """
+    validate_profile(name)
+    target = path if path is not None else port_registry_path()
+    registry = read_port_registry(target)
+    registry[name] = {"main": ports[0], "restore": ports[1]}
+    target.parent.mkdir(parents=True, exist_ok=True)
+    security.atomic_write_bytes(
+        target,
+        (
+            json.dumps(
+                {"schema_version": 1, "profiles": registry},
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n"
+        ).encode("utf-8"),
+        replace=target.exists(),
+    )
+    return registry
 
 
 def default_derived_root() -> Path:
@@ -192,13 +330,31 @@ class ResolvedLayout:
     receipt_root: Path
     embedded_qdrant: Path
     model_cache: Path
+    #: The SHARED ledger, so it is redirectable with the rest of the layout.
+    #: Resolved here rather than recomputed at the write site, where a test that
+    #: redirected everything else would still have written to the real one.
+    port_registry: Path
     main_port: int
     restore_port: int
 
     @classmethod
-    def for_profile(cls, name: str | None, *, restore_offset: int = 2) -> "ResolvedLayout":
-        """Resolve every path from `name` alone — no module globals consulted."""
+    def for_profile(
+        cls,
+        name: str | None,
+        *,
+        restore_offset: int = 2,
+        ports: tuple[int, int] | None = None,
+    ) -> "ResolvedLayout":
+        """Resolve every path from `name` alone — no module globals consulted.
+
+        `ports` may be supplied when the caller has already allocated (and
+        possibly reserved) a pair; otherwise they are read from the shared
+        ledger, which is the authority on what every other profile holds.
+        """
         root = derived_root(name)
+        main_port, restore_port = ports if ports is not None else allocate_ports(
+            name, restore_offset=restore_offset
+        )
         return cls(
             profile=name,
             root=root,
@@ -211,8 +367,9 @@ class ResolvedLayout:
             receipt_root=root / "skill-events",
             embedded_qdrant=root / "qdrant",
             model_cache=root / "model-cache",
-            main_port=qdrant_port(name),
-            restore_port=qdrant_port(name, offset=restore_offset),
+            port_registry=port_registry_path(),
+            main_port=main_port,
+            restore_port=restore_port,
         )
 
     def paths(self) -> tuple[Path, ...]:
