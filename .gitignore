@@ -1,5 +1,8 @@
 node_modules/
 dist/
+# Default --apply target of data/scripts/generate-adapter-packs.py. Rendered
+# output, reproducible from the catalog; reviewable locally, never committed.
+build/
 __pycache__/
 *.pyc
 .DS_Store

@@ -145,7 +145,7 @@ stderr exactly which group is unavailable and why.
 npm run test:all        # everything below that runs without a provisioned substrate
 
 npm run test:unit       # all 10 TypeScript suites (globbed) + init + uninstall
-npm run test:gates      # every generator gate, consistency check and shell harness
+npm run gates           # every generator gate, consistency check and shell harness
 npm run verify:quickstart
 
 # substrate suite (593 tests) — POSIX only; declines with a banner on Windows.
@@ -154,7 +154,8 @@ npm run test:substrate
 # The substrate suite needs the provisioned venv: ~30 cases import qdrant_client
 # at call time. It is NOT part of test:all for that reason.
 
-# the generator gates — all must be clean before committing data/ changes.
+# `npm run gates` above runs all of these and prints one named line per gate;
+# reach for them individually only when you want one gate's own diagnostics.
 # No PYTHONUTF8 needed: every text I/O in data/scripts names its encoding, and
 # catalog provenance is POSIX-separated, so these are byte-identical on Windows,
 # macOS and Linux. Both were verified on Windows AND Linux.

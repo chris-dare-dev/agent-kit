@@ -32,15 +32,22 @@ CI contract (S3.7, all in data-lint, python:3.12-slim — no node):
             (len-diff vs catalog, no hardcoded magic numbers). Exit 0 | 2 drift |
             3 link/case/coverage.
   --update-golden   regenerate the golden manifest (routine catalog growth).
-  --apply   write the packs to the resolved workspace mirrors (LOCAL, not gated).
+  --apply   render the packs to disk. Writes INSIDE the clone by default
+            (build/provider-packs/{codex,opencode}/, git-ignored, PR-diffable);
+            `--install-to WORKSPACE` writes to the resolved workspace mirrors.
+            Never deletes anything unless `--prune` is passed; `--dry-run`
+            previews both writes and removals.
   --self-test   exercise the transforms on torture fixtures.
 
 Rendering is a PURE function of (catalog, data/ sources, model-policy) -> bytes, so
 --check needs no workspace mirror and is CWD-independent. Stdlib + PyYAML (the
-data-lint image already installs it). Workspace root: --workspace, else
-$PERSONAL_WORKSPACE_ROOT / $WORKSPACE_ROOT, else $HOME/Work/workspace. NOTE: --workspace
-moves only the WORKSPACE/ anchor (.codex/.agents); the PLATFORM/.opencode anchor is
-always derived from THIS repo's on-disk location (platform/), never from --workspace.
+data-lint image already installs it). Workspace root (only for
+`--install-to WORKSPACE`): --workspace, else $PERSONAL_WORKSPACE_ROOT /
+$WORKSPACE_ROOT — and if none resolves, the command fails rather than guessing.
+NOTE: --workspace moves only the WORKSPACE/ anchor (.codex/.agents); the
+PLATFORM/.opencode anchor is derived from THIS repo's on-disk location, never from
+--workspace, which is why WORKSPACE install mode can still write outside the clone
+and OUT mode (the default) cannot.
 """
 
 from __future__ import annotations
@@ -519,12 +526,49 @@ def _load() -> tuple[dict, dict]:
     return json.loads(CATALOG_PATH.read_text(encoding="utf-8")), load_policy()
 
 
+#: Default write target. Inside the clone, git-ignored, reviewable in a PR diff.
+#: Before M2 the anchors resolved to `ROOT.parents[1]` and `$HOME/Work/workspace`,
+#: so `--apply` on a bare clone wrote into two directories ABOVE the repository and
+#: unlinked .toml files it had never created. An adopting team could not get the
+#: packs into their own tree, diff them, or run the generator in CI
+#: (gates-green-t-packs-out-dir).
+DEFAULT_OUT = ROOT / "build" / "provider-packs"
+
+ANCHORS = ("WORKSPACE/", "PLATFORM/")
+
+
 def _resolve_workspace(arg: str | None) -> Path:
-    for cand in (arg, os.environ.get("PERSONAL_WORKSPACE_ROOT"),
-                 os.environ.get("WORKSPACE_ROOT"), str(Path.home() / "Work" / "workspace")):
+    """The workspace root for `--install-to WORKSPACE`. No silent fallback.
+
+    `$HOME/Work/workspace` used to be the last candidate, which meant an
+    unresolved workspace was not an error — it was a write into whatever
+    happened to be at that path on the operator's machine.
+    """
+    for cand in (arg, os.environ.get("PERSONAL_WORKSPACE_ROOT"), os.environ.get("WORKSPACE_ROOT")):
         if cand and Path(cand).is_dir():
             return Path(cand)
-    sys.exit("could not resolve workspace root. Pass --workspace PATH or set PERSONAL_WORKSPACE_ROOT.")
+    sys.exit(
+        "could not resolve a workspace root for --install-to WORKSPACE.\n"
+        "  Pass --workspace PATH, or set PERSONAL_WORKSPACE_ROOT (or WORKSPACE_ROOT).\n"
+        "  Omit --install-to to write the packs inside the clone instead "
+        f"(default: {DEFAULT_OUT.relative_to(ROOT).as_posix()}/)."
+    )
+
+
+def _strip_anchor_raises(path: str) -> bool:
+    """True when `path` carries no recognised anchor (self-test helper)."""
+    try:
+        _strip_anchor(path)
+    except ValueError:
+        return True
+    return False
+
+
+def _strip_anchor(path: str) -> str:
+    for a in ANCHORS:
+        if path.startswith(a):
+            return path[len(a):]
+    raise ValueError(f"unanchored pack path: {path}")
 
 
 def _anchor(path: str, workspace: Path) -> Path:
@@ -535,32 +579,77 @@ def _anchor(path: str, workspace: Path) -> Path:
     raise ValueError(f"unanchored pack path: {path}")
 
 
-def apply(workspace_arg: str | None) -> int:
+def _destinations(
+    packs: dict[str, dict[str, bytes]], install_to: str, workspace: Path | None, out: Path
+) -> dict[Path, bytes]:
+    """Logical pack paths -> absolute destinations, for the chosen install mode."""
+    dests: dict[Path, bytes] = {}
+    for provider, files in packs.items():
+        for path, data in files.items():
+            if install_to == "WORKSPACE":
+                assert workspace is not None
+                dests[_anchor(path, workspace)] = data
+            else:
+                # Anchor-relative under a per-provider directory, so the tree is
+                # exactly what --install-to WORKSPACE would write, minus the root.
+                dests[out / provider / _strip_anchor(path)] = data
+    return dests
+
+
+def apply(
+    workspace_arg: str | None,
+    install_to: str,
+    out_arg: str | None,
+    prune: bool,
+    dry_run: bool,
+) -> int:
     catalog, policy = _load()
     packs, _ = build_packs(catalog, policy)
-    ws = _resolve_workspace(workspace_arg)
     flat = _flatten(packs)
 
-    # Prune stale generator-owned agent .toml files (fully owned namespace); skills
-    # are NOT pruned (preserve source-command-* extras with no canonical source).
-    codex_agents_dir = ws / ".codex" / "agents"
-    if codex_agents_dir.is_dir():
-        want = {_anchor(p, ws) for p in flat if p.startswith("WORKSPACE/.codex/agents/")}
-        for stale in codex_agents_dir.glob("*.toml"):
-            if stale not in want:
-                stale.unlink()
+    workspace = _resolve_workspace(workspace_arg) if install_to == "WORKSPACE" else None
+    out = Path(out_arg).resolve() if out_arg else DEFAULT_OUT
+    dests = _destinations(packs, install_to, workspace, out)
 
-    for path, data in flat.items():
-        dst = _anchor(path, ws)
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        dst.write_bytes(data)
+    # Stale generator-owned agent .toml files. This used to run unconditionally
+    # against whatever directory the workspace resolved to. Deletion is now opt-in
+    # (--prune) and previewable (--prune --dry-run); without --prune nothing is
+    # unlinked, ever.
+    if install_to == "WORKSPACE":
+        codex_agents_dir = workspace / ".codex" / "agents"  # type: ignore[union-attr]
+    else:
+        codex_agents_dir = out / "codex" / ".codex" / "agents"
+    removed: list[Path] = []
+    if prune and codex_agents_dir.is_dir():
+        want = set(dests)
+        for stale in sorted(codex_agents_dir.glob("*.toml")):
+            if stale not in want:
+                removed.append(stale)
+                if not dry_run:
+                    stale.unlink()
+
+    if not dry_run:
+        for dst, data in dests.items():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(data)
 
     n_codex = sum(1 for p in flat if p.startswith("WORKSPACE/.codex/agents/"))
     n_cxskill = sum(1 for p in flat if p.startswith("WORKSPACE/.agents/skills/") and p.endswith("SKILL.md"))
     n_oc = sum(1 for p in flat if p.startswith("PLATFORM/.opencode/agents/"))
-    print(f"adapter-packs: wrote {len(flat)} files")
-    print(f"  codex:    {codex_agents_dir}  ({n_codex} agents, {n_cxskill} skills -> {ws/'.agents/skills'})")
-    print(f"  opencode: {PLATFORM_ROOT/'.opencode'}  ({n_oc} agents + skills + commands)")
+    verb = "would write" if dry_run else "wrote"
+    print(f"adapter-packs: {verb} {len(dests)} files (--install-to {install_to})")
+    if install_to == "WORKSPACE":
+        print(f"  codex:    {codex_agents_dir}  ({n_codex} agents, {n_cxskill} skills)")
+        print(f"  opencode: {PLATFORM_ROOT / '.opencode'}  ({n_oc} agents + skills + commands)")
+    else:
+        print(f"  codex:    {out / 'codex'}  ({n_codex} agents, {n_cxskill} skills)")
+        print(f"  opencode: {out / 'opencode'}  ({n_oc} agents + skills + commands)")
+    for stale in removed:
+        print(f"  {'would remove' if dry_run else 'removed'} stale: {stale}")
+    if not prune and codex_agents_dir.is_dir():
+        orphans = [p for p in sorted(codex_agents_dir.glob("*.toml")) if p not in dests]
+        if orphans:
+            print(f"  {len(orphans)} unmanaged .toml left in place — pass --prune to remove them")
     return 0
 
 
@@ -677,6 +766,48 @@ def self_test() -> int:
     ck("read-only -> deny mutating/egress", opencode_permission("Read, Grep, Glob") == {"edit": "deny", "bash": "deny", "webfetch": "deny"})
     ck("bash+write+websearch -> allow", opencode_permission("Read, Bash, Write, WebSearch") == {"edit": "allow", "bash": "allow", "webfetch": "allow"})
 
+    # --- write-target containment (gates-green-t-packs-out-dir) ----------------
+    fake_packs = {
+        "codex": {"WORKSPACE/.codex/agents/a.toml": b"x", "WORKSPACE/.agents/skills/s/SKILL.md": b"y"},
+        "opencode": {"PLATFORM/.opencode/agents/a.md": b"z"},
+    }
+    out_dests = _destinations(fake_packs, "OUT", None, DEFAULT_OUT)
+    ck("out: default is inside the clone", DEFAULT_OUT.is_relative_to(ROOT))
+    ck("out: every destination stays under --out", all(d.is_relative_to(DEFAULT_OUT) for d in out_dests))
+    ck("out: nothing escapes the repository", all(d.is_relative_to(ROOT) for d in out_dests))
+    ck("out: per-provider split", DEFAULT_OUT / "codex" / ".codex" / "agents" / "a.toml" in out_dests)
+    ck("out: opencode anchored under its own provider dir",
+       DEFAULT_OUT / "opencode" / ".opencode" / "agents" / "a.md" in out_dests)
+    ck("out: anchor prefix stripped, content preserved",
+       out_dests[DEFAULT_OUT / "codex" / ".codex" / "agents" / "a.toml"] == b"x")
+
+    # WORKSPACE mode still targets the mirrors — that is its whole purpose — but it
+    # is now opt-in rather than the default.
+    ws_dests = _destinations(fake_packs, "WORKSPACE", Path("/tmp/ws"), DEFAULT_OUT)
+    ck("workspace: WORKSPACE/ anchors at the workspace root",
+       Path("/tmp/ws/.codex/agents/a.toml") in ws_dests)
+    ck("workspace: PLATFORM/ anchors at PLATFORM_ROOT",
+       PLATFORM_ROOT / ".opencode" / "agents" / "a.md" in ws_dests)
+
+    # The home-directory fallback is gone: with nothing to resolve, WORKSPACE mode
+    # must fail loudly rather than write into whatever happens to be at that path.
+    saved = {k: os.environ.pop(k, None) for k in ("PERSONAL_WORKSPACE_ROOT", "WORKSPACE_ROOT")}
+    try:
+        _resolve_workspace(None)
+        ck("unresolvable workspace exits", False)
+    except SystemExit as exc:
+        msg = str(exc)
+        ck("unresolvable workspace exits", True)
+        ck("exit names --workspace", "--workspace" in msg)
+        ck("exit names the env var", "PERSONAL_WORKSPACE_ROOT" in msg)
+        ck("exit names the in-clone default", "provider-packs" in msg)
+    finally:
+        for k, v in saved.items():
+            if v is not None:
+                os.environ[k] = v
+
+    ck("unanchored pack path is rejected", _strip_anchor_raises("no-anchor/x.md"))
+
     for f in failures:
         print(f"FAIL: {f}", file=sys.stderr)
     if failures:
@@ -693,7 +824,16 @@ def main(argv: list[str]) -> int:
     mode.add_argument("--update-golden", action="store_true")
     mode.add_argument("--self-test", action="store_true")
     mode.add_argument("--apply", action="store_true")
-    ap.add_argument("--workspace", metavar="PATH")
+    ap.add_argument("--workspace", metavar="PATH",
+                    help="workspace root for --install-to WORKSPACE (else $PERSONAL_WORKSPACE_ROOT / $WORKSPACE_ROOT)")
+    ap.add_argument("--install-to", choices=("OUT", "WORKSPACE"), default="OUT",
+                    help="OUT (default) writes inside the clone; WORKSPACE writes to the resolved mirrors")
+    ap.add_argument("--out", metavar="DIR",
+                    help=f"output directory for --install-to OUT (default {DEFAULT_OUT.relative_to(ROOT).as_posix()}/)")
+    ap.add_argument("--prune", action="store_true",
+                    help="remove generator-owned .toml files in the target that no catalog entry claims")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="print what would be written or removed, and change nothing")
     args = ap.parse_args(argv)
 
     if args.self_test:
@@ -702,8 +842,8 @@ def main(argv: list[str]) -> int:
         return check()
     if args.update_golden:
         return update_golden()
-    # default is --apply (an explicit write to local mirrors)
-    return apply(args.workspace)
+    # default is --apply (an explicit write, but never outside the clone unless asked)
+    return apply(args.workspace, args.install_to, args.out, args.prune, args.dry_run)
 
 
 if __name__ == "__main__":

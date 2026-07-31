@@ -30,7 +30,8 @@
     "test:init": "node --test tests/init.test.mjs",
     "test:uninstall": "node --test tests/uninstall.test.mjs",
     "test:unit": "npm test && npm run test:init && npm run test:uninstall",
-    "test:gates": "node scripts/run-gates.mjs",
+    "gates": "node scripts/run-gates.mjs",
+    "test:gates": "npm run gates",
     "test:substrate": "python3 workspace-tooling/run-substrate-tests.py",
     "test:all": "npm run test:unit && npm run test:gates && npm run verify:quickstart"
   },
