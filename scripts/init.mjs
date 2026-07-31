@@ -23,15 +23,11 @@
  *
  * Plain Node, so one `node >= 20` prerequisite covers setup on all three OSes.
  */
-import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
-  lstatSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
-  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -39,11 +35,13 @@ import {
 import { spawnSync } from "node:child_process";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { treeDigest } from "./lib/tree-digest.mjs";
 
 const CLONE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DATA_DIR = join(CLONE_ROOT, "data");
 const RECEIPT_DIR = join(CLONE_ROOT, ".agent-kit");
 const RECEIPT_PATH = join(RECEIPT_DIR, "install-receipt.json");
+const BACKUP_DIR = join(RECEIPT_DIR, "backups");
 
 /** Directories under data/ planted into <workspaceRoot>/.claude/. */
 const PLANT_DIRS = ["skills", "agents", "references", "scripts", "hooks", "commands"];
@@ -107,38 +105,65 @@ function readReceipt() {
   }
 }
 
-function sha256(path) {
-  try {
-    if (lstatSync(path).isDirectory()) {
-      // Hash the sorted child names: enough to prove what was displaced
-      // without reading a whole tree into memory.
-      return createHash("sha256")
-        .update(readdirSync(path).sort().join("\n"))
-        .digest("hex");
-    }
-    return createHash("sha256").update(readFileSync(path)).digest("hex");
-  } catch {
-    return undefined;
-  }
-}
-
 // ---- planting --------------------------------------------------------------
 
-/** Did THIS installer create `target`? A symlink into our data/ counts. */
+/**
+ * Did THIS installer create `target`?
+ *
+ * The receipt is the only evidence. A symlink pointing into `data/` used to
+ * count on its own, which meant anyone able to create a link could hand this
+ * installer a path it believed it owned — and planting writes with
+ * `writeFileSync`, which follows the link, so the write landed on the bundled
+ * source. Ownership is a claim about history; only the receipt records history.
+ */
 function isOurs(target, receipt) {
-  if (receipt.entries.some((e) => resolve(e.path) === resolve(target))) return true;
-  try {
-    if (!lstatSync(target).isSymbolicLink()) return false;
-    const real = realpathSync(target);
-    return !relative(DATA_DIR, real).startsWith("..");
-  } catch {
-    return false;
-  }
+  return receipt.entries.some((e) => resolve(e.path) === resolve(target));
 }
 
-function insideClone(target) {
-  const rel = relative(CLONE_ROOT, resolve(target));
+/**
+ * Has a path we DO own changed since we planted it?
+ *
+ * This is the second half of the ownership question, and the half that was
+ * missing. `isOurs` answers "did I create this?"; a re-run then replanted on
+ * that basis alone, destroying any edit made in between. Both answers are
+ * required before an overwrite is licensed.
+ *
+ * A receipt entry with no recorded digest counts as drifted. We cannot prove
+ * the content is still ours, and "cannot prove" must not resolve to "delete".
+ */
+function hasDrifted(target, receipt) {
+  const entry = receipt.entries.find((e) => resolve(e.path) === resolve(target));
+  if (!entry?.sha256_after) return true;
+  return treeDigest(target) !== entry.sha256_after;
+}
+
+/** Is `target` inside `base`? `isAbsolute` matters: a cross-volume relative
+ *  result on Windows (`D:\outside`) does not start with ".." and would pass. */
+function contains(base, target) {
+  const rel = relative(base, resolve(target));
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+const insideClone = (target) => contains(CLONE_ROOT, target);
+
+/**
+ * Copy whatever is at `path` into `.agent-kit/backups/<digest>` and return the
+ * receipt-relative location, or undefined if there was nothing to displace.
+ *
+ * uninstall.mjs has always looked for a backup here and reported the path as
+ * unrestorable when it found none — which was every time, because init recorded
+ * a hash and called it a record. A hash proves what was displaced; it restores
+ * nothing. `verbatimSymlinks` keeps a planted link a link instead of silently
+ * inlining the tree it points at.
+ */
+function backup(path, digest) {
+  if (!digest || !existsSync(path)) return undefined;
+  const dest = join(BACKUP_DIR, digest);
+  mkdirSync(BACKUP_DIR, { recursive: true });
+  if (!existsSync(dest)) {
+    cpSync(path, dest, { recursive: true, verbatimSymlinks: true });
+  }
+  return relative(CLONE_ROOT, dest).split("\\").join("/");
 }
 
 function main() {
@@ -203,19 +228,33 @@ function main() {
 
   // Pass 1 — find every collision BEFORE touching anything, so a refusal
   // reports the full list instead of stopping at the first one.
+  // Two distinct refusals, both of which mean "this content is the user's":
+  // never installed by us, or installed by us and edited since.
   const collisions = [];
+  const drifted = [];
   for (const sub of PLANT_DIRS) {
     if (!existsSync(join(DATA_DIR, sub))) continue;
     const target = join(claudeDir, sub);
-    if (existsSync(target) && !isOurs(target, receipt)) collisions.push(target);
+    if (!existsSync(target)) continue;
+    if (!isOurs(target, receipt)) collisions.push(target);
+    else if (hasDrifted(target, receipt)) drifted.push(target);
   }
   if (collisions.length > 0 && !args.force) {
     die(
       `${collisions.length} path(s) already exist and were not created by this ` +
         "installer. Nothing has been changed. Re-run with --force to replace " +
-        "them (their prior content hash is recorded in the receipt), or move " +
-        "them aside:",
+        "them (their prior content is backed up to .agent-kit/backups/), or " +
+        "move them aside:",
       collisions,
+    );
+  }
+  if (drifted.length > 0 && !args.force) {
+    die(
+      `${drifted.length} path(s) this installer planted have been edited since. ` +
+        "Nothing has been changed. Re-run with --force to replace them (their " +
+        "current content is backed up to .agent-kit/backups/ first), or move " +
+        "them aside:",
+      drifted,
     );
   }
 
@@ -235,10 +274,17 @@ function main() {
 
     let action = args.mode === "symlink" ? "linked" : "copied";
     let shaBefore;
+    let backupPath;
     const existed = existsSync(target);
     if (existed) {
-      shaBefore = sha256(target);
-      if (!isOurs(target, receipt)) action = "overwritten";
+      shaBefore = treeDigest(target);
+      // Anything displaced is the user's content — whether we planted it and
+      // they edited it, or it was never ours. Both reach here only under
+      // --force, and both get a real copy kept before we remove anything.
+      if (!isOurs(target, receipt) || hasDrifted(target, receipt)) {
+        action = "overwritten";
+        if (!args.dryRun) backupPath = backup(target, shaBefore);
+      }
     }
     if (args.dryRun) { info(`would have ${action} .claude/${sub}`); continue; }
 
@@ -262,10 +308,11 @@ function main() {
       path: target,
       action,
       ...(shaBefore ? { sha256_before: shaBefore } : {}),
-      sha256_after: sha256(target),
+      ...(backupPath ? { backup: backupPath } : {}),
+      sha256_after: treeDigest(target),
       at,
     });
-    ok(`${action.padEnd(11)} .claude/${sub}`);
+    ok(`${action.padEnd(11)} .claude/${sub}${backupPath ? `  ${C.d}(backed up)${C.x}` : ""}`);
   }
 
   // CLAUDE.md / AGENTS.md planting. The three targets setup-local.sh expected
@@ -282,12 +329,20 @@ function main() {
       continue;
     }
     const existed = existsSync(target);
-    const shaBefore = existed ? sha256(target) : undefined;
-    if (existed && !isOurs(target, receipt) && !args.force) {
-      warn(`skipped ${target} — exists and was not created by this installer (use --force)`);
+    const shaBefore = existed ? treeDigest(target) : undefined;
+    // Ownership alone licensed this overwrite before, so a user's edited
+    // AGENTS.md was replaced on every re-run without warning or backup.
+    const displacing = existed && (!isOurs(target, receipt) || hasDrifted(target, receipt));
+    if (displacing && !args.force) {
+      warn(
+        `skipped ${target} — ${isOurs(target, receipt)
+          ? "edited since this installer wrote it"
+          : "exists and was not created by this installer"} (use --force)`,
+      );
       continue;
     }
     if (args.dryRun) { info(`would plant ${target}`); continue; }
+    const backupPath = displacing ? backup(target, shaBefore) : undefined;
     // Body only: the data/ masters may carry vault frontmatter, which the
     // active copies Claude Code auto-loads must not have.
     let text = readFileSync(source, "utf-8");
@@ -295,12 +350,17 @@ function main() {
       const end = text.indexOf("\n---\n", 4);
       if (end !== -1) text = text.slice(end + 5).replace(/^\n+/, "");
     }
+    // writeFileSync FOLLOWS a symlink, so a link left at this path would send
+    // the write to whatever it points at — including back into data/. Remove
+    // the entry first and write a genuine file.
+    if (existed) rmSync(target, { recursive: true, force: true });
     writeFileSync(target, text, "utf-8");
     entries.push({
       path: target,
       action: existed ? "overwritten" : "created",
       ...(shaBefore ? { sha256_before: shaBefore } : {}),
-      sha256_after: sha256(target),
+      ...(backupPath ? { backup: backupPath } : {}),
+      sha256_after: treeDigest(target),
       at,
     });
     ok(`${(existed ? "overwritten" : "created").padEnd(11)} ${target}`);
@@ -313,13 +373,25 @@ function main() {
   const mcpTarget = join(workspaceRoot, ".mcp.json");
   if (!existsSync(mcpTemplate)) {
     warn(`plant source missing, skipped: ${mcpTemplate}`);
-  } else if (existsSync(mcpTarget) && !isOurs(mcpTarget, receipt) && !args.force) {
-    warn(`skipped ${mcpTarget} — exists and was not created by this installer (use --force)`);
+  } else if (
+    existsSync(mcpTarget) &&
+    (!isOurs(mcpTarget, receipt) || hasDrifted(mcpTarget, receipt)) &&
+    !args.force
+  ) {
+    warn(
+      `skipped ${mcpTarget} — ${isOurs(mcpTarget, receipt)
+        ? "edited since this installer wrote it"
+        : "exists and was not created by this installer"} (use --force)`,
+    );
   } else if (args.dryRun) {
     info(`would have written ${mcpTarget}`);
   } else {
     const existed = existsSync(mcpTarget);
-    const shaBefore = existed ? sha256(mcpTarget) : undefined;
+    const shaBefore = existed ? treeDigest(mcpTarget) : undefined;
+    const backupPath =
+      existed && (!isOurs(mcpTarget, receipt) || hasDrifted(mcpTarget, receipt))
+        ? backup(mcpTarget, shaBefore)
+        : undefined;
     const rendered = readFileSync(mcpTemplate, "utf-8")
       .split("${AGENT_KIT_ROOT}")
       .join(CLONE_ROOT.split("\\").join("/"));
@@ -329,12 +401,14 @@ function main() {
     } catch (err) {
       die(`rendered .mcp.json is not valid JSON (${err.message}); ${mcpTemplate} is malformed`);
     }
+    if (existed) rmSync(mcpTarget, { recursive: true, force: true });  // never write through a link
     writeFileSync(mcpTarget, rendered, "utf-8");
     entries.push({
       path: mcpTarget,
       action: existed ? "overwritten" : "created",
       ...(shaBefore ? { sha256_before: shaBefore } : {}),
-      sha256_after: sha256(mcpTarget),
+      ...(backupPath ? { backup: backupPath } : {}),
+      sha256_after: treeDigest(mcpTarget),
       at,
     });
     ok(`${(existed ? "overwritten" : "created").padEnd(11)} .mcp.json`);

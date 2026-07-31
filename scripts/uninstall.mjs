@@ -11,24 +11,29 @@
  * DRY RUN BY DEFAULT. Removal is the one operation where "I'll just try it" is
  * unacceptable, so nothing happens until --apply.
  *
- * A LIMIT, STATED PLAINLY: the receipt records `sha256_before` for an
- * overwritten path, not its prior CONTENT. A hash proves what was displaced; it
- * cannot reconstruct it. So an `overwritten` entry is REPORTED, never restored,
- * unless a sibling `.agent-kit/backups/` copy exists (init does not write one
- * today). Silently leaving the user's file replaced while claiming to have
- * uninstalled would be worse than saying so.
+ * RESTORING IS A COPY, NOT A HASH. `sha256_before` proves what was displaced;
+ * it cannot reconstruct it. init now writes the displaced tree to
+ * `.agent-kit/backups/<digest>` and records `backup` on the entry, so an
+ * `overwritten` path is genuinely restorable — directories and symlinks
+ * included. An entry whose backup is missing is still REPORTED rather than
+ * quietly left replaced.
+ *
+ * WHAT LICENSES A DELETE. An entry is removed only when the tree still digests
+ * to what init recorded. That comparison used to hash a directory's child
+ * NAMES, so an edit inside a planted tree was invisible and the tree was
+ * removed with the edit inside it. See scripts/lib/tree-digest.mjs.
  */
-import { createHash } from "node:crypto";
 import {
+  cpSync,
   existsSync,
   lstatSync,
   readFileSync,
   readdirSync,
   rmSync,
-  writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { treeDigest } from "./lib/tree-digest.mjs";
 
 const CLONE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RECEIPT_PATH = join(CLONE_ROOT, ".agent-kit", "install-receipt.json");
@@ -62,17 +67,9 @@ function parseArgs(argv) {
   return args;
 }
 
-/** Same hashing rule init used, so the comparison is meaningful. */
-function sha256(path) {
-  try {
-    if (lstatSync(path).isDirectory()) {
-      return createHash("sha256").update(readdirSync(path).sort().join("\n")).digest("hex");
-    }
-    return createHash("sha256").update(readFileSync(path)).digest("hex");
-  } catch {
-    return undefined;
-  }
-}
+// The digest is imported rather than reimplemented. Both scripts used to carry
+// their own copy, agreeing only by a comment — and both were wrong in the same
+// way, hashing a directory's child NAMES. See scripts/lib/tree-digest.mjs.
 
 const args = parseArgs(process.argv.slice(2));
 if (args.help) {
@@ -107,10 +104,24 @@ for (const entry of entries) {
     continue;
   }
   // A path whose content moved on since init is the user's now, not ours.
-  if (entry.action !== "overwritten") {
-    const now = sha256(path);
+  // A bare directory init merely CREATED (`.claude/` itself) carries no digest:
+  // it is recorded before anything is planted into it, so any digest would be
+  // stale by the end of the same run. It does not need one — the removal loop
+  // below refuses to delete it unless it is empty, which is a stronger
+  // guarantee than a content comparison.
+  const isBareCreatedDir =
+    entry.action === "created" && existsSync(path) && lstatSync(path).isDirectory();
+
+  if (entry.action !== "overwritten" && !isBareCreatedDir) {
+    const now = treeDigest(path);
     const then = entry.sha256_after ?? undefined;
-    if (then && now && now !== then && !args.force) {
+    // No recorded digest means we cannot prove this is still what we planted,
+    // and an unprovable claim must not authorise a recursive delete.
+    if (!then && !args.force) {
+      plan.changed.push({ ...entry, why: "no content digest recorded at install" });
+      continue;
+    }
+    if (then && now !== then && !args.force) {
       plan.changed.push({ ...entry, why: "content changed since init" });
       continue;
     }
@@ -119,8 +130,13 @@ for (const entry of entries) {
   if (entry.action === "created" || entry.action === "linked" || entry.action === "copied") {
     plan.remove.push(entry);
   } else if (entry.action === "overwritten") {
-    const backup = join(BACKUP_DIR, entry.sha256_before ?? "");
-    if (entry.sha256_before && existsSync(backup)) plan.restore.push({ ...entry, backup });
+    // `backup` is the receipt-relative copy init kept. Fall back to the old
+    // hash-named layout so a receipt written before backups existed still
+    // resolves if the directory happens to hold one.
+    const backup = entry.backup
+      ? resolve(CLONE_ROOT, entry.backup)
+      : join(BACKUP_DIR, entry.sha256_before ?? "");
+    if (existsSync(backup)) plan.restore.push({ ...entry, backup });
     else plan.unrestorable.push(entry);
   }
 }
@@ -186,9 +202,11 @@ for (const entry of plan.remove) {
 }
 for (const entry of plan.restore) {
   try {
-    const content = readFileSync(entry.backup);
     rmSync(entry.path, { recursive: true, force: true });
-    writeFileSync(entry.path, content);
+    // cpSync, not readFileSync/writeFileSync: what was displaced may be a whole
+    // directory tree or a symlink, and reading "the content" of either loses it.
+    // verbatimSymlinks keeps a link a link instead of inlining its target.
+    cpSync(entry.backup, entry.path, { recursive: true, verbatimSymlinks: true });
     restored += 1;
   } catch (err) {
     failures.push(`${rel(entry.path)}: ${err.message}`);

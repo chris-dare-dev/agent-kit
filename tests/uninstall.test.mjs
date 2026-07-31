@@ -26,6 +26,7 @@ function bareClone(t) {
   for (const f of ["init.mjs", "uninstall.mjs"]) {
     cpSync(join(REPO_ROOT, "scripts", f), join(root, "scripts", f));
   }
+  cpSync(join(REPO_ROOT, "scripts", "lib"), join(root, "scripts", "lib"), { recursive: true });
   t.after(() => rmSync(root, { recursive: true, force: true, maxRetries: 5 }));
   return root;
 }
@@ -105,6 +106,44 @@ test("a path edited since init is skipped unless --force", (t) => {
 
   assert.equal(run(root, "uninstall.mjs", ["--apply", "--force"]).status, 0);
   assert.ok(!existsSync(agents), "--force did not remove it");
+});
+
+/**
+ * The directory-hash data-loss class.
+ *
+ * `sha256()` used to hash a directory's sorted CHILD NAMES. Editing a file
+ * inside a planted tree therefore left the hash identical, so uninstall
+ * classified the tree as untouched and `rmSync(recursive)` took the user's
+ * edit with it. The same blindness covers adding, deleting or renaming
+ * anything below the first level.
+ */
+test("an edit INSIDE a planted directory is not silently deleted", (t) => {
+  const root = bareClone(t);
+  assert.equal(run(root, "init.mjs", ["--mode", "copy"]).status, 0, "init failed");
+
+  const edited = join(root, ".claude", "commands", "roadmap.md");
+  assert.ok(existsSync(edited), "fixture missing: .claude/commands/roadmap.md");
+  writeFileSync(edited, "THE USER HAS EDITED THIS\n", "utf-8");
+
+  const un = run(root, "uninstall.mjs", ["--apply"]);
+  assert.equal(un.status, 0, `uninstall failed:\n${un.stdout}\n${un.stderr}`);
+  assert.ok(
+    existsSync(edited),
+    "uninstall recursively deleted a planted directory holding a user edit",
+  );
+  assert.equal(readFileSync(edited, "utf-8"), "THE USER HAS EDITED THIS\n");
+});
+
+test("a file ADDED inside a planted directory is not silently deleted", (t) => {
+  const root = bareClone(t);
+  assert.equal(run(root, "init.mjs", ["--mode", "copy"]).status, 0);
+
+  // Two levels down, so a first-level-names-only digest cannot see it at all.
+  const added = join(root, ".claude", "skills", "handoff", "my-notes.md");
+  writeFileSync(added, "mine\n", "utf-8");
+
+  assert.equal(run(root, "uninstall.mjs", ["--apply"]).status, 0);
+  assert.ok(existsSync(added), "uninstall deleted a user file inside a planted tree");
 });
 
 test("with no receipt it refuses rather than guessing", (t) => {
