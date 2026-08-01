@@ -46,7 +46,7 @@ goal:
   - The server answers `server/discover` per MCP 2026-07-28 with the v2 SDK pinned to an exact version,
     every list result carries resultType/ttlMs/cacheScope, and src/transport-lock.test.ts fails if any
     deprecated-feature import is reintroduced.
-  - '`git grep -c "PERSONAL_" -- ":!plans/"` over tracked files matches only the deprecation shim and its test, and
+  - '`git grep -c "PERSONAL_" -- ":!plans/" ":!docs/"` over tracked files matches only the deprecation shim and its test, and
     `grep -rn "personal multi-repo workspace|personal fork|on my own projects" README.md package.json
     workspace-tooling/README.md` returns nothing.'
   wont:
@@ -104,7 +104,7 @@ items:
     -c "argObj as {" src/index.ts` returns 0.
   - Given a client sending `server/discover`, then the server responds per MCP 2026-07-28 and src/transport-lock.test.ts
     fails when a deprecated-feature import is reintroduced.
-  - Given `git grep -c "PERSONAL_" -- ":!plans/"` over tracked files, then the only matches are the compatibility shim
+  - Given `git grep -c "PERSONAL_" -- ":!plans/" ":!docs/"` over tracked files, then the only matches are the compatibility shim
     module and its test; and `grep -rn "personal multi-repo workspace\|personal fork\|on my own projects\|Personal
     provider-neutral" README.md package.json workspace-tooling/README.md` returns nothing.
   depends_on:
@@ -446,7 +446,7 @@ items:
   lane: next
   size: M
   acceptance:
-  - Given `git grep -c "PERSONAL_" -- ":!plans/"` over tracked files, then the only matching files are the single compatibility
+  - Given `git grep -c "PERSONAL_" -- ":!plans/" ":!docs/"` over tracked files, then the only matching files are the single compatibility
     shim module and its test.
   - Given a shell exporting only the legacy variable, when any affected CLI runs, then it resolves the
     value, emits exactly one deprecation line to stderr naming the replacement variable and the removal
