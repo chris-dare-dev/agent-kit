@@ -33,7 +33,7 @@ from collections import defaultdict
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
-from path_contract import load_project_manifest
+from path_contract import default_manifest_path, load_project_manifest
 
 
 SCHEMA_VERSION = 1
@@ -548,7 +548,7 @@ def render_human(report: Report) -> str:
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    default_manifest = Path(__file__).with_name("project-map.json")
+    default_manifest = default_manifest_path()
     parser.add_argument("--manifest", type=Path, default=default_manifest)
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--vault", type=Path)

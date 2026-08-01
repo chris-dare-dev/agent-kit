@@ -12,7 +12,13 @@ from unittest import mock
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from path_contract import load_project_manifest, resolve_project_roots  # noqa: E402
+from path_contract import (  # noqa: E402
+    EXAMPLE_MANIFEST_NAME,
+    MANIFEST_NAME,
+    default_manifest_path,
+    load_project_manifest,
+    resolve_project_roots,
+)
 
 
 ENV_NAMES = (
@@ -103,6 +109,46 @@ class PathContractTests(unittest.TestCase):
         self.assertEqual(manifest["vault_root"], str(self.root))
         self.assertEqual(manifest["presentation_vault"]["root"], str(self.root / "Vault"))
         self.assertEqual(manifest["sentinel"], "${DO_NOT_EXPAND}")
+
+
+class DefaultManifestPathTests(unittest.TestCase):
+    """A personal manifest must not have to be committed to be used.
+
+    `project-map.json` describes one person's machine. Committing it is how an
+    employer's monorepo layout ended up shipped in this kit, kept quiet by a
+    denylist exemption that outlived the closed issue meant to remove it. The
+    file is now untracked; `project-map.example.json` is the tracked one, and
+    every consumer resolves through this helper so the fallback is not
+    reimplemented seven slightly different ways.
+    """
+
+    def test_the_personal_manifest_wins_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            base = Path(raw)
+            (base / MANIFEST_NAME).write_text("{}", encoding="utf-8")
+            (base / EXAMPLE_MANIFEST_NAME).write_text("{}", encoding="utf-8")
+            self.assertEqual(default_manifest_path(base).name, MANIFEST_NAME)
+
+    def test_it_falls_back_to_the_tracked_example(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            base = Path(raw)
+            (base / EXAMPLE_MANIFEST_NAME).write_text("{}", encoding="utf-8")
+            self.assertEqual(default_manifest_path(base).name, EXAMPLE_MANIFEST_NAME)
+
+    def test_a_missing_manifest_is_reported_against_the_example(self) -> None:
+        """Neither exists: name the path that IS in the repository."""
+        with tempfile.TemporaryDirectory() as raw:
+            self.assertEqual(
+                default_manifest_path(Path(raw)).name, EXAMPLE_MANIFEST_NAME
+            )
+
+    def test_the_tracked_example_exists_and_loads(self) -> None:
+        """The fallback is only real if the file it names is committed."""
+        example = SCRIPT_DIR / EXAMPLE_MANIFEST_NAME
+        self.assertTrue(example.exists(), f"{example} is missing from the repository")
+        manifest = load_project_manifest(example)
+        self.assertIn("projects", manifest)
+        self.assertIn("presentation_vault", manifest)
 
 
 if __name__ == "__main__":

@@ -20,6 +20,31 @@ WORKSPACE_TOKEN = "${PERSONAL_WORKSPACE_ROOT}"
 VAULT_TOKEN = "${PERSONAL_VAULT_ROOT}"
 _PLACEHOLDER_RE = re.compile(r"\$\{[^}]+\}")
 
+MANIFEST_NAME = "project-map.json"
+EXAMPLE_MANIFEST_NAME = "project-map.example.json"
+
+
+def default_manifest_path(directory: Path | str | None = None) -> Path:
+    """The personal manifest if it exists, otherwise the tracked example.
+
+    `project-map.json` describes one person's machine — where their vault sits,
+    which local directories hold which project. It was committed anyway, which
+    is why it carried an employer's monorepo layout into a kit meant to be
+    shared, and why a denylist exemption existed to keep the gate quiet about
+    it. The file is now untracked and gitignored; `project-map.example.json` is
+    the tracked, generic one.
+
+    Every consumer resolves through here rather than joining the filename
+    itself, so the fallback cannot be implemented seven slightly different ways
+    — which is how the two sides of a path contract drift apart.
+
+    Returns the example even when neither exists, so callers report a missing
+    manifest against a path that is actually in the repository.
+    """
+    base = Path(directory) if directory is not None else Path(__file__).resolve().parent
+    personal = base / MANIFEST_NAME
+    return personal if personal.exists() else base / EXAMPLE_MANIFEST_NAME
+
 
 def _normalized_path(value: str, *, base: Path) -> Path:
     expanded = os.path.expanduser(value)

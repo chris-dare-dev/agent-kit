@@ -14,3 +14,7 @@ npm-debug.log*
 # Only SERVER_PROFILE=shared switches the log to hashed arguments.
 .claude/mcp-token-log*.jsonl
 .claude/mcp-cache-snapshot*.jsonl
+
+# A personal project manifest stays local; the tracked example is
+# project-map.example.json, which the consumers fall back to (issue #38).
+workspace-tooling/project-map.json

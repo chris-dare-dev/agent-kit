@@ -23,11 +23,11 @@ import glob
 import os
 import sys
 
-from path_contract import load_project_manifest
+from path_contract import default_manifest_path, load_project_manifest
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-VAULT = load_project_manifest(os.path.join(SCRIPT_DIR, "project-map.json"))["vault_root"]
+VAULT = load_project_manifest(default_manifest_path(SCRIPT_DIR))["vault_root"]
 AGENT_REGIONS = [
     "plans",
     "docs",

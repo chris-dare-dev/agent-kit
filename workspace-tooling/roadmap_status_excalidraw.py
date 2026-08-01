@@ -27,9 +27,10 @@ import tempfile
 import urllib.parse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MANIFEST = os.path.join(SCRIPT_DIR, "project-map.json")
 sys.path.insert(0, SCRIPT_DIR)
-from path_contract import load_project_manifest  # noqa: E402
+from path_contract import default_manifest_path, load_project_manifest  # noqa: E402
+
+MANIFEST = str(default_manifest_path(SCRIPT_DIR))
 
 BOARD_SCHEMA_VERSION = 14  # round-trip-stable rail inset + link-carried scene fingerprint
 MAX_CLOSED_REVIEWS = 4

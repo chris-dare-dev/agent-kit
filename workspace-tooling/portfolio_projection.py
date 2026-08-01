@@ -25,10 +25,10 @@ from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
-from path_contract import load_project_manifest  # noqa: E402
+from path_contract import default_manifest_path, load_project_manifest  # noqa: E402
 
 
-DEFAULT_MANIFEST = SCRIPT_DIR / "project-map.json"
+DEFAULT_MANIFEST = default_manifest_path(SCRIPT_DIR)
 SCHEMA_PATH = SCRIPT_DIR / "schemas" / "portfolio-index.schema.json"
 GENERATOR = "scripts/portfolio_projection.py"
 

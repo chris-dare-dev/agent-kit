@@ -23,11 +23,11 @@ import os
 import shutil
 import sys
 
-from path_contract import load_project_manifest
+from path_contract import default_manifest_path, load_project_manifest
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MANIFEST = os.path.join(SCRIPT_DIR, "project-map.json")
+MANIFEST = str(default_manifest_path(SCRIPT_DIR))
 PROJECT_MAP = load_project_manifest(MANIFEST)
 VAULT = PROJECT_MAP["vault_root"]
 PROJ_ROOT = os.path.join(VAULT, "Notes", "Projects")
