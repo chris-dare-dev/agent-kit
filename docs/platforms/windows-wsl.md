@@ -1,3 +1,13 @@
+---
+project: agent-kit
+type: doc
+authorship: agent-generated
+tags:
+- project/agent-kit
+- type/doc
+- authorship/agent-generated
+---
+
 # Running agent-kit on Windows, with WSL2 for the resident service
 
 **This is an interim path.** A native Windows transport for the resident
