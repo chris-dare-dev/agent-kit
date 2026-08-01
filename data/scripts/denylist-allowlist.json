@@ -34,12 +34,6 @@
     },
     {
       "kind": "snippet",
-      "path": "workspace-tooling/project-map.json",
-      "snippet": "platform",
-      "reason": "Out of scope for issue #37 by agreement: this file is untracked and replaced by a tracked project-map.example.json under issue #38, together with the consumer fallbacks in frontmatter-stamp.py, project-linker.py and handoff-validate.py. Remove this entry when #38 lands."
-    },
-    {
-      "kind": "snippet",
       "path": "workspace-tooling/artifact_catalog.py",
       "snippet": "hashlib.sha256",
       "reason": "The employer product key on this line was 'left at its original value deliberately when the kit was genericized' (see the comment immediately above it), and it is hashed into stored catalog digests, so changing it may invalidate existing rows. That is an OWNER DECISION tracked as issue #267, not a sweep. Remove this entry when #267 is decided."

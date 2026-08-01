@@ -11,11 +11,11 @@
   "regions": {
     "plans": "plans",
     "docs": "docs",
-    "platform-plans": "GitLab/workspace/platform/plans",
-    "platform-docs": "GitLab/workspace/platform/docs",
-    "cms-plans": "GitLab/workspace/platform/tools/claude-mcp-server/plans",
-    "platform-infra-plans": "GitLab/workspace/platform/infra/platform-infra/plans",
-    "platform-infra-docs": "GitLab/workspace/platform/infra/platform-infra/docs"
+    "platform-plans": "sources/platform/plans",
+    "platform-docs": "sources/platform/docs",
+    "cms-plans": "sources/platform/tools/mcp-server/plans",
+    "platform-infra-plans": "sources/platform/infra/platform-infra/plans",
+    "platform-infra-docs": "sources/platform/infra/platform-infra/docs"
   },
   "projects": {
     "the dispatcher service": {
@@ -28,7 +28,7 @@
       ],
       "parent_roadmap": "dispatcher-prove-and-distribute-roadmap",
       "app_dirs": [
-        "GitLab/workspace/platform/source/agents-dispatcher"
+        "sources/platform/source/agents-dispatcher"
       ],
       "contains": [
         "engine-reliability-safety",
@@ -50,8 +50,8 @@
       ],
       "deliverable_dirs": [],
       "app_dirs": [
-        "GitLab/workspace/platform/source/service-registry-api",
-        "GitLab/workspace/platform/source/service-registry-operator"
+        "sources/platform/source/service-registry-api",
+        "sources/platform/source/service-registry-operator"
       ],
       "contains": [
         "srm-",
@@ -71,7 +71,7 @@
       ],
       "deliverable_dirs": [],
       "app_dirs": [
-        "GitLab/workspace/platform/charts/istio-gateway"
+        "sources/platform/charts/istio-gateway"
       ],
       "excludes": [
         "tenant-pep-kargo-onboard",
@@ -100,7 +100,7 @@
       ],
       "deliverable_dirs": [],
       "app_dirs": [
-        "GitLab/workspace/platform/source/tenant-pep"
+        "sources/platform/source/tenant-pep"
       ],
       "contains": [
         "zt-pep",
@@ -168,7 +168,7 @@
       ],
       "deliverable_dirs": [],
       "app_dirs": [
-        "GitLab/workspace/platform/source/admin-mcp-server"
+        "sources/platform/source/admin-mcp-server"
       ]
     },
     "Admin WebApp": {
@@ -178,7 +178,7 @@
       ],
       "deliverable_dirs": [],
       "app_dirs": [
-        "GitLab/workspace/platform/source/admin-web-app"
+        "sources/platform/source/admin-web-app"
       ]
     },
     "AI Ops": {
