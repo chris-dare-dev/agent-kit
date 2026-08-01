@@ -10845,6 +10845,28 @@ def self_test() -> int:
             "simulated failure after check evidence write",
         )
         TEST_FAIL_AFTER_CHECK_EVIDENCE_WRITE = False
+        # These two run_check calls are NOT wrapped in check(), so the central
+        # untrusted-interpreter recognition above never saw them: on a host
+        # whose Python is a per-user install under %LOCALAPPDATA% — the Windows
+        # default, user-writable, and correctly refused — the control fired
+        # here and took the whole self-test down as a FAILURE. The control is
+        # right; the call site was simply unguarded.
+        #
+        # Everything below depends on the receipts these produce, so the
+        # section is skipped rather than faked. Fabricating a receipt would let
+        # the assertions that follow verify fiction, which is worse than not
+        # running them.
+        if not _interpreter_trusted:
+            skip(
+                "check-run section",
+                f"REQUIRES:trusted-interpreter-path ({sys.executable}) -- "
+                "check-run receipts, redaction, evidence refs and everything "
+                "derived from them were NOT verified on this host",
+            )
+            verdict = "OK" if failures == 0 else f"{failures} failure(s)"
+            verdict += f" ({skipped} skipped on {sys.platform})"
+            print(f"milestone-pipeline-artifacts self-test: {verdict}")
+            return 0 if failures == 0 else 1
         check_receipt = run_check(
             state_path, "fixture-check", [sys.executable, "fixture_check.py"], 60
         )
