@@ -1467,7 +1467,7 @@ def _reserve_holdout(
         "system_digest": system_digest,
     }
     flags = (
-        os.O_WRONLY
+        os.O_WRONLY | getattr(os, "O_BINARY", 0)
         | os.O_CREAT
         | os.O_EXCL
         | getattr(os, "O_CLOEXEC", 0)

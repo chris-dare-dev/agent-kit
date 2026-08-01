@@ -195,7 +195,7 @@ def private_tree_manifest(path: Path) -> tuple[str, list[dict[str, Any]]]:
     entries: list[dict[str, Any]] = []
     aggregate = hashlib.sha256()
     flags = (
-        os.O_RDONLY
+        os.O_RDONLY | getattr(os, "O_BINARY", 0)
         | getattr(os, "O_CLOEXEC", 0)
         | getattr(os, "O_NOFOLLOW", 0)
     )
@@ -295,7 +295,7 @@ def atomic_write_bytes(
     directory = ensure_private_directory(path.parent)
     temporary = directory / f".tmp-{path.name}-{os.getpid()}-{uuid.uuid4().hex}"
     flags = (
-        os.O_WRONLY
+        os.O_WRONLY | getattr(os, "O_BINARY", 0)
         | os.O_CREAT
         | os.O_EXCL
         | getattr(os, "O_CLOEXEC", 0)

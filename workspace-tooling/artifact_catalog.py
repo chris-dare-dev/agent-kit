@@ -195,7 +195,7 @@ def _read_file_snapshot(path: Path, hint_limit: int = 128 * 1024) -> tuple[str, 
     """Hash and sample one stable, no-follow file descriptor."""
     digest = hashlib.sha256()
     hint = bytearray()
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags)
     with os.fdopen(descriptor, "rb") as handle:
         before = os.fstat(handle.fileno())

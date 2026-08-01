@@ -129,7 +129,7 @@ def _current_catalog_row(catalog: Path, relative: str) -> dict[str, Any]:
 
 
 def _read_verified(path: Path, expected: dict[str, Any], max_chars: int) -> dict[str, Any]:
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags)
     digest = hashlib.sha256()
     content = bytearray()

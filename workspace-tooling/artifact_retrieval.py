@@ -222,7 +222,7 @@ class LexicalIndex:
         self.path = path.expanduser().absolute()
         security.require_private_file(self.path)
         flags = (
-            os.O_RDONLY
+            os.O_RDONLY | getattr(os, "O_BINARY", 0)
             | getattr(os, "O_CLOEXEC", 0)
             | getattr(os, "O_NOFOLLOW", 0)
         )
@@ -327,14 +327,8 @@ class LexicalIndex:
             raise
 
     @staticmethod
-    def _file_identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
-        return (
-            info.st_dev,
-            info.st_ino,
-            info.st_size,
-            info.st_mtime_ns,
-            info.st_ctime_ns,
-        )
+    def _file_identity(info: os.stat_result) -> tuple[int, ...]:
+        return platform_compat.file_identity(info)
 
     def _assert_identity(self) -> None:
         if self._descriptor < 0:
@@ -737,7 +731,7 @@ def _verified_canonical_span(
     if artifact.byte_size > MAX_CANONICAL_BYTES:
         raise RetrievalError("canonical source exceeds the retrieval size limit")
     path = _safe_source(workspace, artifact.relative_path)
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags)
     digest = hashlib.sha256()
     data = bytearray()

@@ -67,7 +67,7 @@ def create_missing_link(
         raise UnsafeLinkError(f"unsafe destination: {destination}")
 
     directory_flags = (
-        os.O_RDONLY
+        os.O_RDONLY | getattr(os, "O_BINARY", 0)
         | getattr(os, "O_CLOEXEC", 0)
         | getattr(os, "O_DIRECTORY", 0)
         | getattr(os, "O_NOFOLLOW", 0)

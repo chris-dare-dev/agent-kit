@@ -156,7 +156,7 @@ def _verified_utf8(
         current = current / part
         if current.is_symlink():
             raise SpanGenerationError("catalog path contains a symlink")
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags)
     digest = hashlib.sha256()
     data = bytearray()
@@ -924,7 +924,7 @@ def build_manifest(
             "INSERT INTO spans_fts(spans_fts) VALUES('integrity-check')"
         )
         connection.close()
-        descriptor = os.open(temporary, os.O_RDONLY)
+        descriptor = os.open(temporary, os.O_RDONLY | getattr(os, "O_BINARY", 0))
         try:
             os.fsync(descriptor)
         finally:

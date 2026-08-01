@@ -203,7 +203,7 @@ def _locked(path: Path) -> Iterator[None]:
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     descriptor = os.open(
         path,
-        os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0),
+        os.O_RDWR | getattr(os, "O_BINARY", 0) | os.O_CREAT | getattr(os, "O_CLOEXEC", 0),
         0o600,
     )
     try:
@@ -644,9 +644,9 @@ def _copy_exclusive(source: Path, destination: Path, expected: dict[str, Any]) -
         if digest != expected["content_sha256"] or info.st_size != expected["byte_size"]:
             raise QuarantineError(f"staged artifact mismatch; refusing overwrite: {destination}")
         return
-    source_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    source_flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     destination_flags = (
-        os.O_WRONLY
+        os.O_WRONLY | getattr(os, "O_BINARY", 0)
         | os.O_CREAT
         | os.O_EXCL
         | getattr(os, "O_CLOEXEC", 0)
@@ -696,7 +696,7 @@ def _copy_exclusive(source: Path, destination: Path, expected: dict[str, Any]) -
 
 def _write_json_exclusive(path: Path, payload: dict[str, Any], mode: int = 0o400) -> None:
     flags = (
-        os.O_WRONLY
+        os.O_WRONLY | getattr(os, "O_BINARY", 0)
         | os.O_CREAT
         | os.O_EXCL
         | getattr(os, "O_CLOEXEC", 0)
@@ -823,7 +823,7 @@ def stage_plan(plan: dict[str, Any], root: Path, apply: bool) -> dict[str, Any]:
             manifest = dict(expected_core)
             manifest["sealed_at"] = datetime.now(timezone.utc).isoformat()
             _write_json_exclusive(manifest_path, manifest)
-            directory_descriptor = os.open(directory, os.O_RDONLY)
+            directory_descriptor = os.open(directory, os.O_RDONLY | getattr(os, "O_BINARY", 0))
             try:
                 os.fsync(directory_descriptor)
             finally:
@@ -970,7 +970,7 @@ def _append_event(path: Path, event: dict[str, Any]) -> None:
     if path.exists() and (path.is_symlink() or not path.is_file()):
         raise QuarantineError(f"unsafe event log: {path}")
     flags = (
-        os.O_WRONLY
+        os.O_WRONLY | getattr(os, "O_BINARY", 0)
         | os.O_APPEND
         | os.O_CREAT
         | getattr(os, "O_CLOEXEC", 0)

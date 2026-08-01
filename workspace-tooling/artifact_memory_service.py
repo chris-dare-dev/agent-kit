@@ -295,15 +295,8 @@ def _canonical_digest(value: Any) -> str:
     ).hexdigest()
 
 
-def _path_identity(path: Path) -> tuple[int, int, int, int, int]:
-    information = path.stat()
-    return (
-        information.st_dev,
-        information.st_ino,
-        information.st_size,
-        information.st_mtime_ns,
-        information.st_ctime_ns,
-    )
+def _path_identity(path: Path) -> tuple[int, ...]:
+    return platform_compat.file_identity(path.stat())
 
 
 def _catalog_binding(path: Path) -> dict[str, Any]:
@@ -1631,7 +1624,7 @@ class ArtifactUnixHTTPServer(socketserver.ThreadingMixIn, _UnixStreamServerBase)
     def _acquire_socket_lifecycle_lock(self) -> None:
         """Hold an owner-private flock through prepare, bind, and cleanup."""
         flags = (
-            os.O_RDWR
+            os.O_RDWR | getattr(os, "O_BINARY", 0)
             | os.O_CREAT
             | getattr(os, "O_CLOEXEC", 0)
             | getattr(os, "O_NOFOLLOW", 0)

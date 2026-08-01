@@ -221,7 +221,7 @@ def load_current_artifacts(catalog: Path) -> tuple[int, list[CatalogArtifact]]:
 
 def _read_verified_source(path: Path, artifact: CatalogArtifact) -> str:
     """Read one stable regular-file descriptor and verify its catalog hash."""
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags)
     digest = hashlib.sha256()
     content = bytearray()
@@ -450,7 +450,7 @@ def _outbox_publish_lock(output_root: Path) -> Iterator[None]:
     """Serialize final-directory publication without exposing partial names."""
     security.ensure_private_directory(output_root)
     lock_path = output_root / ".outbox-publish.lock"
-    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0)
+    flags = os.O_RDWR | getattr(os, "O_BINARY", 0) | os.O_CREAT | getattr(os, "O_CLOEXEC", 0)
     descriptor = os.open(lock_path, flags, security.PRIVATE_FILE_MODE)
     try:
         security.secure_created_file(lock_path)

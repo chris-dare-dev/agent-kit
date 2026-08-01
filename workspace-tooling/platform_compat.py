@@ -67,6 +67,7 @@ __all__ = [
     "reset_degraded_owner_checks",
     "create_directory_link",
     "exclusive_file_lock",
+    "file_identity",
     "fsync_directory",
     "lock_file_exclusive",
     "peak_rss_bytes",
@@ -306,6 +307,29 @@ def exclusive_file_lock(
         yield fd
     finally:
         unlock_file(fd)
+
+
+def file_identity(info: "os.stat_result") -> tuple[int, ...]:
+    """A stable identity for one file, comparable across `fstat` and `lstat`.
+
+    Used to pin a file open and then prove the path still refers to the same
+    bytes -- the "changed while its identity was pinned" guard.
+
+    `st_ctime_ns` is deliberately EXCLUDED on Windows. On POSIX it is the
+    inode-change time, which is exactly the signal this guard wants. Windows has
+    no such concept: `st_ctime` there is the file CREATION time, and `os.fstat`
+    on an open handle and `os.lstat` on the path fill it from different
+    information classes, so the two disagree by a millisecond or two for a file
+    that was just written. Comparing it did not detect tampering, it just failed
+    -- nine substrate errors, all of them the guard firing on itself.
+
+    The remaining four are real identity on both platforms: on Windows `st_ino`
+    is the 64-bit file ID and `st_dev` the volume serial number.
+    """
+    identity = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+    if IS_WINDOWS:
+        return identity
+    return identity + (info.st_ctime_ns,)
 
 
 # ---------------------------------------------------------------------------

@@ -319,7 +319,7 @@ def build_selection(
         connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
         connection.commit()
         connection.close()
-        descriptor = os.open(temporary, os.O_RDONLY)
+        descriptor = os.open(temporary, os.O_RDONLY | getattr(os, "O_BINARY", 0))
         try:
             os.fsync(descriptor)
         finally:

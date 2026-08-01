@@ -130,7 +130,7 @@ def _outside_workspace(path: Path, workspace: Path, label: str) -> Path:
 
 
 def _read_stable_json(path: Path) -> tuple[dict[str, Any], str]:
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags)
     digest = hashlib.sha256()
     content = bytearray()
@@ -2365,7 +2365,7 @@ def supervisor_event(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
     # O_APPEND so concurrent writers cannot interleave or truncate; the log is
     # never opened for writing in any other mode.
     handle = os.open(
-        log_path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600
+        log_path, os.O_WRONLY | getattr(os, "O_BINARY", 0) | os.O_APPEND | os.O_CREAT, 0o600
     )
     try:
         os.write(handle, line.encode("utf-8"))
