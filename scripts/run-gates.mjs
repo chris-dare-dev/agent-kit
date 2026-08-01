@@ -119,13 +119,14 @@ const QUARANTINED = new Map([
   // and this Windows host, where jsonschema 4.26 is present, calls them red.
   // Quarantine, do not "fix" by uninstalling the dependency.
   //
-  // NO ISSUE FILED YET: file one and name it here.
+  // Tracked by issue #269, which also records why a green run of these three
+  // proves nothing on a host without `jsonschema` installed.
   ["milestone-pipeline-schema-check.py --self-test",
-   "fails at HEAD (pre-existing): milestone-trust-policy-v2.schema.json absent — needs an issue"],
+   "fails at HEAD (pre-existing): milestone-trust-policy-v2.schema.json absent — issue #269"],
   ["milestone-pipeline-review-manifest.py --self-test",
-   "fails at HEAD (pre-existing): milestone-review-manifest-v2.schema.json absent — needs an issue"],
+   "fails at HEAD (pre-existing): milestone-review-manifest-v2.schema.json absent — issue #269"],
   ["milestone-pipeline-migrate.py --self-test",
-   "fails at HEAD (pre-existing): milestone-pipeline-state-v2.schema.json absent — needs an issue"],
+   "fails at HEAD (pre-existing): milestone-pipeline-state-v2.schema.json absent — issue #269"],
 ]);
 
 const results = [];
