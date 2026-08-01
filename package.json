@@ -33,6 +33,7 @@
     "test:unit": "npm test && npm run test:init && npm run test:uninstall && npm run test:runner",
     "gates": "node scripts/run-gates.mjs",
     "test:gates": "npm run gates",
+    "check:issues": "python3 data/scripts/issue-refs-check.py",
     "test:substrate": "python3 workspace-tooling/run-substrate-tests.py",
     "wsl:smoke": "node scripts/wsl-smoke.mjs",
     "test:all": "npm run test:unit && npm run test:gates && npm run verify:quickstart"
