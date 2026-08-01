@@ -3,6 +3,7 @@ from __future__ import annotations
 import gzip
 import json
 import sqlite3
+from contextlib import closing
 import sys
 import tempfile
 import unittest
@@ -67,7 +68,7 @@ class OutboxRetentionTests(unittest.TestCase):
         return path
 
     def _write_catalog(self, current: list[str]) -> None:
-        with sqlite3.connect(self.catalog) as conn:
+        with closing(sqlite3.connect(self.catalog)) as conn, conn:
             conn.execute("CREATE TABLE current_artifact_revisions (revision_id TEXT)")
             conn.executemany(
                 "INSERT INTO current_artifact_revisions VALUES (?)",
@@ -75,7 +76,7 @@ class OutboxRetentionTests(unittest.TestCase):
             )
 
     def _write_ingestion(self, serving: list[str]) -> None:
-        with sqlite3.connect(self.ingestion) as conn:
+        with closing(sqlite3.connect(self.ingestion)) as conn, conn:
             conn.execute(
                 "CREATE TABLE sink_units (sink TEXT, target TEXT, unit_id TEXT, "
                 "revision_id TEXT, status TEXT)"
@@ -86,7 +87,7 @@ class OutboxRetentionTests(unittest.TestCase):
             )
 
     def _write_consumer(self, outbox_paths: list[str]) -> None:
-        with sqlite3.connect(self.consumer) as conn:
+        with closing(sqlite3.connect(self.consumer)) as conn, conn:
             conn.execute("CREATE TABLE consumer_events (event_id TEXT, outbox_path TEXT)")
             conn.executemany(
                 "INSERT INTO consumer_events VALUES (?, ?)",
@@ -94,7 +95,7 @@ class OutboxRetentionTests(unittest.TestCase):
             )
 
     def _write_replay(self, revision_to_outbox: dict[str, str]) -> None:
-        with sqlite3.connect(self.replay) as conn:
+        with closing(sqlite3.connect(self.replay)) as conn, conn:
             conn.execute(
                 "CREATE TABLE selected_units (unit_id TEXT, revision_id TEXT, "
                 "source_outbox TEXT, unit_json TEXT)"

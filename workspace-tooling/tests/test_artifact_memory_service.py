@@ -16,7 +16,7 @@ import threading
 import unittest
 
 import platform_compat
-from contextlib import ExitStack, contextmanager
+from contextlib import closing, ExitStack, contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -187,7 +187,7 @@ class ExactServiceFixture(RuntimeFixture):
         )
         migration_contract_digest = canonical_digest(migration_contract)
         migration_state = self.derived / "migration-state.sqlite3"
-        with sqlite3.connect(migration_state) as connection:
+        with closing(sqlite3.connect(migration_state)) as connection, connection:
             connection.executescript(
                 """
                 CREATE TABLE metadata (
@@ -943,7 +943,7 @@ class ExactServiceStartupTests(unittest.TestCase):
 
     def test_catalog_revision_set_mismatch_fails_startup(self) -> None:
         catalog = self.fixture.derived / "catalog.sqlite3"
-        with sqlite3.connect(catalog) as connection:
+        with closing(sqlite3.connect(catalog)) as connection, connection:
             connection.execute(
                 """
                 UPDATE current_artifact_revisions
@@ -966,7 +966,7 @@ class ExactServiceStartupTests(unittest.TestCase):
                 return_value={"results": [], "abstained": True}
             )
             catalog = self.fixture.derived / "catalog.sqlite3"
-            with sqlite3.connect(catalog) as connection:
+            with closing(sqlite3.connect(catalog)) as connection, connection:
                 connection.execute(
                     """
                     UPDATE current_artifact_revisions

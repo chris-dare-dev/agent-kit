@@ -9,14 +9,14 @@ point printed a banner and returned 0 instead.
 
 That banner is now WRONG on both counts. M2 routed those imports through
 ``platform_compat``, and the suite collects on Windows -- 260 tests before,
-625 after. And returning 0 for a suite that ran nothing is the skip-to-green
+646 after. And returning 0 for a suite that ran nothing is the skip-to-green
 pattern the same milestone exists to remove, however loudly the banner said
 "NOT RUN".
 
-So this runs the suite everywhere and reports what actually happened. Windows is
-KNOWN RED pending the teardown and fixture work in M2/#70; the header says so and
-the exit code still tells the truth, because a known-red platform that reports
-green is how a real regression hides.
+So this runs the suite everywhere and reports what actually happened, against a
+recorded per-platform baseline. Windows is still KNOWN RED pending the remaining
+work in M2/#70; the header says so and the exit code still tells the truth,
+because a known-red platform that reports green is how a real regression hides.
 
 Exit codes:
     0  the suite ran and passed
@@ -56,13 +56,14 @@ BASELINES = {
         "note": "same as linux; both are POSIX and share the venv dependency.",
     },
     "win32": {
-        "failures": 31,
-        "errors": 337,
+        "failures": 30,
+        "errors": 129,
         "note": (
-            "the suite COLLECTS here (260 -> 625 tests in M2) but does not pass: "
-            "SQLite handles held across tempdir teardown, macOS-only launchd "
-            "fixtures, and the venv-dependent cases above. Closing this out is "
-            "M2 issue #70."
+            "the suite COLLECTS here (260 -> 646 tests in M2). The teardown, "
+            "mode-bit and directory-fsync defects are fixed; what remains is "
+            "101 cases in three classes that should become machine-readable "
+            "SKIPs (29 need the provisioned venv, 44 need symlink privilege, "
+            "28 need AF_UNIX) plus 57 genuine residue. M2 issue #70."
         ),
     },
 }

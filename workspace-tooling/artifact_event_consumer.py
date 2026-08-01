@@ -16,6 +16,7 @@ import json
 import os
 import re
 import sqlite3
+from contextlib import closing
 import stat
 import subprocess
 import sys
@@ -1125,7 +1126,7 @@ def _read_state(path: Path) -> dict[str, dict[str, Any]]:
     if path.is_symlink() or not path.is_file():
         raise ConsumerError(f"consumer state must be a real file: {path}")
     security.require_private_file(path)
-    with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)) as connection, connection:
         connection.row_factory = sqlite3.Row
         try:
             rows = connection.execute(
@@ -1142,7 +1143,7 @@ def _read_operational_state(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"dead_letters": [], "reconcile_jobs": [], "publication_failed": False}
     security.require_private_file(path)
-    with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)) as connection, connection:
         connection.row_factory = sqlite3.Row
         tables = {
             str(row[0])
@@ -1402,7 +1403,7 @@ def _catalog_generation_status(path: Path) -> dict[str, Any]:
             "authoritative_run_id": None,
         }
     security.require_private_file(path)
-    with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)) as connection, connection:
         columns = {
             str(row[1])
             for row in connection.execute("PRAGMA table_info(scan_runs)")
@@ -2279,9 +2280,9 @@ def dead_letter_action(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
     if args.dead_letter_action == "replay":
         # Replay never edits receipt bytes. It is allowed only after the
         # operator has restored a canonical, fully validating receipt.
-        with sqlite3.connect(
+        with closing(sqlite3.connect(
             f"file:{state_path.resolve()}?mode=ro", uri=True
-        ) as connection:
+        )) as connection, connection:
             row = connection.execute(
                 "SELECT receipt_path FROM dead_letters WHERE dead_letter_id=?",
                 (args.dead_letter_id,),

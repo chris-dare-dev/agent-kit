@@ -6,6 +6,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import sqlite3
+from contextlib import closing
 import statistics
 import subprocess
 import time
@@ -79,10 +80,10 @@ def _small_outbox(runtime: artifact_runtime.ArtifactRuntime) -> str:
         collection_generation=runtime.qdrant_generation,
         embedding_model_digest=digest,
     )
-    with sqlite3.connect(
+    with closing(sqlite3.connect(
         f"file:{runtime.ingestion_state.resolve()}?mode=ro",
         uri=True,
-    ) as connection:
+    )) as connection, connection:
         completed = {
             str(row[0])
             for row in connection.execute(

@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import sqlite3
+from contextlib import closing
 import sys
 import tempfile
 import unittest
@@ -128,7 +129,7 @@ class ReceiptWatermarkTests(unittest.TestCase):
         self.temp.cleanup()
 
     def _state(self, observed_events: list[str]) -> None:
-        with sqlite3.connect(self.state) as connection:
+        with closing(sqlite3.connect(self.state)) as connection, connection:
             connection.execute(
                 "CREATE TABLE consumer_events (event_id TEXT PRIMARY KEY,"
                 " status TEXT NOT NULL, updated_at TEXT NOT NULL)"
@@ -308,7 +309,7 @@ class CatalogAndSnapshotTests(unittest.TestCase):
 
     def _catalog(self, rows: list[tuple[int, str, str]]) -> Path:
         path = self.root / "catalog.sqlite3"
-        with sqlite3.connect(path) as connection:
+        with closing(sqlite3.connect(path)) as connection, connection:
             connection.execute(
                 "CREATE TABLE scan_runs (run_id INTEGER PRIMARY KEY,"
                 " finished_at TEXT, status TEXT)"

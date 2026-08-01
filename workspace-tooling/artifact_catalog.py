@@ -19,7 +19,7 @@ import stat
 import sys
 import tempfile
 from collections import Counter, defaultdict
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -541,7 +541,10 @@ def _open_staging_database(destination: Path) -> tuple[sqlite3.Connection, Path]
     try:
         if destination.exists():
             security.require_private_file(destination)
-            with sqlite3.connect(destination) as old, sqlite3.connect(temporary) as new:
+            with (
+                closing(sqlite3.connect(destination)) as old, old,
+                closing(sqlite3.connect(temporary)) as new, new,
+            ):
                 version = int(old.execute("PRAGMA user_version").fetchone()[0])
                 if version not in SUPPORTED_SCHEMA_VERSIONS:
                     raise PolicyError(

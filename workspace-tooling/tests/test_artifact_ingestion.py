@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 import stat
 import sys
 import tempfile
@@ -257,7 +258,7 @@ class ArtifactIngestionTests(unittest.TestCase):
         self.assertEqual(qdrant["would_ingest"], 2)
         self.assertEqual(graphiti["would_ingest"], 2)
         self.assertEqual(graphiti["backend"], "falkordb")
-        with sqlite3.connect(state) as connection:
+        with closing(sqlite3.connect(state)) as connection, connection:
             self.assertEqual(
                 connection.execute("PRAGMA user_version").fetchone()[0],
                 ingestion.STATE_SCHEMA_VERSION,

@@ -11,6 +11,7 @@ import math
 import os
 import platform
 import sqlite3
+from contextlib import closing
 import statistics
 import stat
 import sys
@@ -560,10 +561,10 @@ def _validate_migration_evidence(
         label="migration checkpoint",
     )
     try:
-        with sqlite3.connect(
+        with closing(sqlite3.connect(
             f"file:{checkpoint_path}?mode=ro",
             uri=True,
-        ) as checkpoint:
+        )) as checkpoint, checkpoint:
             integrity = str(
                 checkpoint.execute("PRAGMA quick_check").fetchone()[0]
             )
@@ -1597,10 +1598,10 @@ def validate_completed_holdout_ledger(
 
 def _manifest_metadata(path: Path) -> tuple[dict[str, Any], str]:
     security.require_private_file(path)
-    with sqlite3.connect(
+    with closing(sqlite3.connect(
         f"file:{path.resolve()}?mode=ro&immutable=1",
         uri=True,
-    ) as connection:
+    )) as connection, connection:
         metadata = {
             str(row[0]): json.loads(str(row[1]))
             for row in connection.execute(
@@ -1745,10 +1746,10 @@ def _validate_gold_judgments(
     manifest: Path,
     suite: GoldSuite,
 ) -> None:
-    with sqlite3.connect(
+    with closing(sqlite3.connect(
         f"file:{manifest.resolve()}?mode=ro&immutable=1",
         uri=True,
-    ) as connection:
+    )) as connection, connection:
         connection.row_factory = sqlite3.Row
         for record in suite.records:
             for judgment in record["judgments"]:
@@ -1790,10 +1791,10 @@ def _annotate_current(
     ]
     current: set[str] = set()
     if point_ids:
-        with sqlite3.connect(
+        with closing(sqlite3.connect(
             f"file:{manifest.resolve()}?mode=ro&immutable=1",
             uri=True,
-        ) as connection:
+        )) as connection, connection:
             for start in range(0, len(point_ids), 500):
                 batch = point_ids[start : start + 500]
                 rows = connection.execute(

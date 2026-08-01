@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import sqlite3
+from contextlib import closing
 import subprocess
 import sys
 import time
@@ -131,7 +132,7 @@ def _wait_restore(runtime: artifact_runtime.ArtifactRuntime) -> None:
 
 def _selection_ids(path: Path) -> dict[str, dict[str, Any]]:
     security.require_private_file(path)
-    with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)) as connection, connection:
         return {
             str(point_id): json.loads(str(unit_json))
             for point_id, unit_json in connection.execute(

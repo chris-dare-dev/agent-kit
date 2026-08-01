@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import sqlite3
+from contextlib import closing
 import sys
 import tempfile
 import unittest
@@ -80,7 +81,7 @@ class UnitArchiveTests(unittest.TestCase):
         self.temp.cleanup()
 
     def _sqlite(self, path: Path, ddl: str, insert: str, rows: list) -> None:
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn, conn:
             conn.execute(ddl)
             if rows:
                 conn.executemany(insert, rows)
@@ -186,13 +187,13 @@ class UnitArchiveTests(unittest.TestCase):
         second = archive_mod.backfill(**self.kwargs(), apply=True)
         # nothing left to do for the already-archived revision
         self.assertEqual(second["units_archived"], 0)
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             total = conn.execute("SELECT COUNT(*) FROM archived_units").fetchone()[0]
         self.assertEqual(total, 1)
 
     def test_archived_row_records_its_provenance(self) -> None:
         archive_mod.backfill(**self.kwargs(), apply=True)
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             row = conn.execute(
                 "SELECT revision_id, source_outbox, source_units_sha256, "
                 "catalog_run_id, unit_json FROM archived_units"
@@ -233,7 +234,7 @@ class UnitArchiveTests(unittest.TestCase):
         skipped = {s["outbox"]: s["reason"] for s in payload["skipped_sources"]}
         self.assertIn(tmp.name, skipped)
         self.assertIn("interrupted render", skipped[tmp.name])
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             origins = {
                 r[0]
                 for r in conn.execute(
@@ -308,7 +309,7 @@ class UnitArchiveTests(unittest.TestCase):
         self.assertTrue(
             any("error" in entry for entry in result["sources"]), result["sources"]
         )
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             units_rows = conn.execute("SELECT COUNT(*) FROM archived_units").fetchone()[0]
             attested = conn.execute(
                 "SELECT COUNT(*) FROM archived_revisions"
@@ -330,7 +331,7 @@ class UnitArchiveTests(unittest.TestCase):
         # REV_LOST's serving unit_id is "u-lost"; the outbox renders it as
         # "catalog-run-1-chunks-v2:0", so parity fails and it is NOT attested.
         self.assertIn(REV_LOST, result["unrecoverable"])
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             attested = {
                 r[0] for r in conn.execute("SELECT revision_id FROM archived_revisions")
             }
@@ -396,7 +397,7 @@ class UnitArchiveTests(unittest.TestCase):
             connection.commit()
         finally:
             connection.close()
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             attested = conn.execute(
                 "SELECT COUNT(*) FROM archived_revisions"
             ).fetchone()[0]
@@ -432,7 +433,7 @@ class UnitArchiveTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIn(REV_ORPHANED, covered)
 
-        with sqlite3.connect(self.ingestion) as conn:
+        with closing(sqlite3.connect(self.ingestion)) as conn, conn:
             conn.execute(
                 "INSERT INTO sink_units VALUES ('qdrant', ?, ?, ?, 'completed')",
                 (TARGET, "u-extra-for-orphan", REV_ORPHANED),
@@ -462,7 +463,7 @@ class UnitArchiveTests(unittest.TestCase):
         self.assertTrue(
             any("error" in entry for entry in result["sources"]), result["sources"]
         )
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             units_rows = conn.execute(
                 "SELECT COUNT(*) FROM archived_units"
             ).fetchone()[0]
@@ -488,7 +489,7 @@ class UnitArchiveTests(unittest.TestCase):
         self.assertIn(REV_ORPHANED, covered)  # intact -> covered
 
         # corrupt the stored payload WITHOUT updating its recorded digest
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             conn.execute(
                 "UPDATE archived_units SET unit_json='{}' WHERE revision_id=?",
                 (REV_ORPHANED,),
@@ -511,7 +512,7 @@ class UnitArchiveTests(unittest.TestCase):
         forged = json.dumps(
             {"unit_id": "not-the-served-one", "revision_id": REV_ORPHANED}
         )
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             conn.execute(
                 "UPDATE archived_units SET unit_json=?, unit_sha256=? "
                 "WHERE revision_id=?",
@@ -534,7 +535,7 @@ class UnitArchiveTests(unittest.TestCase):
         # from the "ONE coverage query". Now the attestation is payload-validated AND
         # OR REPLACE repairs the corrupt row from the still-present source outbox.
         archive_mod.backfill(**self.kwargs(), apply=True)
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             conn.execute(
                 "UPDATE archived_units SET unit_json='{}' WHERE revision_id=?",
                 (REV_ORPHANED,),
@@ -545,7 +546,7 @@ class UnitArchiveTests(unittest.TestCase):
         self.assertNotIn(REV_ORPHANED, covered)  # read authority: not covered
 
         second = archive_mod.backfill(**self.kwargs(), apply=True)
-        with sqlite3.connect(self.archive) as conn:
+        with closing(sqlite3.connect(self.archive)) as conn, conn:
             row = conn.execute(
                 "SELECT unit_sha256, unit_json FROM archived_units WHERE revision_id=?",
                 (REV_ORPHANED,),
@@ -572,7 +573,7 @@ class UnitArchiveTests(unittest.TestCase):
                 if self.archive.exists():
                     self.archive.unlink()
                 archive_mod.backfill(**self.kwargs(), apply=True)
-                with sqlite3.connect(self.archive) as conn:
+                with closing(sqlite3.connect(self.archive)) as conn, conn:
                     conn.execute(
                         "UPDATE archived_units SET unit_json=?, unit_sha256=? "
                         "WHERE revision_id=?",

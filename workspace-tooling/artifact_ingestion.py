@@ -32,7 +32,7 @@ import sys
 import uuid
 from urllib.parse import urlparse
 from collections import Counter
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -183,7 +183,7 @@ def _latest_catalog_run(connection: sqlite3.Connection) -> int:
 def load_current_artifacts(catalog: Path) -> tuple[int, list[CatalogArtifact]]:
     catalog = catalog.expanduser().resolve(strict=True)
     security.require_private_file(catalog)
-    with sqlite3.connect(catalog) as connection:
+    with closing(sqlite3.connect(catalog)) as connection, connection:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         if version not in (2, 3):
             raise IngestionError(

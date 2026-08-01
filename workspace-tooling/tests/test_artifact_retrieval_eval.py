@@ -10,7 +10,7 @@ import sys
 import tempfile
 import unittest
 from collections.abc import Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -840,7 +840,7 @@ class MigrationEvidenceValidationTests(unittest.TestCase):
             evaluation._canonical_json(self.migration_contract)
         ).hexdigest()
         self.state = self.root / "migration-state.sqlite3"
-        with sqlite3.connect(self.state) as connection:
+        with closing(sqlite3.connect(self.state)) as connection, connection:
             connection.executescript(
                 """
                 CREATE TABLE metadata (

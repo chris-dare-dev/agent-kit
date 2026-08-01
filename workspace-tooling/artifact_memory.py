@@ -16,6 +16,7 @@ import json
 import os
 import re
 import sqlite3
+from contextlib import closing
 import stat
 import subprocess
 import sys
@@ -112,7 +113,7 @@ def _safe_catalog_source(workspace: Path, relative: str) -> Path:
 def _current_catalog_row(catalog: Path, relative: str) -> dict[str, Any]:
     database = catalog.expanduser().resolve(strict=True)
     security.require_private_file(database)
-    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(f"file:{database}?mode=ro", uri=True)) as connection, connection:
         connection.row_factory = sqlite3.Row
         row = connection.execute(
             "SELECT revision_id, content_sha256, byte_size, mtime_ns, "
@@ -433,7 +434,7 @@ def temporal_facts(
 def _catalog_status(catalog: Path) -> dict[str, Any]:
     database = catalog.expanduser().resolve(strict=True)
     security.require_private_file(database)
-    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(f"file:{database}?mode=ro", uri=True)) as connection, connection:
         current = connection.execute(
             "SELECT run_id, finished_at FROM scan_runs "
             "WHERE finished_at IS NOT NULL AND status='complete' "
@@ -719,7 +720,7 @@ def _consumer_status(path: Path) -> dict[str, int]:
         return {}
     try:
         security.require_private_file(path)
-        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as connection:
+        with closing(sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)) as connection, connection:
             rows = connection.execute(
                 "SELECT status, COUNT(*) FROM consumer_events GROUP BY status"
             ).fetchall()

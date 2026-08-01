@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 import stat
 import sys
 import tempfile
@@ -34,7 +35,7 @@ class ArtifactMemoryControlTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_catalog_status_marks_a_complete_generation_available(self) -> None:
-        with sqlite3.connect(self.catalog) as connection:
+        with closing(sqlite3.connect(self.catalog)) as connection, connection:
             connection.executescript(
                 """
                 CREATE TABLE scan_runs (

@@ -32,6 +32,7 @@ import json
 import os
 import shutil
 import sqlite3
+from contextlib import closing
 import stat
 import subprocess
 import sys
@@ -216,8 +217,8 @@ def _copy_sqlite(source: Path, destination: Path) -> dict[str, Any]:
     takes a transactionally consistent copy instead, which is what makes the
     consumer/ingestion state actually restorable.
     """
-    with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as src:
-        with sqlite3.connect(destination) as dst:
+    with closing(sqlite3.connect(f"file:{source}?mode=ro", uri=True)) as src, src:
+        with closing(sqlite3.connect(destination)) as dst, dst:
             src.backup(dst)
     security.secure_created_file(destination)
     return {

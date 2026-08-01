@@ -33,6 +33,7 @@ import json
 import os
 import plistlib
 import sqlite3
+from contextlib import closing
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -232,9 +233,9 @@ def catalog_component(
         component["detail"] = "catalog database is absent"
         return component
     try:
-        with sqlite3.connect(
+        with closing(sqlite3.connect(
             f"file:{catalog_path.resolve()}?mode=ro", uri=True, timeout=5.0
-        ) as connection:
+        )) as connection, connection:
             connection.row_factory = sqlite3.Row
             columns = {
                 str(row[1]) for row in connection.execute("PRAGMA table_info(scan_runs)")
@@ -299,9 +300,9 @@ def _observed_event_ids(consumer_state: Path) -> set[str] | None:
     if not consumer_state.is_file():
         return set()
     try:
-        with sqlite3.connect(
+        with closing(sqlite3.connect(
             f"file:{consumer_state.resolve()}?mode=ro", uri=True, timeout=5.0
-        ) as connection:
+        )) as connection, connection:
             return {
                 str(row[0])
                 for row in connection.execute("SELECT event_id FROM consumer_events")
@@ -384,9 +385,9 @@ def _consumer_last_success(consumer_state: Path) -> datetime | None:
     if not consumer_state.is_file():
         return None
     try:
-        with sqlite3.connect(
+        with closing(sqlite3.connect(
             f"file:{consumer_state.resolve()}?mode=ro", uri=True, timeout=5.0
-        ) as connection:
+        )) as connection, connection:
             row = connection.execute(
                 "SELECT MAX(updated_at) FROM consumer_events WHERE status='completed'"
             ).fetchone()

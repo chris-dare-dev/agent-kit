@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from contextlib import closing
 import stat
 import sys
 import tempfile
@@ -81,7 +82,7 @@ class ArtifactCatalogTests(unittest.TestCase):
         )
         self.assertEqual(roadmap.read_text(), "# Alpha\n")
         self.assertEqual(handoff.read_text(), "status: requested\n")
-        with sqlite3.connect(self.output / "artifact-catalog.sqlite3") as connection:
+        with closing(sqlite3.connect(self.output / "artifact-catalog.sqlite3")) as connection, connection:
             rows = connection.execute("SELECT artifact_type, authority_class, lifecycle_hints_json FROM artifact_revisions ORDER BY relative_path").fetchall()
             duplicate_count = connection.execute("SELECT COUNT(*) FROM duplicate_content").fetchone()[0]
         self.assertEqual(duplicate_count, 1)
@@ -95,7 +96,7 @@ class ArtifactCatalogTests(unittest.TestCase):
         target.write_text("two\n", encoding="utf-8")
         second = catalog.run_catalog(self.workspace, self.output, self.policy, dry_run=False)
         self.assertNotEqual(first["catalog"]["run_id"], second["catalog"]["run_id"])
-        with sqlite3.connect(self.output / "artifact-catalog.sqlite3") as connection:
+        with closing(sqlite3.connect(self.output / "artifact-catalog.sqlite3")) as connection, connection:
             ids = connection.execute("SELECT DISTINCT artifact_id FROM artifact_revisions").fetchall()
             revisions = connection.execute("SELECT COUNT(*) FROM artifact_revisions").fetchone()[0]
             runs = connection.execute("SELECT COUNT(*) FROM scan_runs").fetchone()[0]
@@ -151,7 +152,7 @@ class ArtifactCatalogTests(unittest.TestCase):
         right.write_text("different\n", encoding="utf-8")
         catalog.run_catalog(self.workspace, self.output, self.policy, dry_run=False)
         self.assertEqual(left.read_text(), "same\n")
-        with sqlite3.connect(self.output / "artifact-catalog.sqlite3") as connection:
+        with closing(sqlite3.connect(self.output / "artifact-catalog.sqlite3")) as connection, connection:
             current = connection.execute("SELECT COUNT(*) FROM duplicate_content").fetchone()[0]
             history = connection.execute("SELECT COUNT(*) FROM duplicate_content_history").fetchone()[0]
             version = connection.execute("PRAGMA user_version").fetchone()[0]
@@ -174,9 +175,9 @@ class ArtifactCatalogTests(unittest.TestCase):
         )
         self.assertEqual(failed["generation"]["status"], "failed")
         self.assertEqual(failed["catalog"]["authoritative_run_id"], first_run)
-        with sqlite3.connect(
+        with closing(sqlite3.connect(
             self.output / "artifact-catalog.sqlite3"
-        ) as connection:
+        )) as connection, connection:
             latest_status = connection.execute(
                 "SELECT status FROM scan_runs ORDER BY run_id DESC LIMIT 1"
             ).fetchone()[0]

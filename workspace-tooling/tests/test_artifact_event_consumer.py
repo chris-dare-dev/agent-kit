@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import sqlite3
+from contextlib import closing
 import stat
 import sys
 import tempfile
@@ -189,7 +190,7 @@ class ArtifactEventConsumerTests(_ConsumerTestSupport):
         self.assertEqual(result["poison_count"], 1)
         self.assertEqual(len(result["dead_letter_ids"]), 1)
         self.assertEqual(self.qdrant_calls, [])
-        with sqlite3.connect(self.state) as connection:
+        with closing(sqlite3.connect(self.state)) as connection, connection:
             self.assertEqual(
                 connection.execute(
                     "SELECT COUNT(*) FROM dead_letters WHERE status='open'"
@@ -330,7 +331,7 @@ class ArtifactEventConsumerTests(_ConsumerTestSupport):
         )
         self.assertFalse(replay_failed)
         self.assertEqual(replayed["results"][0]["status"], "completed")
-        with sqlite3.connect(self.state) as connection:
+        with closing(sqlite3.connect(self.state)) as connection, connection:
             dead_status = connection.execute(
                 "SELECT status FROM dead_letters WHERE dead_letter_id=?",
                 (dead_id,),
@@ -383,7 +384,7 @@ class ArtifactEventConsumerTests(_ConsumerTestSupport):
     def test_v1_state_migration_preserves_completed_and_recovers_processing(
         self,
     ) -> None:
-        with sqlite3.connect(self.state) as connection:
+        with closing(sqlite3.connect(self.state)) as connection, connection:
             connection.executescript(
                 """
                 PRAGMA user_version=1;
@@ -409,7 +410,7 @@ class ArtifactEventConsumerTests(_ConsumerTestSupport):
         state = consumer.ConsumerState(self.state, self.workspace)
         state.close()
 
-        with sqlite3.connect(self.state) as connection:
+        with closing(sqlite3.connect(self.state)) as connection, connection:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             rows = dict(
                 connection.execute(
@@ -645,7 +646,7 @@ class CatalogStalenessRefreshTests(_ConsumerTestSupport):
     """Staleness-driven refresh + catalog-diff publication (F-01 closure)."""
 
     def _backdate_catalog(self) -> None:
-        with sqlite3.connect(self.derived / "artifact-catalog.sqlite3") as conn:
+        with closing(sqlite3.connect(self.derived / "artifact-catalog.sqlite3")) as conn, conn:
             conn.execute(
                 "UPDATE scan_runs SET finished_at='2026-01-01T00:00:00+00:00'"
             )
@@ -875,7 +876,7 @@ class CatalogStalenessRefreshTests(_ConsumerTestSupport):
                 qdrant_ingest=crashing_ingest,
                 qdrant_reconcile=self.fake_reconcile,
             )
-        with sqlite3.connect(self.state) as connection:
+        with closing(sqlite3.connect(self.state)) as connection, connection:
             surviving = connection.execute(
                 "SELECT COUNT(*) FROM publication_failures"
             ).fetchone()[0]

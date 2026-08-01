@@ -110,6 +110,27 @@ def _reject_user_owned_symlink_ancestors(path: Path) -> None:
         current = parent
 
 
+def _mode_is_private(info: os.stat_result, path: Path, expected: int, kind: str) -> bool:
+    """Whether `info`'s permission bits match `expected`.
+
+    POSIX mode bits are not an access control on Windows. `os.chmod` there only
+    toggles the read-only attribute; a directory created with mode 0o700 reports
+    0o777 and a file 0o666, regardless of the ACL that actually governs access.
+    Comparing them does not enforce privacy — it just fails, which is what 223
+    of the substrate's Windows errors were: `private directory mode must be
+    0700, found 0777`.
+
+    Same rule as the ownership checks: where the check cannot mean anything,
+    record the degradation and do not pretend. A real ACL-backed check is F003.
+    """
+    if not platform_compat.supports_posix_privacy():
+        platform_compat.owner_check_degraded(
+            f"artifact_security.private_{kind}_mode", str(path)
+        )
+        return True
+    return _mode(info) == expected
+
+
 def require_private_directory(path: Path) -> Path:
     path = path.expanduser().absolute()
     _reject_user_owned_symlink_ancestors(path)
@@ -120,7 +141,7 @@ def require_private_directory(path: Path) -> Path:
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
         raise PrivateStateError(f"private directory must be a real directory: {path}")
     _owned(info, path)
-    if _mode(info) != PRIVATE_DIR_MODE:
+    if not _mode_is_private(info, path, PRIVATE_DIR_MODE, "directory"):
         raise PrivateStateError(
             f"private directory mode must be 0700, found {_mode(info):04o}: {path}"
         )
@@ -147,7 +168,7 @@ def require_private_file(path: Path) -> Path:
     if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
         raise PrivateStateError(f"private file must be a real regular file: {path}")
     _owned(info, path)
-    if _mode(info) != PRIVATE_FILE_MODE:
+    if not _mode_is_private(info, path, PRIVATE_FILE_MODE, "file"):
         raise PrivateStateError(
             f"private file mode must be 0600, found {_mode(info):04o}: {path}"
         )
@@ -245,15 +266,15 @@ def secure_created_file(path: Path) -> Path:
 
 
 def fsync_directory(path: Path) -> None:
+    """fsync a directory so a temp+rename is durable, where the OS allows it.
+
+    Windows cannot open a directory as a file: `os.open` on one raises
+    PermissionError, so this was an error rather than a durability measure
+    there. platform_compat.fsync_directory is the single implementation and
+    reports whether the sync actually happened.
+    """
     directory = require_private_directory(path)
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
-    if hasattr(os, "O_DIRECTORY"):
-        flags |= os.O_DIRECTORY
-    descriptor = os.open(directory, flags)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
+    platform_compat.fsync_directory(directory)
 
 
 def atomic_write_bytes(

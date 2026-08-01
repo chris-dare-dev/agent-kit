@@ -12,6 +12,7 @@ import os
 import platform
 import re
 import sqlite3
+from contextlib import closing
 import stat
 import struct
 import threading
@@ -520,10 +521,10 @@ def verify_qdrant_point_set(
         raise RetrievalError("point verification page size is invalid")
     manifest = manifest.expanduser().absolute()
     security.require_private_file(manifest)
-    with sqlite3.connect(
+    with closing(sqlite3.connect(
         f"file:{manifest.resolve()}?mode=ro&immutable=1",
         uri=True,
-    ) as connection:
+    )) as connection, connection:
         connection.row_factory = sqlite3.Row
         metadata = _metadata(connection)
         expected_count = int(metadata["spans"])

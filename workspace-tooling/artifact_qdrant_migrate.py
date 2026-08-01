@@ -16,6 +16,7 @@ import importlib.metadata
 import json
 import os
 import sqlite3
+from contextlib import closing
 import sys
 import time
 import uuid
@@ -99,7 +100,7 @@ def _load_checkpoints(
     checkpoints: dict[str, Checkpoint] = {}
     point_ids: set[str] = set()
     canonical_rows: list[dict[str, str]] = []
-    with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)) as connection, connection:
         rows = connection.execute(
             """
             SELECT unit_id, revision_id, external_id, updated_at
@@ -335,7 +336,7 @@ def build_selection(
 
 def _selection_metadata(path: Path) -> dict[str, Any]:
     security.require_private_file(path)
-    with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)) as connection, connection:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         if version != SCHEMA_VERSION:
             raise MigrationError(f"unsupported selection schema {version}")
@@ -349,7 +350,7 @@ def _selection_metadata(path: Path) -> dict[str, Any]:
 
 def _iter_selection(path: Path, batch_size: int) -> Iterator[list[dict[str, Any]]]:
     security.require_private_file(path)
-    with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)) as connection, connection:
         cursor = connection.execute(
             "SELECT unit_json FROM selected_units ORDER BY unit_id"
         )

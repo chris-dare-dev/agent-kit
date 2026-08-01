@@ -11,6 +11,7 @@ import math
 import os
 import platform
 import sqlite3
+from contextlib import closing
 import sys
 import time
 from datetime import datetime, timezone
@@ -47,10 +48,10 @@ def _file_sha256(path: Path) -> str:
 
 def _manifest_metadata(path: Path) -> dict[str, Any]:
     security.require_private_file(path)
-    with sqlite3.connect(
+    with closing(sqlite3.connect(
         f"file:{path.resolve()}?mode=ro&immutable=1",
         uri=True,
-    ) as connection:
+    )) as connection, connection:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         if version != spans.SCHEMA_VERSION:
             raise RetrievalMigrationError(
@@ -319,10 +320,10 @@ def _iter_spans(
     after_row_id: int,
     batch_size: int,
 ) -> Iterator[list[dict[str, Any]]]:
-    with sqlite3.connect(
+    with closing(sqlite3.connect(
         f"file:{manifest.resolve()}?mode=ro&immutable=1",
         uri=True,
-    ) as connection:
+    )) as connection, connection:
         connection.row_factory = sqlite3.Row
         cursor = connection.execute(
             """
@@ -691,10 +692,10 @@ def migrate(
                 "checkpoint ledger"
             )
         sample_rows: list[tuple[Any, ...]]
-        with sqlite3.connect(
+        with closing(sqlite3.connect(
             f"file:{manifest.resolve()}?mode=ro&immutable=1",
             uri=True,
-        ) as connection:
+        )) as connection, connection:
             sample_rows = connection.execute(
                 """
                 SELECT point_id, span_id, revision_id, span_sha256
