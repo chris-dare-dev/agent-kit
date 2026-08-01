@@ -6,6 +6,8 @@ import sys
 import tempfile
 import unittest
 
+import platform_skips
+
 import platform_compat
 from pathlib import Path
 from unittest import mock
@@ -25,6 +27,7 @@ class ArtifactSecurityTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
+    @platform_skips.requires_posix_modes
     def test_explicit_modes_hold_under_umask_022(self) -> None:
         prior = os.umask(0o022)
         try:
@@ -49,6 +52,7 @@ class ArtifactSecurityTests(unittest.TestCase):
         with self.assertRaisesRegex(security.PrivateStateError, "symlink"):
             security.require_private_directory(linked)
 
+    @platform_skips.requires_symlinks
     def test_user_owned_intermediate_symlink_fails_closed(self) -> None:
         external = self.root / "external"
         external.mkdir(mode=0o700)
@@ -116,6 +120,7 @@ class ArtifactSecurityTests(unittest.TestCase):
             security.atomic_write_bytes(target, b"second")
         self.assertEqual(target.read_bytes(), b"first")
 
+    @platform_skips.requires_posix_modes
     def test_explicit_repair_preserves_content_and_rejects_links(self) -> None:
         root = self.root / "derived"
         child = root / "outbox"
@@ -196,6 +201,7 @@ class PermissionSweepTests(unittest.TestCase):
             [("retired/gold-v1.SEALED.tar", "0400")],
         )
 
+    @platform_skips.requires_af_unix
     def test_socket_mode_is_swept(self) -> None:
         import socket as socket_module
 
@@ -221,6 +227,7 @@ class PermissionSweepTests(unittest.TestCase):
         self.assertEqual(report["violations"][0]["type"], "socket")
         self.assertEqual(report["counts"]["sockets"], 1)
 
+    @platform_skips.requires_symlinks
     def test_symlink_is_a_violation(self) -> None:
         external = Path(self.temp.name) / "external"
         external.mkdir(mode=0o700)

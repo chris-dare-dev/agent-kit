@@ -15,6 +15,8 @@ import tempfile
 import threading
 import unittest
 
+import platform_skips
+
 import platform_compat
 from contextlib import closing, ExitStack, contextmanager
 from pathlib import Path
@@ -689,6 +691,7 @@ class ExactServiceStartupTests(unittest.TestCase):
                 )
             return service.ServiceState(config, health)
 
+    @platform_skips.requires_qdrant_stack
     def test_exact_startup_loads_each_resident_model_once(self) -> None:
         state = self.initialize()
         try:
@@ -727,6 +730,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         payload.update(overrides)
         return payload
 
+    @platform_skips.requires_qdrant_stack
     def test_server_backend_never_opens_the_rollback_embedded_store(self) -> None:
         """The embedded store is retained read-only for rollback only.
 
@@ -764,6 +768,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_embedded_backend_still_opens_the_store_for_rollback_rehearsal(
         self,
     ) -> None:
@@ -779,6 +784,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_rollback_return_to_server_releases_the_embedded_store(self) -> None:
         state = self.initialize(self.legacy_payload(active_backend="embedded"))
         try:
@@ -793,6 +799,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_manifest_collection_model_and_policy_mismatches_fail_closed(self) -> None:
         cases = (
             ("manifest_sha256", "9" * 64, None),
@@ -822,6 +829,7 @@ class ExactServiceStartupTests(unittest.TestCase):
                 ):
                     self.initialize(payload)
 
+    @platform_skips.requires_qdrant_stack
     def test_partial_collection_fails_closed_even_with_matching_metadata(self) -> None:
         FakeQdrantClient.collection_metadata = self.fixture.collection_binding()
         FakeQdrantClient.points = 0
@@ -832,6 +840,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         ):
             self.initialize()
 
+    @platform_skips.requires_qdrant_stack
     def test_readiness_and_health_file_degrade_on_qdrant_point_drift(self) -> None:
         state = self.initialize()
         try:
@@ -858,6 +867,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_readiness_degrades_on_qdrant_release_metadata_drift(self) -> None:
         state = self.initialize()
         try:
@@ -874,6 +884,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_collection_vector_space_must_match_the_evaluated_model(self) -> None:
         cases = (("size", 128), ("distance", "Dot"))
         for field, value in cases:
@@ -890,6 +901,7 @@ class ExactServiceStartupTests(unittest.TestCase):
                 ):
                     self.initialize()
 
+    @platform_skips.requires_qdrant_stack
     def test_retrieval_selector_change_requires_a_service_restart(self) -> None:
         state = self.initialize()
         try:
@@ -908,6 +920,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_exact_backend_change_is_rejected_while_service_is_running(self) -> None:
         state = self.initialize()
         try:
@@ -923,6 +936,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_service_socket_path_change_requires_a_service_restart(self) -> None:
         state = self.initialize()
         try:
@@ -941,6 +955,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_catalog_revision_set_mismatch_fails_startup(self) -> None:
         catalog = self.fixture.derived / "catalog.sqlite3"
         with closing(sqlite3.connect(catalog)) as connection, connection:
@@ -958,6 +973,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         ):
             self.initialize()
 
+    @platform_skips.requires_qdrant_stack
     def test_catalog_drift_after_startup_blocks_exact_search(self) -> None:
         state = self.initialize()
         try:
@@ -989,6 +1005,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_manifest_path_replacement_requires_a_service_restart(self) -> None:
         state = self.initialize()
         try:
@@ -1014,6 +1031,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_exact_search_rejects_a_hot_backend_configuration_change(self) -> None:
         state = self.initialize()
         try:
@@ -1033,6 +1051,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         finally:
             state.close()
 
+    @platform_skips.requires_qdrant_stack
     def test_frozen_ranking_constants_must_match_the_running_ranker(self) -> None:
         altered = json.loads(json.dumps(self.fixture.system))
         altered["ranking_contract"]["rrf_k"] = 999.0
@@ -1044,6 +1063,7 @@ class ExactServiceStartupTests(unittest.TestCase):
         ):
             self.initialize(self.fixture.exact_payload())
 
+    @platform_skips.requires_qdrant_stack
     def test_model_name_cannot_change_while_reusing_a_snapshot_digest(self) -> None:
         payload = self.fixture.exact_payload()
         exact = payload["retrieval"]
@@ -1187,6 +1207,7 @@ class ExactServiceRouteTests(unittest.TestCase):
         self.assertFalse(embedder.query_embed.called)
         self.assertFalse(embedder.embed_query.called)
 
+    @platform_skips.requires_qdrant_stack
     def test_exact_search_never_requests_or_reads_qdrant_payload_content(self) -> None:
         class PayloadRejectingPoint:
             id = "not-used"
@@ -1284,6 +1305,7 @@ class ExactServiceRouteTests(unittest.TestCase):
             "legacy_chunks_g1",
         )
 
+    @platform_skips.requires_qdrant_stack
     def test_status_reports_the_complete_active_generation_identity(self) -> None:
         state, _retriever, _embedder = manual_state()
         state.read_client.count.return_value = SimpleNamespace(count=1)
@@ -1535,6 +1557,7 @@ def http_request(
 
 
 class ArtifactUnixHTTPHandlerTests(unittest.TestCase):
+    @platform_skips.requires_af_unix
     def test_degraded_healthz_is_qdrant_aware_and_returns_503(self) -> None:
         state = HTTPStubState(available=False)
         with running_unix_http_service(state) as socket_path:
@@ -1548,6 +1571,7 @@ class ArtifactUnixHTTPHandlerTests(unittest.TestCase):
         self.assertEqual(state.acquires, 1)
         self.assertEqual(state.releases, 1)
 
+    @platform_skips.requires_af_unix
     def test_request_slot_is_rejected_before_any_body_read(self) -> None:
         state = HTTPStubState(acquire=False)
         with running_unix_http_service(state) as socket_path:
@@ -1568,6 +1592,7 @@ class ArtifactUnixHTTPHandlerTests(unittest.TestCase):
         self.assertEqual(state.releases, 0)
         self.assertEqual(state.observations, [("/v1/search", 429)])
 
+    @platform_skips.requires_af_unix
     def test_listener_has_no_internal_mutation_routes(self) -> None:
         state = HTTPStubState()
         body = b'{"outbox_name":"skill-event-example"}'
@@ -1587,6 +1612,7 @@ class ArtifactUnixHTTPHandlerTests(unittest.TestCase):
         self.assertEqual(state.handler_calls, [])
         self.assertEqual(state.observations, [("__unknown__", 404)])
 
+    @platform_skips.requires_af_unix
     def test_uds_transport_does_not_require_a_bearer_token(self) -> None:
         state = HTTPStubState()
         with running_unix_http_service(state) as socket_path:
@@ -1603,6 +1629,7 @@ class ArtifactUnixHTTPHandlerTests(unittest.TestCase):
         self.assertEqual(state.handler_calls, ["status"])
         self.assertEqual(state.observations, [("/v1/status", 200)])
 
+    @platform_skips.requires_af_unix
     def test_python_client_and_service_share_the_uds_contract(self) -> None:
         state = HTTPStubState()
         with running_unix_http_service(state) as socket_path:
@@ -1615,6 +1642,7 @@ class ArtifactUnixHTTPHandlerTests(unittest.TestCase):
         self.assertEqual(payload, {"service": {"available": True}})
         self.assertEqual(state.handler_calls, ["status"])
 
+    @platform_skips.requires_af_unix
     def test_protocol_level_5xx_response_is_counted(self) -> None:
         state = HTTPStubState()
         with running_unix_http_service(state) as socket_path:
@@ -1656,6 +1684,7 @@ class ArtifactProtocolVersionTests(unittest.TestCase):
             headers=headers,
         )
 
+    @platform_skips.requires_af_unix
     def test_current_protocol_is_served_and_identity_is_announced(self) -> None:
         state = HTTPStubState()
         with running_unix_http_service(state) as socket_path:
@@ -1678,6 +1707,7 @@ class ArtifactProtocolVersionTests(unittest.TestCase):
         self.assertEqual(headers[service.BUILD_HEADER], service.SERVICE_BUILD)
         self.assertNotEqual(service.SERVICE_BUILD, "unknown")
 
+    @platform_skips.requires_af_unix
     def test_versionless_client_is_served_during_rollout(self) -> None:
         """The shipped adapter and client send no header yet; both must work."""
         state = HTTPStubState()
@@ -1691,6 +1721,7 @@ class ArtifactProtocolVersionTests(unittest.TestCase):
             str(service.PROTOCOL_VERSION),
         )
 
+    @platform_skips.requires_af_unix
     def test_stale_adapter_against_upgraded_service_is_fenced(self) -> None:
         """Falsification #17: old adapter vs new service on every route."""
         for route in sorted(service.PUBLIC_ROUTES):
@@ -1723,6 +1754,7 @@ class ArtifactProtocolVersionTests(unittest.TestCase):
                 )
                 self.assertNotIn("degraded", state.health_writes)
 
+    @platform_skips.requires_af_unix
     def test_fenced_client_with_a_large_body_still_receives_the_426(self) -> None:
         """The rejection must be delivered, not lost to a broken pipe.
 
@@ -1749,6 +1781,7 @@ class ArtifactProtocolVersionTests(unittest.TestCase):
         self.assertIn("restart the session", str(payload["error"]))
         self.assertEqual(state.handler_calls, [])
 
+    @platform_skips.requires_af_unix
     def test_malformed_protocol_header_is_fenced_not_treated_as_absent(self) -> None:
         for malformed in ("", "  ", "1.0", "v1", "one", "-1", "1;2", "9" * 10):
             with self.subTest(header=malformed):
@@ -1781,6 +1814,7 @@ class ArtifactProtocolVersionTests(unittest.TestCase):
                 with self.assertRaises(service.ProtocolVersionError):
                     service.parse_protocol_version(malformed)
 
+    @platform_skips.requires_af_unix
     def test_tightened_rollout_fences_versionless_clients(self) -> None:
         state = HTTPStubState()
         with mock.patch.object(service, "REQUIRE_CLIENT_PROTOCOL", True):
@@ -1796,6 +1830,7 @@ class ArtifactProtocolVersionTests(unittest.TestCase):
         self.assertEqual(served, 200)
         self.assertEqual(state.handler_calls, ["status"])
 
+    @platform_skips.requires_af_unix
     def test_python_client_declares_the_protocol_and_surfaces_an_upgrade(self) -> None:
         state = HTTPStubState()
         with running_unix_http_service(state) as socket_path:
@@ -1917,6 +1952,7 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
+    @platform_skips.requires_af_unix
     def test_bind_sets_private_mode_and_shutdown_unlinks_only_its_socket(self) -> None:
         server = service.ArtifactUnixHTTPServer(self.socket_path, HTTPStubState())
         try:
@@ -1931,6 +1967,7 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
 
         self.assertFalse(os.path.lexists(self.socket_path))
 
+    @platform_skips.requires_af_unix
     def test_verified_stale_socket_is_replaced(self) -> None:
         stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
@@ -1947,6 +1984,7 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
         finally:
             server.server_close()
 
+    @platform_skips.requires_af_unix
     def test_active_socket_is_never_unlinked_for_a_second_start(self) -> None:
         first = service.ArtifactUnixHTTPServer(self.socket_path, HTTPStubState())
         try:
@@ -1959,6 +1997,7 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
         finally:
             first.server_close()
 
+    @platform_skips.requires_af_unix
     def test_stale_cleanup_is_serialized_before_a_contender_can_prepare(self) -> None:
         stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
@@ -2022,6 +2061,7 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
         finally:
             server.server_close()
 
+    @platform_skips.requires_af_unix
     def test_lifecycle_lock_persists_without_blocking_a_later_start(self) -> None:
         lock_path = service._socket_lifecycle_lock_path(self.socket_path)
         first = service.ArtifactUnixHTTPServer(self.socket_path, HTTPStubState())
@@ -2038,6 +2078,7 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
         second = service.ArtifactUnixHTTPServer(self.socket_path, HTTPStubState())
         second.server_close()
 
+    @platform_skips.requires_af_unix
     def test_lifecycle_lock_refuses_a_second_process(self) -> None:
         first = service.ArtifactUnixHTTPServer(self.socket_path, HTTPStubState())
         child = "\n".join(
@@ -2076,6 +2117,7 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
             msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
         )
 
+    @platform_skips.requires_af_unix
     def test_shutdown_does_not_unlink_a_replacement_socket(self) -> None:
         server = service.ArtifactUnixHTTPServer(self.socket_path, HTTPStubState())
         replacement = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -2089,6 +2131,7 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
             replacement.close()
             self.socket_path.unlink(missing_ok=True)
 
+    @platform_skips.requires_af_unix
     def test_non_socket_and_permissive_socket_are_refused_without_unlinking(self) -> None:
         self.socket_path.write_text("not a socket", encoding="utf-8")
         self.socket_path.chmod(0o600)
@@ -2107,6 +2150,7 @@ class ArtifactUnixSocketLifecycleTests(unittest.TestCase):
             service.ArtifactUnixHTTPServer(self.socket_path, HTTPStubState())
         self.assertTrue(os.path.lexists(self.socket_path))
 
+    @platform_skips.requires_symlinks
     def test_symlink_is_refused_without_touching_its_target(self) -> None:
         target = self.root / "target"
         target.write_text("do not unlink", encoding="utf-8")

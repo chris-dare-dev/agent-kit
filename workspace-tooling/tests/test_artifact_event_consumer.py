@@ -9,6 +9,8 @@ import stat
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from argparse import Namespace
 from pathlib import Path
 from types import SimpleNamespace
@@ -144,6 +146,7 @@ class ArtifactEventConsumerTests(_ConsumerTestSupport):
         self.assertFalse(self.outboxes.exists())
         self.assertEqual(self.qdrant_calls, [])
 
+    @platform_skips.requires_posix_modes
     def test_apply_creates_immutable_outbox_and_is_idempotent(self) -> None:
         first, failed = consumer.consume(
             self.args(apply=True),
@@ -627,6 +630,7 @@ class SupervisorEventTests(unittest.TestCase):
         self.assertEqual(json.loads(lines[0])["transition"], "unloaded")
         self.assertEqual(json.loads(lines[1])["transition"], "loaded")
 
+    @platform_skips.requires_posix_modes
     def test_log_is_private(self) -> None:
         consumer.supervisor_event(self.args())
         self.assertEqual(stat.S_IMODE(self.log.stat().st_mode), 0o600)

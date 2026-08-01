@@ -14,6 +14,8 @@ import os
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from pathlib import Path
 
 
@@ -178,6 +180,7 @@ class ProjectionTests(unittest.TestCase):
                     out.append(action)
         return out
 
+    @platform_skips.requires_symlinks
     def test_owner_gets_symlink_and_secondary_gets_reference_note(self) -> None:
         self.sync()
 
@@ -190,6 +193,7 @@ class ProjectionTests(unittest.TestCase):
         self.assertIn(linker.REFERENCE_MARKER, body)
         self.assertIn("owner_project: service-registry", body)
 
+    @platform_skips.requires_symlinks
     def test_exactly_one_vault_path_resolves_to_the_source(self) -> None:
         """The invariant the vault validator checks, asserted at projection time."""
         self.sync()
@@ -201,12 +205,14 @@ class ProjectionTests(unittest.TestCase):
         ]
         self.assertEqual([Path(p) for p in resolved], [self.owner_alias])
 
+    @platform_skips.requires_symlinks
     def test_secondary_path_still_exists_so_hub_and_canvas_links_resolve(self) -> None:
         """Dropping the path instead of repurposing it would break hub/board/canvas links."""
         self.sync()
 
         self.assertTrue(self.secondary_alias.exists())
 
+    @platform_skips.requires_symlinks
     def test_legacy_duplicate_symlink_is_preserved_by_default(self) -> None:
         self.secondary_alias.parent.mkdir(parents=True)
         os.symlink(
@@ -218,6 +224,7 @@ class ProjectionTests(unittest.TestCase):
         self.assertTrue(self.secondary_alias.is_symlink())
         self.assertTrue(any("PRESERVE" in a for a in actions))
 
+    @platform_skips.requires_symlinks
     def test_repair_duplicates_converts_legacy_symlink(self) -> None:
         self.secondary_alias.parent.mkdir(parents=True)
         os.symlink(
@@ -231,6 +238,7 @@ class ProjectionTests(unittest.TestCase):
             linker.REFERENCE_MARKER, self.secondary_alias.read_text(encoding="utf-8")
         )
 
+    @platform_skips.requires_symlinks
     def test_reference_note_regeneration_is_idempotent(self) -> None:
         self.sync()
         stamp = self.secondary_alias.stat().st_mtime_ns
@@ -240,6 +248,7 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(stamp, self.secondary_alias.stat().st_mtime_ns)
         self.assertFalse(any("reference" in a for a in actions))
 
+    @platform_skips.requires_symlinks
     def test_foreign_real_file_is_never_overwritten(self) -> None:
         self.secondary_alias.parent.mkdir(parents=True)
         self.secondary_alias.write_text("hand-written\n", encoding="utf-8")

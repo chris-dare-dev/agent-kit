@@ -5,6 +5,8 @@ import os
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from argparse import Namespace
 from pathlib import Path
 
@@ -95,6 +97,7 @@ class ArtifactSkillCaptureTests(unittest.TestCase):
         self.assertEqual(artifact["routing"]["graphiti_bulk"], "disabled")
         self.assertEqual(result["safety"]["sink_writes"], "none")
 
+    @platform_skips.requires_posix_modes
     def test_apply_is_exclusive_and_idempotent(self) -> None:
         roadmap = self.write("plans/alpha-roadmap.md")
         arguments = self.args("roadmap", "alpha", paths=[roadmap], apply=True)
@@ -110,6 +113,7 @@ class ArtifactSkillCaptureTests(unittest.TestCase):
         self.assertEqual(receipt_path.stat().st_mtime_ns, first_stat.st_mtime_ns)
         self.assertEqual(receipt_path.stat().st_mode & 0o777, 0o600)
 
+    @platform_skips.requires_symlinks
     def test_recursive_capture_is_sorted_and_skips_non_documents_and_symlinks(self) -> None:
         spike_root = self.workspace / ".claude/notes/spikes/S-1"
         second = self.write(".claude/notes/spikes/S-1/z.md")
@@ -135,6 +139,7 @@ class ArtifactSkillCaptureTests(unittest.TestCase):
             )
         )
 
+    @platform_skips.requires_symlinks
     def test_refuses_external_symlink_excluded_and_wrong_producer_type(self) -> None:
         external = self.root / "external.md"
         external.write_text("# outside\n", encoding="utf-8")
@@ -194,6 +199,7 @@ class ArtifactSkillCaptureTests(unittest.TestCase):
         with self.assertRaisesRegex(capture.CaptureError, "identity mismatch"):
             capture.emit(arguments)
 
+    @platform_skips.requires_symlinks
     def test_symlinked_receipt_shard_cannot_redirect_write(self) -> None:
         handoff = self.write("plans/HANDOFF-alpha.md")
         planned = capture.emit(

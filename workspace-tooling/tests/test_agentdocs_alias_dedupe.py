@@ -4,6 +4,8 @@ import os
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from pathlib import Path
 
 
@@ -49,6 +51,7 @@ class AgentDocsAliasDedupeTests(unittest.TestCase):
             os.symlink(source, farm)
         return source, canonical, farm
 
+    @platform_skips.requires_symlinks
     def test_dry_run_proves_safe_duplicate_without_mutating(self) -> None:
         _source, canonical, farm = self.aliases()
 
@@ -60,6 +63,7 @@ class AgentDocsAliasDedupeTests(unittest.TestCase):
         self.assertTrue(canonical.is_symlink())
         self.assertEqual(report.as_dict()["summary"]["safe_existing_removals"], 1)
 
+    @platform_skips.requires_symlinks
     def test_indexed_reference_blocks_removal(self) -> None:
         _source, _canonical, farm = self.aliases()
         self.write(
@@ -77,6 +81,7 @@ class AgentDocsAliasDedupeTests(unittest.TestCase):
         dedupe.apply_safe_removals(report)
         self.assertTrue(farm.is_symlink())
 
+    @platform_skips.requires_symlinks
     def test_workspace_state_reference_blocks_removal(self) -> None:
         _source, _canonical, farm = self.aliases()
         self.write(
@@ -94,6 +99,7 @@ class AgentDocsAliasDedupeTests(unittest.TestCase):
         dedupe.apply_safe_removals(report)
         self.assertTrue(farm.is_symlink())
 
+    @platform_skips.requires_symlinks
     def test_apply_unlinks_only_farm_alias_and_preserves_canonical(self) -> None:
         source, canonical, farm = self.aliases()
         report = dedupe.build_report(self.config, mode="apply")
@@ -105,6 +111,7 @@ class AgentDocsAliasDedupeTests(unittest.TestCase):
         self.assertEqual(canonical.resolve(strict=True), source.resolve(strict=True))
         self.assertTrue(report.candidates[0].removed)
 
+    @platform_skips.requires_symlinks
     def test_build_filter_suppresses_absent_duplicate_but_not_user_file(self) -> None:
         source, _canonical, farm = self.aliases(create_farm=False)
         plan = self.root / "farm-plan.tsv"

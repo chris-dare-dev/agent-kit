@@ -5,6 +5,8 @@ import os
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from pathlib import Path
 
 
@@ -110,6 +112,7 @@ tags: [excalidraw, type/roadmap-status]
         self.assertGreater(report.checks["canvas_nodes"].inspected, 0)
         self.assertGreater(report.checks["excalidraw_links"].inspected, 0)
 
+    @platform_skips.requires_symlinks
     def test_contract_violations_have_stable_codes(self) -> None:
         manifest = self.manifest()
         source = self.write(self.workspace, "source/shared.md", "# Shared\n")
@@ -160,6 +163,7 @@ tags: [excalidraw, type/roadmap-status]
         self.assertIn("EXCALIDRAW_ABSOLUTE_PATH_URI", codes)
         self.assertIn("DUPLICATE_MARKDOWN_ALIAS", codes)
 
+    @platform_skips.requires_symlinks
     def test_link_resolution_is_lexical_across_directory_symlink(self) -> None:
         source_notes = self.workspace / "Notes"
         source_notes.mkdir()

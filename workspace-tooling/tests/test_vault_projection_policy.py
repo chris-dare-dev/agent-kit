@@ -5,6 +5,8 @@ import os
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from pathlib import Path
 
 
@@ -79,6 +81,7 @@ class VaultProjectionPolicyTests(unittest.TestCase):
             projection.Decision("exclude", "default-exclude"),
         )
 
+    @platform_skips.requires_symlinks
     def test_plan_scans_only_allowlisted_regular_files(self) -> None:
         wanted = self.write("docs/architecture/overview.md")
         self.write("docs/generated/output.md")
@@ -96,6 +99,7 @@ class VaultProjectionPolicyTests(unittest.TestCase):
             "AgentDocs/docs/architecture/overview.md",
         )
 
+    @platform_skips.requires_symlinks
     def test_audit_reports_but_does_not_mutate_existing_aliases(self) -> None:
         planned = self.write("docs/current.md")
         excluded = self.write(".claude/notes/milestones/m1/report.md")

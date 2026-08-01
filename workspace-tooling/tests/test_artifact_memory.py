@@ -8,6 +8,8 @@ import sys
 import tempfile
 import types
 import unittest
+
+import platform_skips
 from pathlib import Path
 from unittest import mock
 
@@ -174,6 +176,7 @@ class ArtifactMemoryControlTests(unittest.TestCase):
                 password_env="FALKORDB_PASSWORD",
             )
 
+    @platform_skips.requires_posix_modes
     def test_status_hides_unapproved_group_names_and_content(self) -> None:
         approvals = self.root / "approvals.json"
         approvals.write_text(

@@ -6,6 +6,8 @@ import sys
 import tempfile
 import threading
 import unittest
+
+import platform_skips
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -51,7 +53,19 @@ class ReplyingUnixHandler(socketserver.StreamRequestHandler):
         )
 
 
-class ReplyingUnixServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
+# Windows has no AF_UNIX, so socketserver does not define UnixStreamServer and
+# the class STATEMENT below was an AttributeError at collection time. The stub
+# keeps the module importable; every test using it is skipped by
+# platform_skips.requires_af_unix, so the stub is never constructed.
+if hasattr(socketserver, "UnixStreamServer"):
+    _UnixServerBase = socketserver.UnixStreamServer
+else:
+    class _UnixServerBase:  # type: ignore[no-redef]
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("PLATFORM:win32 (no AF_UNIX)")
+
+
+class ReplyingUnixServer(socketserver.ThreadingMixIn, _UnixServerBase):
     daemon_threads = True
 
     def __init__(self, socket_path: Path, *, status: int, body: bytes):
@@ -85,6 +99,7 @@ def running_reply_server(*, status: int = 200, body: bytes | None = None):
 
 
 class ArtifactServiceClientTests(unittest.TestCase):
+    @platform_skips.requires_af_unix
     def test_posts_json_over_private_uds_without_bearer_header(self) -> None:
         with running_reply_server() as (socket_path, server):
             result = client.post_json(
@@ -119,6 +134,7 @@ class ArtifactServiceClientTests(unittest.TestCase):
                     payload={},
                 )
 
+    @platform_skips.requires_af_unix
     def test_rejects_oversized_response(self) -> None:
         oversized = b"{" + b'"payload":"' + b"x" * client.MAX_RESPONSE_BYTES + b'"}'
         with running_reply_server(body=oversized) as (socket_path, _server):

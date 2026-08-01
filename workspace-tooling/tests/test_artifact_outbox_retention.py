@@ -7,6 +7,8 @@ from contextlib import closing
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from pathlib import Path
 
 
@@ -189,6 +191,7 @@ class OutboxRetentionTests(unittest.TestCase):
             self.assertEqual(entry["predicates"]["scan"], "skipped")
             self.assertEqual(entry["verdict"], retention.VERDICT_RETAIN)
 
+    @platform_skips.requires_symlinks
     def test_symlinked_entry_is_never_classified(self) -> None:
         link = self.outbox / "catalog-run-9-chunks-v2"
         link.symlink_to(self.clean)

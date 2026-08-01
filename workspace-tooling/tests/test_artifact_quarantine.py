@@ -9,6 +9,8 @@ import sys
 import tempfile
 import time
 import unittest
+
+import platform_skips
 from pathlib import Path
 
 
@@ -305,6 +307,7 @@ class ArtifactQuarantineTests(unittest.TestCase):
         self.assertIn('"action":"quarantined"', events)
         self.assertIn('"action":"restored"', events)
 
+    @platform_skips.requires_symlinks
     def test_alias_and_backlink_block_relocation_before_any_move(self) -> None:
         aliased = self.terminal_roadmap("plans/SUPERSEDED-aliased-roadmap.md")
         referenced = self.terminal_roadmap("plans/SUPERSEDED-referenced-roadmap.md")

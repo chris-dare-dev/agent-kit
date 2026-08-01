@@ -8,6 +8,8 @@ import stat
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from pathlib import Path
 from unittest import mock
 
@@ -55,6 +57,7 @@ class ArtifactCatalogTests(unittest.TestCase):
         path.write_text(content, encoding="utf-8")
         return path
 
+    @platform_skips.requires_posix_modes
     def test_catalogs_classifies_and_reports_duplicates(self) -> None:
         roadmap = self.write("plans/alpha-roadmap.md", "# Alpha\n")
         handoff = self.write("plans/handoff-continuation.md", "status: requested\n")
@@ -129,6 +132,7 @@ class ArtifactCatalogTests(unittest.TestCase):
         self.assertEqual(summary["counts"]["artifacts"], 2)
         self.assertEqual(summary["counts"]["outside_artifact_scope"], 1)
 
+    @platform_skips.requires_symlinks
     def test_symlink_root_and_overlapping_roots_are_rejected(self) -> None:
         external = self.root / "external"
         external.mkdir()

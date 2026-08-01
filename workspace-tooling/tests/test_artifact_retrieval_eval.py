@@ -9,6 +9,8 @@ import stat
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from collections.abc import Iterator, Mapping
 from contextlib import closing, contextmanager
 from pathlib import Path
@@ -960,6 +962,7 @@ class MigrationEvidenceValidationTests(unittest.TestCase):
             expected_points=7,
         )
 
+    @platform_skips.requires_qdrant_stack
     def test_passed_private_migration_evidence_binds_full_vector_set(self) -> None:
         self._write(self.document)
 
@@ -977,6 +980,7 @@ class MigrationEvidenceValidationTests(unittest.TestCase):
             json.loads(self.path.read_text(encoding="utf-8"))["evidence_digest"],
         )
 
+    @platform_skips.requires_qdrant_stack
     def test_tamper_and_release_identity_mismatch_fail_closed(self) -> None:
         unsigned = copy.deepcopy(self.document)
         unsigned["status"] = "failed"
@@ -1025,6 +1029,7 @@ class HoldoutLedgerTests(unittest.TestCase):
         self.derived_patch.stop()
         self.temp.cleanup()
 
+    @platform_skips.requires_posix_modes
     def test_same_ledger_can_be_reserved_for_holdout_only_once(self) -> None:
         with (
             mock.patch.object(evaluation.time, "time", return_value=100.0),
@@ -1397,6 +1402,7 @@ class EvaluationGoldBindingTests(unittest.TestCase):
                 policy=selected_policy,
             )
 
+    @platform_skips.requires_qdrant_stack
     def test_dev_frozen_system_binds_both_split_hashes_and_rejects_swap(
         self,
     ) -> None:
@@ -1581,6 +1587,7 @@ class EvaluationGoldBindingTests(unittest.TestCase):
             [],
         )
 
+    @platform_skips.requires_qdrant_stack
     def test_failed_development_gate_publishes_evidence_but_no_policy(self) -> None:
         binding_path = self.root / "gold-manifest.json"
         self._write_json(binding_path, self._binding())
@@ -1616,6 +1623,7 @@ class EvaluationGoldBindingTests(unittest.TestCase):
         self.assertTrue(output_path.exists())
         self.assertFalse(policy_path.exists())
 
+    @platform_skips.requires_qdrant_stack
     def test_collection_postflight_change_blocks_dev_evidence_and_policy(self) -> None:
         binding_path = self.root / "gold-manifest.json"
         self._write_json(binding_path, self._binding())
@@ -1644,6 +1652,7 @@ class EvaluationGoldBindingTests(unittest.TestCase):
         self.assertFalse(output_path.exists())
         self.assertFalse(policy_path.exists())
 
+    @platform_skips.requires_qdrant_stack
     def test_holdout_is_first_read_after_durable_reservation_and_failure_burns(
         self,
     ) -> None:
@@ -1725,6 +1734,7 @@ class EvaluationGoldBindingTests(unittest.TestCase):
 
 
 class ReleaseIdentityTests(unittest.TestCase):
+    @platform_skips.requires_qdrant_stack
     def test_material_sources_and_runtime_dependencies_are_release_bound(self) -> None:
         source_manifest = evaluation._material_source_manifest()
         runtime_contract = evaluation._evaluation_runtime_contract()

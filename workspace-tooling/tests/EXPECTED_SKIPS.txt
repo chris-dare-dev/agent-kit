@@ -1,0 +1,30 @@
+# Skip budget for the substrate suite. One line per platform:
+#     <sys.platform> <max-skips>
+#
+# M2 / gates-green-t-suite-collects. Skipping a test that genuinely cannot run
+# here is fine. Skipping one QUIETLY is not: a skip is a hole in coverage, and
+# without a budget the hole can grow with nobody noticing. run-substrate-tests.py
+# compares the actual skip count against this file and fails when it goes ABOVE,
+# so a new unconditional skip is a check failure rather than a silent reduction.
+#
+# Going BELOW is reported too, as a prompt to tighten the number rather than
+# leave slack that a future skip could hide in.
+#
+# Every skip reason must match one of two shapes, enforced by convention in
+# workspace-tooling/tests/platform_skips.py:
+#     PLATFORM:<name>   this OS cannot run it, and no install changes that
+#     REQUIRES:<thing>  a dependency or privilege is absent
+#
+# linux/darwin: 32 = the qdrant-client+fastembed stack, absent without the
+#   provisioned venv. Install it and these run.
+# win32: 109 = those same venv skips, plus AF_UNIX (no Unix sockets),
+#   symlink privilege (needs Developer Mode), and POSIX mode bits (Windows
+#   chmod only toggles read-only, so `S_IMODE == 0o600` asserts something the
+#   OS does not implement).
+#
+# Update a number ONLY together with the change that moves it, and say why in
+# the commit. Raising it to make a red check green is the failure this guards.
+
+linux 32
+darwin 32
+win32 109

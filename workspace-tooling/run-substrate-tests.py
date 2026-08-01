@@ -9,7 +9,7 @@ point printed a banner and returned 0 instead.
 
 That banner is now WRONG on both counts. M2 routed those imports through
 ``platform_compat``, and the suite collects on Windows -- 260 tests before,
-646 after. And returning 0 for a suite that ran nothing is the skip-to-green
+648 after. And returning 0 for a suite that ran nothing is the skip-to-green
 pattern the same milestone exists to remove, however loudly the banner said
 "NOT RUN".
 
@@ -32,6 +32,7 @@ import unittest
 from pathlib import Path
 
 TESTS_DIR = Path(__file__).resolve().parent / "tests"
+EXPECTED_SKIPS = TESTS_DIR / "EXPECTED_SKIPS.txt"
 
 #: Measured residue per platform, so "did I break something" is answerable
 #: without a clean tree to compare against. Update these when an issue closes.
@@ -42,28 +43,28 @@ TESTS_DIR = Path(__file__).resolve().parent / "tests"
 BASELINES = {
     "linux": {
         "failures": 1,
-        "errors": 30,
+        "errors": 0,
         "note": (
-            "without the provisioned venv. ~30 errors are cases that import "
-            "qdrant_client at call time; the 1 failure is "
+            "clean apart from one long-standing failure, "
             "test_embedder_shortfall_fails_loudly_instead_of_partial_success. "
-            "With the venv the errors clear."
+            "The venv-dependent cases now SKIP rather than error; install the "
+            "provisioned venv and they run."
         ),
     },
     "darwin": {
         "failures": 1,
-        "errors": 30,
+        "errors": 0,
         "note": "same as linux; both are POSIX and share the venv dependency.",
     },
     "win32": {
-        "failures": 30,
-        "errors": 129,
+        "failures": 16,
+        "errors": 21,
         "note": (
-            "the suite COLLECTS here (260 -> 646 tests in M2). The teardown, "
-            "mode-bit and directory-fsync defects are fixed; what remains is "
-            "101 cases in three classes that should become machine-readable "
-            "SKIPs (29 need the provisioned venv, 44 need symlink privilege, "
-            "28 need AF_UNIX) plus 57 genuine residue. M2 issue #70."
+            "collection is 648, the same as Linux. The teardown, mode-bit, "
+            "directory-fsync and platform-guard defects are fixed and 109 "
+            "genuinely unrunnable cases now SKIP with machine-readable reasons. "
+            "What remains is real residue: span-identity, quarantine sealing "
+            "and a handful of POSIX-shaped assertions. M2 issue #70."
         ),
     },
 }
@@ -78,6 +79,52 @@ BASELINE_NOTE = """
   that your change broke something. A count above it is.
 --------------------------------------------------------------------------------
 """
+
+
+def _skips_within_budget(actual: int) -> bool:
+    """Compare the skip count against EXPECTED_SKIPS.txt.
+
+    A skip is a hole in coverage. Allowed, but not allowed to grow unnoticed:
+    going ABOVE the budget fails, which is what makes a newly-added
+    unconditional skip visible instead of silent.
+    """
+    if not EXPECTED_SKIPS.is_file():
+        print(f"skip budget: {EXPECTED_SKIPS.name} is missing", file=sys.stderr)
+        return False
+    budget = None
+    for line in EXPECTED_SKIPS.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        name, _, count = line.partition(" ")
+        if name == sys.platform:
+            budget = int(count.strip())
+            break
+    if budget is None:
+        print(
+            f"skip budget: no entry for {sys.platform} in {EXPECTED_SKIPS.name} "
+            "-- add one rather than leaving the platform unbudgeted",
+            file=sys.stderr,
+        )
+        return False
+    if actual > budget:
+        print(
+            f"skip budget: {actual} skips exceeds the {budget} allowed for "
+            f"{sys.platform}. A new skip is a new hole in coverage -- justify it "
+            f"and update {EXPECTED_SKIPS.name} in the same commit.",
+            file=sys.stderr,
+        )
+        return False
+    if actual < budget:
+        print(
+            f"skip budget: {actual} skips is below the {budget} allowed for "
+            f"{sys.platform} -- tighten {EXPECTED_SKIPS.name} so the slack "
+            "cannot hide a future skip.",
+            file=sys.stderr,
+        )
+    else:
+        print(f"skip budget: {actual}/{budget} for {sys.platform}", file=sys.stderr)
+    return True
 
 
 def main() -> int:
@@ -115,6 +162,9 @@ def main() -> int:
             )
         else:
             print("  exactly at the recorded baseline", file=sys.stderr)
+
+    if not _skips_within_budget(len(result.skipped)):
+        return 1
 
     return 0 if result.wasSuccessful() else 1
 

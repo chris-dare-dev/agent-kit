@@ -8,6 +8,8 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -271,6 +273,7 @@ class CanonicalSpanVerificationTests(unittest.TestCase):
                 ),
             )
 
+    @platform_skips.requires_symlinks
     def test_symlink_in_canonical_path_is_rejected(self) -> None:
         target = self.workspace / "actual.md"
         target.write_bytes(self.raw)
@@ -431,6 +434,7 @@ class HybridRetrieverContractTests(unittest.TestCase):
             "repository": None,
         }
 
+    @platform_skips.requires_qdrant_stack
     def test_abstention_is_recomputed_after_source_verification(self) -> None:
         first = self._row("invalid")
         second = self._row("valid")
@@ -500,6 +504,7 @@ class HybridRetrieverContractTests(unittest.TestCase):
         self.assertEqual(response["results"], [])
         self.assertEqual(len(response["verification_failures"]), 1)
 
+    @platform_skips.requires_qdrant_stack
     def test_nonfinite_vector_and_reranker_scores_fail_closed(self) -> None:
         row = self._row("candidate")
         lexical = SimpleNamespace(
@@ -868,6 +873,7 @@ class LexicalIndexSafetyTests(unittest.TestCase):
                         manifest=self.manifest,
                     )
 
+    @platform_skips.requires_qdrant_stack
     def test_vector_and_lexical_channels_receive_identical_filters(self) -> None:
         retriever = retrieval.HybridRetriever(
             workspace=self.root,

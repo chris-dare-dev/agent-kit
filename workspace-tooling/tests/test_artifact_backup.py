@@ -10,6 +10,8 @@ import sqlite3
 import subprocess
 import tempfile
 import unittest
+
+import platform_skips
 from pathlib import Path
 from unittest import mock
 
@@ -325,6 +327,7 @@ class TreeIntegrityManifestTests(unittest.TestCase):
         dest = root / "copied"
         return dest, offdevice._copy_tree(src, dest)
 
+    @platform_skips.requires_symlinks
     def test_manifest_records_per_entry_sha256_type_mode_and_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             _, manifest = self._copied(Path(raw))
@@ -342,12 +345,14 @@ class TreeIntegrityManifestTests(unittest.TestCase):
             self.assertEqual(link["target"], "a.json")
             self.assertNotIn("sha256", link)  # never followed / digested
 
+    @platform_skips.requires_symlinks
     def test_intact_tree_verifies_clean(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             dest, manifest = self._copied(Path(raw))
             problems, _, _ = offdevice._verify_tree(manifest, dest)
             self.assertEqual(problems, [])
 
+    @platform_skips.requires_symlinks
     def test_single_byte_corruption_is_caught(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             dest, manifest = self._copied(Path(raw))
@@ -357,6 +362,7 @@ class TreeIntegrityManifestTests(unittest.TestCase):
                 any("sha256 mismatch" in p and "a.json" in p for p in problems), problems
             )
 
+    @platform_skips.requires_symlinks
     def test_omitted_entry_is_caught(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             dest, manifest = self._copied(Path(raw))
@@ -366,6 +372,7 @@ class TreeIntegrityManifestTests(unittest.TestCase):
                 any("missing entry" in p and "sub/b.txt" in p for p in problems), problems
             )
 
+    @platform_skips.requires_symlinks
     def test_unexpected_entry_is_caught(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             dest, manifest = self._copied(Path(raw))
@@ -375,6 +382,7 @@ class TreeIntegrityManifestTests(unittest.TestCase):
                 any("unexpected entry" in p and "sneaked.txt" in p for p in problems), problems
             )
 
+    @platform_skips.requires_symlinks
     def test_symlink_repoint_is_caught(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             dest, manifest = self._copied(Path(raw))
@@ -384,6 +392,7 @@ class TreeIntegrityManifestTests(unittest.TestCase):
             problems, _, _ = offdevice._verify_tree(manifest, dest)
             self.assertTrue(any("symlink target changed" in p for p in problems), problems)
 
+    @platform_skips.requires_symlinks
     def test_mode_only_change_is_advisory_not_a_defect(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             dest, manifest = self._copied(Path(raw))
@@ -405,6 +414,7 @@ class TreeIntegrityManifestTests(unittest.TestCase):
             self.assertEqual(manifest["files"], 0)
             self.assertEqual(offdevice._verify_tree(manifest, dest)[0], [])
 
+    @platform_skips.requires_symlinks
     def test_symlink_in_tree_is_surfaced_as_advisory(self) -> None:
         # #7: derived-state symlinks are what the restore `--repair` rejects. They
         # are not a hard verify failure (H6 records them by target), but MUST be
@@ -765,6 +775,7 @@ class ExtractedBundleVerifyTests(unittest.TestCase):
             self.assertFalse(report["ok"])
             self.assertTrue(any("plan is empty" in p for p in report["problems"]), report["problems"])
 
+    @platform_skips.requires_symlinks
     def test_symlinked_manifest_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             bundle = self._bundle(Path(raw))
@@ -1268,6 +1279,7 @@ class EvalCustodyStagingTests(unittest.TestCase):
                 )
         return ctx.exception
 
+    @platform_skips.requires_symlinks
     def test_build_refuses_a_source_tree_symlink(self) -> None:
         # Sol #7 (owner decision: refuse at build): derived state must contain no
         # symlinks; build() fails loudly BEFORE any watermark/rotation (V-M3 pins the
@@ -1293,6 +1305,7 @@ class EvalCustodyStagingTests(unittest.TestCase):
                 list((root / ".offdevice-build-staging").rglob("*")), []
             )  # staging cleaned
 
+    @platform_skips.requires_symlinks
     def test_build_refuses_nested_and_second_tree_symlinks(self) -> None:
         # Sol #7 genericity (L2): fires for a symlink at ANY depth in ANY of the four
         # backed-up trees, not just a top-level evals link.
@@ -1310,6 +1323,7 @@ class EvalCustodyStagingTests(unittest.TestCase):
                     exc = self._build_raises(root, dest, recipients)
                     self.assertIn("symlink", str(exc).lower())
 
+    @platform_skips.requires_symlinks
     def test_build_refuses_a_symlinked_plan_item_path(self) -> None:
         # V-M4: a plan-item PATH that is ITSELF a symlink (here the required evidence
         # file) is silently dereferenced by copy2/copytree pre-fix; build() now

@@ -9,6 +9,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from contextlib import ExitStack
 from pathlib import Path
 from unittest import mock
@@ -471,6 +473,7 @@ class ArtifactMemoryProvisionTests(unittest.TestCase):
             ],
         )
 
+    @platform_skips.requires_posix_modes
     def test_apply_writes_every_key_file_privately(self) -> None:
         self.install()
         for filename in provision.SECRET_FILES.values():

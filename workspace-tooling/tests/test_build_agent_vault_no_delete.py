@@ -5,6 +5,8 @@ import os
 import subprocess
 import tempfile
 import unittest
+
+import platform_skips
 from pathlib import Path
 
 
@@ -97,6 +99,7 @@ class BuildAgentVaultNoDeleteTests(unittest.TestCase):
             for path in paths
         }
 
+    @platform_skips.requires_symlinks
     def test_default_run_creates_allowed_and_preserves_every_existing_alias(self) -> None:
         curated = self.write("docs/_curated/architecture.md")
         excluded_new = self.write("repos/repo/README.md")
@@ -136,6 +139,7 @@ class BuildAgentVaultNoDeleteTests(unittest.TestCase):
         self.assertEqual(before, self.snapshot(alias))
         self.assertIn("0 linked", second.stdout)
 
+    @platform_skips.requires_symlinks
     def test_audit_is_read_only(self) -> None:
         runtime = self.write(".claude/notes/milestones/m1/report.md")
         existing = self.alias(runtime, "claude/notes/milestones/m1/report.md")
@@ -158,6 +162,7 @@ class BuildAgentVaultNoDeleteTests(unittest.TestCase):
         self.assertFalse((self.vault / handoff.name).exists())
         self.assertIn("0 linked", result.stdout)
 
+    @platform_skips.requires_symlinks
     def test_symlinked_destination_parent_cannot_escape_vault(self) -> None:
         self.write("docs/_curated/architecture.md")
         outside = self.root / "outside"

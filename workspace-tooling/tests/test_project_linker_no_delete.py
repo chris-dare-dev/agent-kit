@@ -5,6 +5,8 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from pathlib import Path
 
 
@@ -28,6 +30,7 @@ class ProjectLinkerNoDeleteTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
+    @platform_skips.requires_symlinks
     def test_wrong_target_symlink_is_preserved_by_default(self) -> None:
         target = self.root / "target.md"
         old_target = self.root / "old.md"
@@ -44,6 +47,7 @@ class ProjectLinkerNoDeleteTests(unittest.TestCase):
         self.assertEqual(before, (os.readlink(link), link.lstat().st_mtime_ns))
         self.assertEqual(link.resolve(), old_target.resolve())
 
+    @platform_skips.requires_symlinks
     def test_explicit_allow_delete_can_repoint_symlink(self) -> None:
         target = self.root / "target.md"
         old_target = self.root / "old.md"

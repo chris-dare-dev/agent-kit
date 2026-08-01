@@ -31,6 +31,8 @@ import os
 import re
 import subprocess
 import sys
+
+import platform_compat
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
@@ -148,7 +150,13 @@ def probe_launchctl(label: str) -> dict[str, Any]:
     Recording observed state alongside declared intent is what lets a later
     reader distinguish "operator unloaded it" from "it was already gone".
     """
-    target = f"gui/{os.getuid()}/{label}"
+    # os.getuid does not exist on Windows, so building this string used to
+    # AttributeError before the probe could report that launchctl was simply
+    # absent. Only the uid lookup needed guarding: an early platform return
+    # would skip the subprocess call entirely, and the error-propagation
+    # behaviour under it is platform-independent and separately tested
+    # (M2, gates-green-t-suite-collects).
+    target = f"gui/{platform_compat.current_uid()}/{label}"
     try:
         completed = subprocess.run(
             ["/bin/launchctl", "print", target],

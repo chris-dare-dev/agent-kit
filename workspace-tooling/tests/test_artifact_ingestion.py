@@ -7,6 +7,8 @@ import stat
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -83,6 +85,7 @@ class ArtifactIngestionTests(unittest.TestCase):
         self.assertEqual(first[0].heading, "Demo")
         self.assertTrue(any(chunk.overlap_prefix_chars > 0 for chunk in first[1:]))
 
+    @platform_skips.requires_posix_modes
     def test_prepare_verifies_sources_and_creates_immutable_outbox(self) -> None:
         result = self.prepare()
         outbox = Path(result["outbox"])
