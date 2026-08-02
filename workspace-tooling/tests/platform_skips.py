@@ -70,12 +70,6 @@ requires_symlinks = unittest.skipUnless(
     HAS_SYMLINKS, "REQUIRES:symlink-privilege"
 )
 
-#: Tests that assert POSIX permission bits directly (`S_IMODE(...) == 0o600`).
-#: Windows `os.chmod` only toggles the read-only attribute, so a file created
-#: 0o600 reports 0o666 and a directory 0o700 reports 0o777 -- the assertion is
-#: checking something the OS does not implement, not a defect in the code.
-#: Production paths take the same branch via
-#: `platform_compat.supports_posix_privacy()`; see artifact_security.
 def _can_replace_an_open_file() -> bool:
     """Whether this OS lets a path be replaced while a handle is held open.
 
@@ -119,6 +113,12 @@ requires_open_file_replacement = unittest.skipUnless(
     "swap this test stages is impossible)",
 )
 
+#: Tests that assert POSIX permission bits directly (`S_IMODE(...) == 0o600`).
+#: Windows `os.chmod` only toggles the read-only attribute, so a file created
+#: 0o600 reports 0o666 and a directory 0o700 reports 0o777 -- the assertion is
+#: checking something the OS does not implement, not a defect in the code.
+#: Production paths take the same branch via
+#: `platform_compat.supports_posix_privacy()`; see artifact_security.
 requires_posix_modes = unittest.skipUnless(
     platform_compat.supports_posix_privacy(),
     f"PLATFORM:{sys.platform} (POSIX mode bits are not an access control here)",
