@@ -81,7 +81,10 @@ class BuildAgentVaultNoDeleteTests(unittest.TestCase):
         )
         return subprocess.run(
             [
-                "/bin/bash",
+                # Resolved, not hardcoded: Git for Windows ships bash and this
+                # script runs there unchanged, so /bin/bash was excluding a
+                # platform that can in fact run the test.
+                platform_skips.BASH or "/bin/bash",
                 str(BUILD_SCRIPT),
                 "--policy",
                 str(self.policy),
@@ -125,6 +128,7 @@ class BuildAgentVaultNoDeleteTests(unittest.TestCase):
         self.assertTrue(excluded_new.exists())
         self.assertIn("0 deleted", result.stdout)
 
+    @platform_skips.requires_symlinks
     def test_default_run_is_idempotent_for_new_allowed_alias(self) -> None:
         self.write("docs/_curated/architecture.md")
         first = self.run_builder()

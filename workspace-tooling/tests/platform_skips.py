@@ -19,6 +19,7 @@ never collected.
 from __future__ import annotations
 
 import importlib.util
+import shutil
 import socket
 import sys
 import unittest
@@ -119,6 +120,14 @@ requires_open_file_replacement = unittest.skipUnless(
 #: checking something the OS does not implement, not a defect in the code.
 #: Production paths take the same branch via
 #: `platform_compat.supports_posix_privacy()`; see artifact_security.
+#: Several shell harnesses shell out to bash. It is not POSIX-only in practice:
+#: Git for Windows ships it, and the scripts under test run there unchanged. So
+#: this resolves the interpreter rather than hardcoding /bin/bash, and only
+#: skips where bash is genuinely absent.
+BASH = shutil.which("bash")
+
+requires_bash = unittest.skipUnless(BASH is not None, "REQUIRES:bash")
+
 requires_posix_modes = unittest.skipUnless(
     platform_compat.supports_posix_privacy(),
     f"PLATFORM:{sys.platform} (POSIX mode bits are not an access control here)",
@@ -130,7 +139,9 @@ __all__ = [
     "HAS_QDRANT_STACK",
     "HAS_SYMLINKS",
     "ALLOWS_OPEN_FILE_REPLACEMENT",
+    "BASH",
     "requires_af_unix",
+    "requires_bash",
     "requires_open_file_replacement",
     "requires_posix_modes",
     "requires_qdrant_stack",

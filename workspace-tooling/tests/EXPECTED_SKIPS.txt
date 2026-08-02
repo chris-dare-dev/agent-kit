@@ -17,7 +17,7 @@
 #
 # linux/darwin: 32 = the qdrant-client+fastembed stack, absent without the
 #   provisioned venv. Install it and these run.
-# win32: 110 = those same venv skips, plus AF_UNIX (no Unix sockets),
+# win32: 111 = those same venv skips, plus AF_UNIX (no Unix sockets),
 #   symlink privilege (needs Developer Mode), and POSIX mode bits (Windows
 #   chmod only toggles read-only, so `S_IMODE == 0o600` asserts something the
 #   OS does not implement), and one path-replacement test that Windows makes
@@ -28,4 +28,4 @@
 
 linux 32
 darwin 32
-win32 110
+win32 111
