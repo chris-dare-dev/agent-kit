@@ -190,10 +190,7 @@ items:
     the same script name rather than an inline `python -m unittest ...` command.
   - Given the substrate job, when it completes on ubuntu-latest, then the reported collected-test count
     matches the count reported on macos-latest (no silent collection loss on Linux).
-  - Given the workflow, when `grep -c 'windows-latest' .github/workflows/ci.yml` is inspected against
-    the `substrate` job block, then windows-latest is absent from the substrate matrix and a `# scoped
-    to ubuntu+macos until <M2 portability epic>` comment names the reason and the milestone that lifts
-    it.
+  - Given .github/workflows/ci.yml at HEAD, when `python -c "import yaml; m=yaml.safe_load(open('.github/workflows/ci.yml'))['jobs']['substrate']['strategy']['matrix']; print('windows-latest' in m['os'], m['os'])"` is run, then it prints False followed by the substrate os list, and the substrate job carries a comment naming both the reason it is scoped to ubuntu+macos and the concrete milestone that lifts it. Parsed rather than grepped on purpose -- ci-proves-it-t-ci-node-matrix requires windows-latest in the build-test matrix of this same file, so a whole-file `grep -c` can never show its absence from the substrate block, and `grep -c` prints nothing and exits 1 on no match rather than printing 0.
   - Given workspace-tooling/README.md:73-87, when it is read after this task, then the prose incantation
     is replaced by `npm run test:py` and the dangling `.gitlab-ci.yml` claim at :82 is gone (verified
     by `grep -c 'gitlab-ci' workspace-tooling/README.md` returning 0).
