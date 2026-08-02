@@ -6,7 +6,7 @@ Productionised from the SP3 POC (self-improving-tooling-sealed-eval-spike-1).
 stdlib only; no boto3; no network; no live-infra mutation.
 
 Subcommands:
-  python3 sealed-eval.py seal [--corpus PATH] [--manifest PATH]
+  python3 sealed-eval.py seal [--corpus PATH] [--manifest PATH] [--invalidated-by WHY]
       Hash a corpus and write a seal manifest (sha256 + custodian + date + count).
   python3 sealed-eval.py verify MANIFEST [--corpus PATH]
       Recompute the corpus hash and compare to the sealed value.
@@ -114,6 +114,62 @@ def _load_corpus(path: Path, skipped: list | None = None) -> list[dict]:
     return records
 
 
+ORIGIN = "committed-v0, agent-kit data/scripts/"
+
+
+def _read_manifest(path: Path) -> dict | None:
+    """The manifest being replaced, or None. Unreadable counts as absent."""
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
+def _next_seal_version(prior: dict | None, prior_sha: str | None, sha: str) -> str:
+    """Bump only when a DIFFERENT corpus is being sealed over an existing one.
+
+    Re-sealing identical bytes is a no-op and must not inflate the version, or
+    the number stops meaning "how many times this corpus was invalidated".
+    """
+    current = (prior or {}).get("seal_version", SEAL_VERSION)
+    if not prior_sha or prior_sha == sha:
+        return current if prior else SEAL_VERSION
+    if isinstance(current, str) and current.startswith("v") and current[1:].isdigit():
+        return f"v{int(current[1:]) + 1}"
+    return SEAL_VERSION
+
+
+def _provenance_with_history(
+    prior: dict | None, prior_sha: str | None, sha: str, invalidated_by: str | None
+) -> dict:
+    """Carry every superseded digest forward, newest last.
+
+    Structured rather than the free string it used to be, because "retain the
+    prior digest" has to be machine-checkable — a sentence in a text field is
+    not something a gate can verify, and this record exists to be verified.
+    """
+    previous = (prior or {}).get("provenance")
+    if isinstance(previous, dict):
+        provenance = {
+            "origin": previous.get("origin", ORIGIN),
+            "superseded": list(previous.get("superseded") or []),
+        }
+    else:
+        # Migrate the old free-text field rather than dropping it.
+        provenance = {"origin": previous if isinstance(previous, str) and previous else ORIGIN,
+                      "superseded": []}
+
+    if prior_sha and prior_sha != sha:
+        provenance["superseded"].append({
+            "seal_version": (prior or {}).get("seal_version"),
+            "seal_date": (prior or {}).get("seal_date"),
+            "corpus_sha256": prior_sha,
+            "invalidated_by": invalidated_by,
+        })
+    return provenance
+
+
 def cmd_seal(args) -> int:
     corpus_path = Path(args.corpus) if args.corpus else _default_corpus_path()
     if not corpus_path.exists():
@@ -123,14 +179,38 @@ def cmd_seal(args) -> int:
     sha = hashlib.sha256(corpus_bytes).hexdigest()
     records = _load_corpus(corpus_path)
     manifest_path = Path(args.manifest) if args.manifest else _default_manifest_path()
+
+    # Re-sealing used to rebuild this manifest from scratch, which meant the
+    # outgoing corpus_sha256 was simply gone. A seal whose history is erased by
+    # the routine act of re-sealing is not tamper-evidence: the manifest would
+    # assert a clean seal over a corpus that had been silently altered, and
+    # nothing would record that it ever changed. That is exactly what happened
+    # to v0 during the genericization fork.
+    prior = _read_manifest(manifest_path)
+    prior_sha = prior.get("corpus_sha256") if prior else None
+    invalidated_by = getattr(args, "invalidated_by", None)
+
+    if prior_sha and prior_sha != sha and not invalidated_by:
+        print(
+            f"seal: REFUSED -- {manifest_path.name} seals {prior_sha} but the corpus "
+            f"now hashes to {sha}.\n"
+            "seal: Re-sealing would discard the sealed digest with no record that it "
+            "changed.\n"
+            "seal: State the cause to proceed:  --invalidated-by \"<why the corpus "
+            "changed>\"",
+            file=sys.stderr,
+        )
+        return 1
+
+    provenance = _provenance_with_history(prior, prior_sha, sha, invalidated_by)
     manifest = {
-        "seal_version": SEAL_VERSION,
+        "seal_version": _next_seal_version(prior, prior_sha, sha),
         "custodian": CUSTODIAN,
         "seal_date": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "corpus_path": str(corpus_path),
         "corpus_sha256": sha,
         "record_count": len(records),
-        "provenance": "committed-v0, agent-kit data/scripts/",
+        "provenance": provenance,
         "immutability_note": (
             "Tamper-EVIDENCE (detectable change), not write-prevention. Re-verify with: "
             "python3 sealed-eval.py verify data/scripts/sealed-eval-v0-manifest.json "
@@ -306,6 +386,11 @@ def main(argv=None) -> int:
     sp = sub.add_parser("seal")
     sp.add_argument("--corpus", dest="corpus", default=None)
     sp.add_argument("--manifest", dest="manifest", default=None)
+    # Required to re-seal over a DIFFERENT corpus. The flag is the record:
+    # without it the outgoing digest would vanish with nothing saying why.
+    sp.add_argument("--invalidated-by", dest="invalidated_by", default=None,
+                    help="why the sealed corpus changed; required when re-sealing "
+                         "over a manifest whose digest no longer matches")
 
     vp = sub.add_parser("verify")
     vp.add_argument("manifest", metavar="MANIFEST")

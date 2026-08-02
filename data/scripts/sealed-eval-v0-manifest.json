@@ -1,10 +1,20 @@
 {
-  "seal_version": "v0",
+  "seal_version": "v1",
   "custodian": "Chris Dare",
-  "seal_date": "2026-06-19T14:26:44Z",
-  "corpus_path": "data/scripts/sealed-eval-v0-corpus.jsonl",
-  "corpus_sha256": "3dac0bbfcba86fc993b46e43c6d16f795f55ba3ddb77fd9fd9d79830d006f4d3",
+  "seal_date": "2026-08-02T14:16:35Z",
+  "corpus_path": "data\\scripts\\sealed-eval-v0-corpus.jsonl",
+  "corpus_sha256": "310723cb03330a00c252ef8250ac5a62840d50bb88fc596e09c1e0e3a2c17720",
   "record_count": 9,
-  "provenance": "committed-v0, claude-mcp-server data/scripts/",
+  "provenance": {
+    "origin": "committed-v0, agent-kit data/scripts/",
+    "superseded": [
+      {
+        "seal_version": "v0",
+        "seal_date": "2026-06-19T14:26:44Z",
+        "corpus_sha256": "3dac0bbfcba86fc993b46e43c6d16f795f55ba3ddb77fd9fd9d79830d006f4d3",
+        "invalidated_by": "corpus edited during the genericization fork and never re-sealed; corpus mtime 2026-07-23 postdates manifest mtime 2026-07-20 (issue #271)"
+      }
+    ]
+  },
   "immutability_note": "Tamper-EVIDENCE (detectable change), not write-prevention. Re-verify with: python3 sealed-eval.py verify data/scripts/sealed-eval-v0-manifest.json --corpus data/scripts/sealed-eval-v0-corpus.jsonl"
 }

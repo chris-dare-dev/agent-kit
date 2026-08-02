@@ -105,8 +105,6 @@ const SHELL_HARNESSES = [
 const QUARANTINED = new Map([
   ["pipeline-outcome-log-test.py",
    "fails at HEAD: outcome-log locking + cwd resolution — issues #69, #60"],
-  ["data/scripts/sealed-eval-test.sh",
-   "fails at HEAD: the committed corpus no longer matches its own seal — issue #59"],
   // These three reference *.schema.json documents that exist nowhere in the
   // repository: `data/schemas/` was never committed, so it is not a registration
   // gap. Verified failing identically at e6a221f, the parent of the UTF-8 sweep,

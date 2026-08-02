@@ -22,12 +22,6 @@
       "reason": "Roadmap acceptance criteria quote the literals they require removed. Segment-strict on purpose: NOT plans/**, so plans/README.md and plans/*/issue-map.json stay gated."
     },
     {
-      "kind": "snippet",
-      "path": "data/scripts/sealed-eval-v0-manifest.json",
-      "snippet": "committed-v0",
-      "reason": "FROZEN v0 seal. Re-running `sealed-eval.py seal` would rewrite seal_date (2026-06-19) and destroy the frozen-v0 provenance claim, so this file must stay byte-identical. The GENERATOR constant was corrected; the sealed artifact deliberately was not."
-    },
-    {
       "kind": "history-file",
       "path": "plans/native-everywhere/roadmap.yaml",
       "reason": "Duplicate of the plans/*/roadmap.yaml rule, kept explicit because this file also carries the project-map.json replacement criterion."
