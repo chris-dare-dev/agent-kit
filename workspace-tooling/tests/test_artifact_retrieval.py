@@ -590,6 +590,14 @@ class LexicalIndexSafetyTests(unittest.TestCase):
         )
 
     def tearDown(self) -> None:
+        # LexicalIndex pins the manifest open on purpose: the held descriptor is
+        # what stops the path being swapped between the identity check and the
+        # read. Windows enforces that by refusing to unlink an open file, so a
+        # teardown that does not close the index cannot remove its own tempdir.
+        # Closing is the caller's job, here as in production.
+        index = getattr(self, "index", None)
+        if index is not None:
+            index.close()
         self.temp.cleanup()
 
     @staticmethod
@@ -726,6 +734,7 @@ class LexicalIndexSafetyTests(unittest.TestCase):
                 model_manifest_digest="model-a",
             )
 
+    @platform_skips.requires_open_file_replacement
     def test_path_replacement_is_detected_while_pinned_inode_stays_open(self) -> None:
         replacement = self.root / "replacement.sqlite3"
         shutil.copyfile(self.manifest, replacement)

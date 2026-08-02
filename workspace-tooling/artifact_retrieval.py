@@ -12,14 +12,14 @@ import os
 import platform
 import re
 import sqlite3
-from contextlib import closing
+from contextlib import contextmanager, closing
 import stat
 import struct
 import threading
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable, Sequence
+from typing import Iterator, Any, Callable, Iterable, Sequence
 
 import artifact_ingestion as ingestion
 import artifact_security as security
@@ -347,20 +347,49 @@ class LexicalIndex:
         ):
             raise RetrievalError("span manifest immutable identity changed")
 
-    def _read(self) -> sqlite3.Connection:
+    @contextmanager
+    def _read(self) -> Iterator[sqlite3.Connection]:
+        """Open the manifest read-only, bound to the descriptor already pinned,
+        and CLOSE it on exit.
+
+        A context manager, not a bare Connection: `with sqlite3.connect(...)`
+        commits the transaction and leaves the handle open, which on Windows
+        pins the file and makes the manifest un-removable by its own owner.
+        All three call sites already used `with`, so making the return value a
+        real context manager fixes every one of them.
+
+        The threat is a path swapped between the identity check and the read.
+        POSIX closes it by handing sqlite `/dev/fd/<fd>`, so the connection reads
+        the pinned inode and the name is never resolved again.
+
+        Windows has no `/dev/fd`, and it closes the same hole a different way:
+        a file opened without FILE_SHARE_DELETE -- which is what `os.open` gives
+        you -- cannot be renamed, replaced or unlinked while the handle is held.
+        Verified directly: `os.replace` over it, `os.unlink` and `os.rename` all
+        raise PermissionError (WinError 5 / 32 / 32) while `self._descriptor` is
+        open. So connecting by path here reaches the same guarantee by a
+        different mechanism, and the `_assert_identity()` calls either side of it
+        stay in place regardless.
+
+        This is NOT a relaxation: dropping the descriptor would be. Keeping it
+        open is what makes the path connect safe.
+        """
         self._assert_identity()
+        if platform_compat.IS_WINDOWS:
+            uri = f"file:{self.path.as_posix()}?mode=ro&immutable=1"
+        else:
+            uri = f"file:/dev/fd/{self._descriptor}?mode=ro&immutable=1"
         connection = sqlite3.connect(
-            f"file:/dev/fd/{self._descriptor}?mode=ro&immutable=1",
+            uri,
             uri=True,
             timeout=5,
         )
         connection.row_factory = sqlite3.Row
         try:
             self._assert_identity()
-        except BaseException:
+            yield connection
+        finally:
             connection.close()
-            raise
-        return connection
 
     def close(self) -> None:
         descriptor = getattr(self, "_descriptor", -1)

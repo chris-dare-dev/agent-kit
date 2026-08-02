@@ -76,6 +76,49 @@ requires_symlinks = unittest.skipUnless(
 #: checking something the OS does not implement, not a defect in the code.
 #: Production paths take the same branch via
 #: `platform_compat.supports_posix_privacy()`; see artifact_security.
+def _can_replace_an_open_file() -> bool:
+    """Whether this OS lets a path be replaced while a handle is held open.
+
+    POSIX does: the name is rebound, the pinned inode survives, and code that
+    cares must detect it. Windows refuses -- a file opened without
+    FILE_SHARE_DELETE (what `os.open` gives you) cannot be renamed, replaced or
+    unlinked. Probed rather than assumed, because it is the exact behaviour the
+    tests using this decorator simulate.
+    """
+    import os
+    import tempfile
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            pinned = os.path.join(tmp, "pinned")
+            other = os.path.join(tmp, "other")
+            for name in (pinned, other):
+                with open(name, "wb") as handle:
+                    handle.write(b"x")
+            fd = os.open(pinned, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+            try:
+                os.replace(other, pinned)
+                return True
+            except OSError:
+                return False
+            finally:
+                os.close(fd)
+    except OSError:
+        return False
+
+
+#: Tests that REPLACE a path while a descriptor on it is pinned open, to prove
+#: the code notices. Windows makes that impossible, so the scenario cannot be
+#: staged there -- a stronger guarantee, not a weaker one, but an unrunnable
+#: test either way.
+ALLOWS_OPEN_FILE_REPLACEMENT = _can_replace_an_open_file()
+
+requires_open_file_replacement = unittest.skipUnless(
+    ALLOWS_OPEN_FILE_REPLACEMENT,
+    f"PLATFORM:{sys.platform} (an open handle cannot be replaced here, so the "
+    "swap this test stages is impossible)",
+)
+
 requires_posix_modes = unittest.skipUnless(
     platform_compat.supports_posix_privacy(),
     f"PLATFORM:{sys.platform} (POSIX mode bits are not an access control here)",
@@ -86,7 +129,9 @@ __all__ = [
     "HAS_AF_UNIX",
     "HAS_QDRANT_STACK",
     "HAS_SYMLINKS",
+    "ALLOWS_OPEN_FILE_REPLACEMENT",
     "requires_af_unix",
+    "requires_open_file_replacement",
     "requires_posix_modes",
     "requires_qdrant_stack",
     "requires_symlinks",

@@ -58,13 +58,14 @@ BASELINES = {
     },
     "win32": {
         "failures": 16,
-        "errors": 21,
+        "errors": 13,
         "note": (
             "collection is 648, the same as Linux. The teardown, mode-bit, "
-            "directory-fsync and platform-guard defects are fixed and 109 "
+            "directory-fsync and platform-guard defects are fixed and 110 "
             "genuinely unrunnable cases now SKIP with machine-readable reasons. "
-            "What remains is real residue: span-identity, quarantine sealing "
-            "and a handful of POSIX-shaped assertions. M2 issue #70."
+            "What remains is real residue: missing-binary probes, a few status "
+            "assertions and guards that no longer raise where a test expects. "
+            "M2 issue #70."
         ),
     },
 }
