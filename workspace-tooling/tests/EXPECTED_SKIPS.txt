@@ -20,8 +20,9 @@
 # win32: 111 = those same venv skips, plus AF_UNIX (no Unix sockets),
 #   symlink privilege (needs Developer Mode), and POSIX mode bits (Windows
 #   chmod only toggles read-only, so `S_IMODE == 0o600` asserts something the
-#   OS does not implement), and one path-replacement test that Windows makes
-#   impossible to stage because an open handle cannot be replaced.
+#   OS does not implement), one path-replacement test that Windows makes
+#   impossible to stage because an open handle cannot be replaced, and one
+#   vault-alias test whose "alias" is a symlink created with dir_fd.
 #
 # Update a number ONLY together with the change that moves it, and say why in
 # the commit. Raising it to make a red check green is the failure this guards.
