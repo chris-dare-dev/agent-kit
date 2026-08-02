@@ -187,6 +187,7 @@ class PermissionSweepTests(unittest.TestCase):
         self.assertFalse(report["conforming"])
         self.assertEqual(report["violations"][0]["reason"], "group or other accessible")
 
+    @platform_skips.requires_chmod_enforcement
     def test_sealed_read_only_file_is_not_a_violation(self) -> None:
         """0400 is a seal, not a defect — flagging it invites a loosening repair."""
         sealed = self.root / "retired"

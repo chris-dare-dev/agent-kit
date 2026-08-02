@@ -996,6 +996,7 @@ class QuarantineAckHardeningTests(_ConsumerTestSupport):
         with self.assertRaises(consumer.ConsumerError):
             consumer.quarantine_ack(self.ack_args(expected_fingerprint=reviewed))
 
+    @platform_skips.requires_chmod_enforcement
     def test_status_fails_closed_when_quarantine_is_unreadable(self) -> None:
         # H5: the component early-returns state=unknown with open/count at 0,
         # so status() keying on `open` alone read a can't-tell as an all-clear.

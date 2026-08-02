@@ -123,6 +123,48 @@ BASH = shutil.which("bash")
 
 requires_bash = unittest.skipUnless(BASH is not None, "REQUIRES:bash")
 
+def _chmod_can_deny_reads() -> bool:
+    """Whether `os.chmod` can actually make a directory unreadable here.
+
+    On POSIX, `chmod(0o000)` denies listing and stat to the owner, which is how
+    several tests stage a "cannot tell" condition and assert the code reports
+    UNKNOWN rather than a false all-clear. Windows `os.chmod` only toggles the
+    read-only attribute: the directory stays fully readable, the code succeeds,
+    and the test cannot create the situation it is about. Probed rather than
+    inferred from sys.platform.
+    """
+    import os
+    import tempfile
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = os.path.join(tmp, "denied")
+            os.mkdir(target)
+            with open(os.path.join(target, "child"), "wb") as handle:
+                handle.write(b"x")
+            os.chmod(target, 0o000)
+            try:
+                os.listdir(target)
+                return False
+            except OSError:
+                return True
+            finally:
+                os.chmod(target, 0o700)
+    except OSError:
+        return False
+
+
+#: Tests that revoke read permission to prove the code reports "unknown"
+#: instead of "all clear". Windows cannot revoke it with chmod, so the
+#: condition under test is unreachable there.
+CHMOD_CAN_DENY_READS = _chmod_can_deny_reads()
+
+requires_chmod_enforcement = unittest.skipUnless(
+    CHMOD_CAN_DENY_READS,
+    f"PLATFORM:{sys.platform} (chmod cannot revoke read access here, so the "
+    "unreadable state this test stages is unreachable)",
+)
+
 #: Tests that assert POSIX permission bits directly (`S_IMODE(...) == 0o600`).
 #: Windows `os.chmod` only toggles the read-only attribute, so a file created
 #: 0o600 reports 0o666 and a directory 0o700 reports 0o777 -- the assertion is
@@ -141,8 +183,10 @@ __all__ = [
     "HAS_SYMLINKS",
     "ALLOWS_OPEN_FILE_REPLACEMENT",
     "BASH",
+    "CHMOD_CAN_DENY_READS",
     "requires_af_unix",
     "requires_bash",
+    "requires_chmod_enforcement",
     "requires_open_file_replacement",
     "requires_posix_modes",
     "requires_qdrant_stack",

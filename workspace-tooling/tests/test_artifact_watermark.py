@@ -8,6 +8,8 @@ from contextlib import closing
 import sys
 import tempfile
 import unittest
+
+import platform_skips
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -519,6 +521,7 @@ class QuarantineAcknowledgmentTests(unittest.TestCase):
         self.assertNotEqual(component["state"], watermark.STATE_OK)
         self.assertEqual(component["entries"][0]["ack"], "reopened-changed")
 
+    @platform_skips.requires_chmod_enforcement
     def test_unstattable_child_reports_unknown_rather_than_raising(self) -> None:
         # H1: an r-without-x root LISTS names but cannot stat them, so the
         # per-child is_symlink()/is_dir() raised EACCES. That leg was
@@ -533,6 +536,7 @@ class QuarantineAcknowledgmentTests(unittest.TestCase):
         self.assertEqual(component["state"], watermark.STATE_UNKNOWN)
         self.assertIn("unreadable", str(component["detail"]))
 
+    @platform_skips.requires_chmod_enforcement
     def test_unreadable_subdirectory_fails_the_fingerprint_closed(self) -> None:
         # M1: the directory walk silently omitted an unreadable subtree, so the
         # fingerprint stayed STABLE while hidden content changed. An unreadable
@@ -548,6 +552,7 @@ class QuarantineAcknowledgmentTests(unittest.TestCase):
             os.chmod(nested, 0o700)
         self.assertIsNone(fingerprint, "an unreadable subtree must fail closed")
 
+    @platform_skips.requires_chmod_enforcement
     def test_unreadable_root_reports_unknown_rather_than_all_clear(self) -> None:
         # H5: the early return leaves open/count at 0 with state=unknown — the
         # trap that let consumers read a can't-tell as an all-clear.

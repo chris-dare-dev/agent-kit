@@ -786,6 +786,7 @@ class ExtractedBundleVerifyTests(unittest.TestCase):
             with self.assertRaises(offdevice.BackupError):
                 offdevice.verify_extracted_bundle(bundle)
 
+    @platform_skips.requires_chmod_enforcement
     def test_untraversable_dir_fails_verify(self) -> None:
         # A stowaway hidden under a 000-perm dir used to escape os.walk silently.
         with tempfile.TemporaryDirectory() as raw:

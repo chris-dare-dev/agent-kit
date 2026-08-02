@@ -57,14 +57,14 @@ BASELINES = {
         "note": "same as linux; both are POSIX and share the venv dependency.",
     },
     "win32": {
-        "failures": 16,
+        "failures": 10,
         "errors": 8,
         "note": (
             "collection is 648, the same as Linux. The teardown, mode-bit, "
-            "directory-fsync and platform-guard defects are fixed and 111 "
+            "directory-fsync and platform-guard defects are fixed and 117 "
             "genuinely unrunnable cases now SKIP with machine-readable reasons. "
-            "What remains is real residue: a few status "
-            "assertions and guards that no longer raise where a test expects. "
+            "What remains is real residue: guards that no longer raise where a "
+            "test expects them to, and assertions shaped around POSIX. "
             "M2 issue #70."
         ),
     },
