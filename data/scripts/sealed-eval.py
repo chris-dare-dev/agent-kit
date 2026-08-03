@@ -207,7 +207,11 @@ def cmd_seal(args) -> int:
         "seal_version": _next_seal_version(prior, prior_sha, sha),
         "custodian": CUSTODIAN,
         "seal_date": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "corpus_path": str(corpus_path),
+        # POSIX separators always. `str(Path(...))` yields backslashes on
+        # Windows, which put an OS-dependent value into a COMMITTED artifact:
+        # the manifest then resolved on the machine that sealed it and nowhere
+        # else, and the harness died with FileNotFoundError on Linux.
+        "corpus_path": corpus_path.as_posix(),
         "corpus_sha256": sha,
         "record_count": len(records),
         "provenance": provenance,

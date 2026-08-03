@@ -1,8 +1,8 @@
 {
   "seal_version": "v1",
   "custodian": "Chris Dare",
-  "seal_date": "2026-08-02T14:16:35Z",
-  "corpus_path": "data\\scripts\\sealed-eval-v0-corpus.jsonl",
+  "seal_date": "2026-08-03T02:43:54Z",
+  "corpus_path": "data/scripts/sealed-eval-v0-corpus.jsonl",
   "corpus_sha256": "310723cb03330a00c252ef8250ac5a62840d50bb88fc596e09c1e0e3a2c17720",
   "record_count": 9,
   "provenance": {
