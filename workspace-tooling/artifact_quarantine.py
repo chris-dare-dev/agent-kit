@@ -823,11 +823,12 @@ def stage_plan(plan: dict[str, Any], root: Path, apply: bool) -> dict[str, Any]:
             manifest = dict(expected_core)
             manifest["sealed_at"] = datetime.now(timezone.utc).isoformat()
             _write_json_exclusive(manifest_path, manifest)
-            directory_descriptor = os.open(directory, os.O_RDONLY | getattr(os, "O_BINARY", 0))
-            try:
-                os.fsync(directory_descriptor)
-            finally:
-                os.close(directory_descriptor)
+            # Directory fsync, so the manifest's directory entry is durable.
+            # The inline os.open form cannot work on Windows -- a directory
+            # cannot be opened as a file there and raises PermissionError.
+            # platform_compat.fsync_directory is the single implementation and
+            # reports whether the sync actually happened.
+            platform_compat.fsync_directory(directory)
             status = "created"
     return {
         "schema_version": SCHEMA_VERSION,

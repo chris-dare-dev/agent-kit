@@ -117,11 +117,19 @@ def _connect_ro(path: Path) -> sqlite3.Connection | None:
     """
     if not path.is_file():
         return None
+    connection = None
     try:
         connection = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True)
         connection.execute("SELECT 1")
         return connection
     except (sqlite3.Error, OSError):
+        # The probe is what detects a corrupt database, so this branch is the
+        # FAIL-CLOSED path -- and it leaked the connection it had just opened.
+        # On POSIX an abandoned handle is invisible; on Windows it pins the
+        # file, so a caller that correctly refused a corrupt archive could then
+        # not delete it. Closing here is the fix for both.
+        if connection is not None:
+            connection.close()
         return None
 
 
